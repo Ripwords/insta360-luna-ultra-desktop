@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.2.3...master
+
+[compare changes](https://github.com/Ripwords/luna-ultra-desktop/compare/v0.2.3...master)
+
+### 🚀 Enhancements
+
+- **camera:** Add the Leica and cinematic filter controls ([b7c7109](https://github.com/Ripwords/luna-ultra-desktop/commit/b7c7109))
+- **camera:** Gate controls by what each mode actually supports ([b84da24](https://github.com/Ripwords/luna-ultra-desktop/commit/b84da24))
+- **camera:** Rework the viewfinder and gate the settings panel ([94a701d](https://github.com/Ripwords/luna-ultra-desktop/commit/94a701d))
+- **scripts:** Add the camera protocol calibration probe ([d3ae740](https://github.com/Ripwords/luna-ultra-desktop/commit/d3ae740))
+
+### 🩹 Fixes
+
+- **camera:** Correct protocol enums for firmware v1.0.238 ([6dd7551](https://github.com/Ripwords/luna-ultra-desktop/commit/6dd7551))
+- **camera:** Read settings on arrival and after a colour-mode change ([4ba6735](https://github.com/Ripwords/luna-ultra-desktop/commit/4ba6735))
+
+### 🏡 Chore
+
+- Ignore .playwright-mcp ([15760d4](https://github.com/Ripwords/luna-ultra-desktop/commit/15760d4))
+
+### ❤️ Contributors
+
+- JJ <teohjjteoh@gmail.com>
+
 ## v0.2.2...feat/camera-control
 
 [compare changes](https://github.com/Ripwords/luna-ultra-desktop/compare/v0.2.2...feat/camera-control)
