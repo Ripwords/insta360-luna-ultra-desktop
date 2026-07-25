@@ -1,6 +1,26 @@
 # Changelog
 
 
+## v0.2.4...master
+
+[compare changes](https://github.com/Ripwords/luna-ultra-desktop/compare/v0.2.4...master)
+
+### 🚀 Enhancements
+
+- **scripts:** Watch the camera live and decode captures ([b40883b](https://github.com/Ripwords/luna-ultra-desktop/commit/b40883b))
+- **camera:** Zoom from 1x to 12x ([40ae746](https://github.com/Ripwords/luna-ultra-desktop/commit/40ae746))
+- **camera:** Choose resolution, framerate and aspect separately ([ed8c50c](https://github.com/Ripwords/luna-ultra-desktop/commit/ed8c50c))
+- **camera:** Drop the pro-bar pickers out of their own chips ([587418d](https://github.com/Ripwords/luna-ultra-desktop/commit/587418d))
+
+### 🩹 Fixes
+
+- **camera:** Add the resolutions and fields this firmware really has ([b5527f7](https://github.com/Ripwords/luna-ultra-desktop/commit/b5527f7))
+- **camera:** Apply filters while the camera is in i-Log ([da6ac05](https://github.com/Ripwords/luna-ultra-desktop/commit/da6ac05))
+
+### ❤️ Contributors
+
+- JJ <teohjjteoh@gmail.com>
+
 ## v0.2.3...master
 
 [compare changes](https://github.com/Ripwords/luna-ultra-desktop/compare/v0.2.3...master)
