@@ -120,15 +120,24 @@ describe("optionLabel", () => {
 });
 
 describe("visibleEnumNames", () => {
-  it("drops Vivid from color mode but keeps Standard / i-Log / Dolby Vision", () => {
+  it("offers exactly the three colour modes this camera has", () => {
     const modes = visibleEnumNames("insta360.messages.PhotographyOptions.COLOR_MODE");
     expect(modes).toEqual(["COLOR_MODE_NORMAL", "COLOR_MODE_LOG", "COLOR_MODE_HDR"]);
   });
 
-  it("hides gamma_mode's phantom Leica looks but keeps the real curves", () => {
-    const gammas = visibleEnumNames("insta360.messages.GammaMode");
-    expect(gammas).toEqual(["STANDARD", "LOG", "VIVID", "FLAT"]);
-    expect(gammas).not.toContain("URBAN_1");
-    expect(gammas).not.toContain("NIGHTLIGHT_2");
+  /**
+   * This used to assert that gamma_mode's Urban/Ocean Blue/Snow/… entries were
+   * hidden while STANDARD/LOG/VIVID/FLAT were kept as "the real curves". Both
+   * halves were wrong: gamma_mode is the Filter picker, and none of those six
+   * names exists on this camera. The firmware-corrected enum has no phantoms
+   * left to hide, so nothing needs filtering out.
+   */
+  it("passes the filter list through, there being no phantoms left to hide", () => {
+    const filters = visibleEnumNames("insta360.messages.GammaMode");
+    expect(filters).toContain("FILTER_LEICA_VIVID");
+    expect(filters).toContain("FILTER_FRESH");
+    for (const phantom of ["STANDARD", "VIVID", "FLAT", "URBAN_1", "NIGHTLIGHT_2"]) {
+      expect(filters).not.toContain(phantom);
+    }
   });
 });

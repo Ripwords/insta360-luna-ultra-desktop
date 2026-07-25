@@ -87,11 +87,21 @@ export const CONTROL_SECTIONS: ControlSection[] = [
         values: `${PO}.COLOR_MODE`,
       },
       {
+        // Named "Gamma" until the camera showed otherwise: stepping through the
+        // Filter picker is what moves gamma_mode, and nothing else does.
         kind: "select",
-        label: "Gamma",
+        label: "Filter",
         field: "gamma_mode",
         option: "VIDEO_GAMMA_MODE",
         values: "insta360.messages.GammaMode",
+      },
+      {
+        kind: "select",
+        label: "Filter strength",
+        field: "filter_intensity",
+        option: "FILTER_INTENSITY",
+        values: "insta360.messages.FilterIntensity",
+        hint: "Cinematic filters only — the Leica profiles have no strength",
       },
       {
         kind: "select",
@@ -247,17 +257,4 @@ export const WHITE_BALANCE_KELVIN: Record<string, number> = {
   WB_5000K: 5000,
   WB_6500K: 6500,
   WB_7500K: 7500,
-};
-
-/**
- * `color_mode` and `gamma_mode` are two overlapping "picture profile" fields the
- * firmware does not keep in sync (the probe caught color_mode=LOG alongside
- * gamma_mode=STANDARD). Pair a colour choice with its matching gamma so the
- * profile is unambiguous. HDR has no gamma of its own, so it keeps STANDARD.
- */
-export const COLOR_MODE_GAMMA: Record<string, string> = {
-  COLOR_MODE_NORMAL: "STANDARD",
-  COLOR_MODE_LOG: "LOG",
-  COLOR_MODE_VIVID: "VIVID",
-  COLOR_MODE_HDR: "STANDARD",
 };

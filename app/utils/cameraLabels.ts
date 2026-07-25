@@ -69,21 +69,25 @@ const FRIENDLY_LABELS: Record<string, string> = {
   WB_5000K: "5000K",
   WB_6500K: "6500K",
   WB_7500K: "7500K",
-  // gamma / Leica looks
-  STANDARD: "Standard",
-  LOG: "Log",
-  VIVID: "Vivid",
-  FLAT: "Flat",
-  URBAN_1: "Urban 1",
-  URBAN_2: "Urban 2",
-  OCEANBLUE_1: "Ocean Blue 1",
-  OCEANBLUE_2: "Ocean Blue 2",
-  SNOW_1: "Snow 1",
-  SNOW_2: "Snow 2",
-  BIKING_1: "Biking 1",
-  BIKING_2: "Biking 2",
-  NIGHTLIGHT_1: "Night Light 1",
-  NIGHTLIGHT_2: "Night Light 2",
+  // gamma_mode — the camera's "Filter" picker: three Leica colour profiles and
+  // six cinematic looks, named as the camera names them
+  FILTER_NONE: "Original",
+  FILTER_LEICA_NATURAL: "Leica Natural",
+  FILTER_LEICA_VIVID: "Leica Vivid",
+  FILTER_LEICA_CHROME: "Leica Chrome",
+  FILTER_POS_FILM: "Pos Film",
+  FILTER_NEG_FILM: "Neg Film",
+  FILTER_CC_FILM: "CC Film",
+  FILTER_NC_FILM: "NC Film",
+  FILTER_FRESH: "Fresh",
+  FILTER_CINEMATIC: "Cinematic",
+  // filter intensity, which only the six cinematic filters offer
+  INTENSITY_LOW: "Low",
+  INTENSITY_MEDIUM: "Medium",
+  INTENSITY_HIGH: "High",
+  // pano_aspect — Pano's 360 / 2:1 choice
+  PANO_ASPECT_360: "360",
+  PANO_ASPECT_2_1: "2:1",
 };
 
 /** Label an enum value the way the camera does, or tidy its name if unlisted. */
@@ -92,24 +96,15 @@ export const optionLabel = (value: string): string =>
 
 /**
  * Enum values the Luna Ultra does not actually offer, hidden from the pickers.
- * "Vivid" is a Leica *filter*, not one of the camera's color modes (which are
- * Standard / i-Log / Dolby Vision), and gamma_mode's Urban/Ocean Blue/Snow/…
- * entries are stale looks from the shared 2020-era schema that the Luna's Leica
- * filter set replaced — and those filters aren't reachable through this API.
+ *
+ * Empty, and worth keeping that way. This list used to paper over two enums the
+ * extraction got wrong — COLOR_MODE's phantom "Vivid" and gamma_mode's
+ * Urban/Ocean Blue/Snow/… looks. Both are now corrected at the source (see the
+ * overrides in scripts/build-schema.mjs), so the enums name only what the camera
+ * has and there is nothing left to filter. Hiding a wrong value was always a
+ * worse fix than not having the wrong value.
  */
-const HIDDEN_OPTIONS = new Set([
-  "COLOR_MODE_VIVID",
-  "URBAN_1",
-  "URBAN_2",
-  "OCEANBLUE_1",
-  "OCEANBLUE_2",
-  "SNOW_1",
-  "SNOW_2",
-  "BIKING_1",
-  "BIKING_2",
-  "NIGHTLIGHT_1",
-  "NIGHTLIGHT_2",
-]);
+const HIDDEN_OPTIONS = new Set<string>([]);
 
 /** Enum values worth offering in a picker — drops ones this camera doesn't have. */
 export const visibleEnumNames = (enumName: string): string[] =>
