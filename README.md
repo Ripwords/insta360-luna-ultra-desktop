@@ -22,7 +22,9 @@
   <a href="https://github.com/Ripwords/luna-ultra-desktop/releases/latest"><img src="https://img.shields.io/github/v/release/Ripwords/luna-ultra-desktop?style=flat-square&label=latest&color=555" alt="Latest release" /></a>
 </p>
 
-Connect over Wi-Fi to browse the camera's media library, batch-download photos and videos with the official Luna Ultra watermark, delete files, and explore the camera as an interactive 3D model. Ships as a native desktop app for macOS, Windows, and Linux with signed auto-updates.
+Connect over Wi-Fi to drive the camera from a live viewfinder, browse its media library, batch-download photos and videos with the official Luna Ultra watermark, delete files, and explore the camera as an interactive 3D model. Ships as a native desktop app for macOS, Windows, and Linux with signed auto-updates.
+
+Every Luna Ultra feature this app has mapped out is tracked below: what's [shipping](#features), what's [still WIP](#status--whats-still-wip), and what turned out to be unreachable on the camera's control protocol.
 
 <p align="center">
   <img src="screenshots/02-gallery.png" alt="Gallery" width="49%" />
@@ -32,7 +34,7 @@ Connect over Wi-Fi to browse the camera's media library, batch-download photos a
 ## Features
 
 - **Real camera connection** — pairs with the Luna Ultra over its Wi-Fi network using the camera's own TCP control protocol and HTTP media index. No mock data.
-- **Camera control** — a live viewfinder with a heads-up display (recording time, storage, resolution, battery), quick exposure controls (ISO, shutter, EV, white balance), and one-tap photo/video capture.
+- **Camera control** — a live viewfinder with a heads-up display (recording time, storage, resolution, battery), a pro bar for exposure (ISO, shutter, EV, WB), the look (colour mode, Leica and cinematic filters, strength) and format (resolution, framerate, aspect), 1×–12× zoom, six capture modes, and one-tap photo/video capture. See the [feature map](docs/FEATURES.md) for what is verified on-device and what is not.
 - **Gallery** — date-grouped grid with photo/video filtering, three thumbnail sizes, and a full-screen preview with metadata and keyboard navigation.
 - **Multi-select** — click to toggle, shift-click for ranges, per-day select, and select-all. A floating action bar drives downloads and deletes.
 - **Downloads** — a background queue with per-file progress, streamed straight from the camera to your Downloads folder.
@@ -42,9 +44,53 @@ Connect over Wi-Fi to browse the camera's media library, batch-download photos a
 - **Two colorways** — Arctic (light) and Midnight (dark), matching the camera's finishes.
 - **Auto-updates** — signed delta updates delivered from GitHub Releases.
 
+## Status — what's still WIP
+
+Everything above is shipping and verified against the camera itself. The camera
+has no published API, and its failure mode is silent: it **accepts** a write,
+**echoes** it as successful, and **reads back** a value a stale enum renders
+under the wrong name. Nothing errors. So a feature only counts here once it has
+been set from the app and confirmed on the camera's own screen.
+
+On that bar, this is what is left:
+
+**🧪 Built, gated off** — written and rendering, waiting on on-device verification.
+
+| | Why it's held back |
+| --- | --- |
+| Full settings panel — stabilisation, format, capture timers, metering, bitrate, RAW | ~30 controls that have never been exercised on the camera. The two that *were* checked properly (colour mode, filters) both turned out to be writing wrong values against a stale schema while reporting success. A panel of confident-looking controls that quietly do the wrong thing is worse than no panel. |
+| Live-view diagnostics | Lives inside that same panel. |
+
+**○ Known gaps** — understood, not built.
+
+| | Note |
+| --- | --- |
+| UltraPhoto capture mode | Sub-mode value unmeasured. Guessing it lands you silently in ordinary Photo mode. |
+| Watermarking video | Needs a re-encode; videos currently transfer untouched. |
+| White-balance read-back | The write works; the camera reports 10000K regardless, so the dial tracks your last choice. |
+| macOS notarization / Windows signing | Needs a paid Apple Developer ID. Until then, macOS installs need one `xattr` command — see [Installing](#installing). |
+
+**⛔ Chased and abandoned** — not reachable on the control protocol.
+
+| | What was tried |
+| --- | --- |
+| Gimbal pan/tilt control | `PTZ_CTRL` is option type 87, but `Options` has no field 87 — the type has a name and no payload. |
+| Gimbal attitude / gyro | `GET_GYRO` is fully defined and answers nothing to any of 20 request shapes. |
+| Colour Recovery | Photography *and* device option types 1–400, all 11 named `GET_*` commands, notifications. Nothing moves with the toggle. |
+| Deep Track | The field is real and moves when you toggle it on the camera, but writes come back rejected and the value read on connect disagrees with the camera. |
+| Tap to focus | No stored option corresponds to it. |
+
+The dividing line is not luck: **everything reachable is a value the camera
+stores and reports, and nothing in that last table is.** The one route left for
+them is capturing the phone app's traffic.
+
+**[→ Full feature map](docs/FEATURES.md)** — the same picture area by area, with
+the measured field numbers, the per-mode availability rules, and the six-step bar
+a feature has to clear to ship.
+
 ## Screenshots
 
-**Camera control** — a live viewfinder with HUD, quick exposure controls, and capture.
+**Camera control** — a live viewfinder with HUD, the pro bar, zoom, and the mode strip.
 
 ![Camera control](screenshots/08-camera.png)
 
@@ -129,7 +175,10 @@ app/                     Nuxt frontend (pages, components, composables, utils)
   utils/watermark*.ts    Official watermark placement engine
 src-tauri/src/luna.rs    Luna Ultra TCP control protocol (Rust)
 luna_mock_server/        Camera emulator for development and tests
+scripts/probe-*.mjs      On-device protocol probes (calibration, live view, file list)
 tests/                   Vitest unit tests
+docs/FEATURES.md         Feature map: implemented, gated, and unreachable
+docs/superpowers/specs/  Protocol findings of record
 screenshots/             Product screenshots
 ```
 
