@@ -1,7 +1,8 @@
 import { CAPTURE_MODES, findMode, modeForState, type CameraMode } from "~/utils/cameraModes";
+import { resetsToStandard } from "~/utils/cameraCapabilities";
 import { FEATURES } from "~/utils/features";
 import { readCaptureStatus, startCapture, stopCapture, takePicture } from "~/utils/lunaCapture";
-import { writeDeviceOptions } from "~/utils/lunaSettings";
+import { writeDeviceOptions, writePhotographyOptions } from "~/utils/lunaSettings";
 
 /** How often to ask the camera what it is doing while a capture runs. */
 const POLL_MS = 1000;
@@ -71,6 +72,20 @@ export function useCameraCapture() {
       modeId.value = target.id;
       // Settings are stored per function mode, so re-read them for the new one
       functionMode.value = target.functionMode;
+
+      // Pano, PureVideo, Slow-mo and Timelapse only shoot Standard with no
+      // filter, and the camera does not clear either on the way in — switching
+      // from i-Log leaves color_mode where it was. Write the reset before
+      // reading back, or the panel would show the one value it can offer while
+      // the camera shot something else entirely.
+      if (resetsToStandard(target.id)) {
+        await writePhotographyOptions(
+          target.functionMode,
+          ["COLOR_MODE", "VIDEO_GAMMA_MODE"],
+          { color_mode: "COLOR_MODE_NORMAL", gamma_mode: "FILTER_NONE" },
+        );
+      }
+
       await load();
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : String(cause);
