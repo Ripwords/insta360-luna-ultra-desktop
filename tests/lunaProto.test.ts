@@ -50,9 +50,11 @@ describe("decodeMessage", () => {
   });
 
   it("reports an out-of-range enum as its number, not a crash", () => {
-    // photo_sub_mode (field 40) = 8, which postdates the schema's PhotoSubMode
-    const decoded = decodeMessage(MSG.Options, hex("c00208"));
-    expect(decoded.photo_sub_mode).toBe(8);
+    // photo_sub_mode (field 40) = 5. The extraction called 5 PHOTO_INSTA_PANO;
+    // this camera puts Pano on 8 and has nothing on 5, so it has no name and
+    // must come back as the raw number rather than a confident wrong label.
+    const decoded = decodeMessage(MSG.Options, hex("c00205"));
+    expect(decoded.photo_sub_mode).toBe(5);
   });
 });
 
@@ -114,6 +116,49 @@ describe("enum helpers", () => {
   });
 });
 
+/**
+ * The vendored schema's COLOR_MODE numbering (NORMAL=0, LOG=1, VIVID=2, HDR=3)
+ * is not what firmware v1.0.238 uses. Toggling the mode on the camera and
+ * diffing `color_mode` before and after (scripts/probe-colorspace.mjs) gave
+ * Standard=1, i-Log=2, Dolby Vision=5 — every value shifted, so writing "i-Log"
+ * sent 1 and the camera went to Standard, and reading 1 back rendered "i-Log"
+ * on a camera that was in Standard. These numbers are measured, not derived.
+ */
+describe("COLOR_MODE, as firmware v1.0.238 actually numbers it", () => {
+  const COLOR_MODE = "insta360.messages.PhotographyOptions.COLOR_MODE";
+
+  it("maps each mode to the number observed on the camera", () => {
+    expect(enumValue(COLOR_MODE, "COLOR_MODE_NORMAL")).toBe(1);
+    expect(enumValue(COLOR_MODE, "COLOR_MODE_LOG")).toBe(2);
+    expect(enumValue(COLOR_MODE, "COLOR_MODE_HDR")).toBe(5);
+  });
+
+  it("no longer claims a VIVID mode, which this camera does not have", () => {
+    expect(enumValue(COLOR_MODE, "COLOR_MODE_VIVID")).toBeNull();
+  });
+
+  it("decodes the camera's idle reading of 1 as Standard, not i-Log", () => {
+    // field 35 (tag 0x9802) varint 1 — what a factory-fresh camera reports
+    const decoded = decodeMessage(MSG.PhotographyOptions, hex("980201"));
+    expect(decoded.color_mode).toBe("COLOR_MODE_NORMAL");
+  });
+
+  it("puts Dolby Vision on the wire as 5", () => {
+    expect(encodeMessage(MSG.PhotographyOptions, { color_mode: "COLOR_MODE_HDR" })).toEqual(
+      hex("980205"),
+    );
+  });
+
+  it("still encodes Standard, whose number is no longer the proto3 default", () => {
+    // The old numbering made Standard 0, so it serialised to nothing and the
+    // silent read-back was scored "applied" whether or not anything happened.
+    expect(encodeMessage(MSG.PhotographyOptions, { color_mode: "COLOR_MODE_NORMAL" })).toEqual(
+      hex("980201"),
+    );
+    expect(isDefaultValue(MSG.PhotographyOptions, "color_mode", "COLOR_MODE_NORMAL")).toBe(false);
+  });
+});
+
 describe("isDefaultValue", () => {
   const PO = MSG.PhotographyOptions;
 
@@ -140,5 +185,107 @@ describe("isDefaultValue", () => {
 
   it("treats an unknown field as non-default rather than guessing", () => {
     expect(isDefaultValue(PO, "not_a_field", 0)).toBe(false);
+  });
+});
+
+/**
+ * The Leica/cinematic filters ride on `gamma_mode`, whose vendored numbering
+ * (STANDARD=0, LOG=1, VIVID=2, FLAT=3, then Urban/OceanBlue/Snow/… up to 13)
+ * describes a 2020 camera and not this one. Measured on firmware v1.0.238 by
+ * stepping the camera through every filter and diffing (probe-colorspace.mjs
+ * `series`): the filters land on 15, 16, 24, 26, 34, 35, 36, 37, 38 with 0 for
+ * off, and nothing at all on 1-13.
+ */
+describe("GammaMode, which is really the filter picker", () => {
+  const GAMMA = "insta360.messages.GammaMode";
+
+  it("maps each filter to the number measured on the camera", () => {
+    expect(enumValue(GAMMA, "FILTER_NONE")).toBe(0);
+    expect(enumValue(GAMMA, "FILTER_LEICA_NATURAL")).toBe(15);
+    expect(enumValue(GAMMA, "FILTER_LEICA_VIVID")).toBe(16);
+    expect(enumValue(GAMMA, "FILTER_NC_FILM")).toBe(24);
+    expect(enumValue(GAMMA, "FILTER_CC_FILM")).toBe(26);
+    expect(enumValue(GAMMA, "FILTER_POS_FILM")).toBe(34);
+    expect(enumValue(GAMMA, "FILTER_NEG_FILM")).toBe(35);
+    expect(enumValue(GAMMA, "FILTER_LEICA_CHROME")).toBe(36);
+    expect(enumValue(GAMMA, "FILTER_CINEMATIC")).toBe(37);
+    expect(enumValue(GAMMA, "FILTER_FRESH")).toBe(38);
+  });
+
+  it("drops the 2020 look names, which this camera has no numbers for", () => {
+    for (const stale of ["STANDARD", "LOG", "VIVID", "FLAT", "URBAN_1", "SNOW_2"]) {
+      expect(enumValue(GAMMA, stale), `${stale} should be gone`).toBeNull();
+    }
+  });
+
+  it("offers exactly the nine filters the camera has, plus off", () => {
+    expect(enumNames(GAMMA)).toHaveLength(10);
+  });
+
+  it("puts Leica Vivid on the wire as 16", () => {
+    // field 18, tag 0x9001
+    expect(encodeMessage(MSG.PhotographyOptions, { gamma_mode: "FILTER_LEICA_VIVID" })).toEqual(
+      hex("900110"),
+    );
+  });
+});
+
+/**
+ * Filter intensity is a field the vendored schema has no entry for at all —
+ * field 104, reachable as option type 104 (this protocol numbers option types
+ * to match field numbers, confirmed by asking for type 104 alone and getting
+ * field 104 back). Measured Low/Medium/High = 1/2/3 by holding one filter and
+ * stepping only its strength.
+ */
+describe("filter_intensity, a field the extraction never had", () => {
+  it("names the three strengths the camera reports", () => {
+    const INTENSITY = "insta360.messages.FilterIntensity";
+    expect(enumValue(INTENSITY, "INTENSITY_LOW")).toBe(1);
+    expect(enumValue(INTENSITY, "INTENSITY_MEDIUM")).toBe(2);
+    expect(enumValue(INTENSITY, "INTENSITY_HIGH")).toBe(3);
+  });
+
+  it("decodes field 104 as filter_intensity", () => {
+    // field 104, tag 0xc006, value 3
+    const decoded = decodeMessage(MSG.PhotographyOptions, hex("c00603"));
+    expect(decoded.filter_intensity).toBe("INTENSITY_HIGH");
+  });
+
+  it("encodes it back to field 104", () => {
+    expect(
+      encodeMessage(MSG.PhotographyOptions, { filter_intensity: "INTENSITY_LOW" }),
+    ).toEqual(hex("c00601"));
+  });
+
+  it("exposes FILTER_INTENSITY as an option type, so a write can name it", () => {
+    expect(enumValue("insta360.messages.PhotographyOptionType", "FILTER_INTENSITY")).toBe(104);
+  });
+});
+
+/**
+ * PhotoSubMode drifted too. Measured on firmware v1.0.238 by switching the
+ * capture mode on the camera and reading `photo_sub_mode` back: normal Photo is
+ * 0, and Pano is 8 — not the extraction's PHOTO_INSTA_PANO = 5. Writing 5 is
+ * why selecting Pano left the camera in ordinary Photo mode.
+ */
+describe("PhotoSubMode, as this firmware numbers it", () => {
+  const SUB = "insta360.messages.PhotoSubMode";
+
+  it("puts Pano on 8, the value the camera actually reports", () => {
+    expect(enumValue(SUB, "PHOTO_INSTA_PANO")).toBe(8);
+  });
+
+  it("keeps plain Photo on 0", () => {
+    expect(enumValue(SUB, "PHOTO_SINGLE")).toBe(0);
+  });
+
+  it("keeps the none sentinel, which mode detection tests against", () => {
+    expect(enumValue(SUB, "PHOTO_NONE")).toBe(100);
+  });
+
+  it("drops the modes this camera does not have", () => {
+    for (const gone of ["PHOTO_INSTA_PANO_HDR", "PHOTO_HDR", "PHOTO_STARLAPSE"]) {
+      expect(enumValue(SUB, gone), `${gone} should be gone`).toBeNull();
+    }
   });
 });

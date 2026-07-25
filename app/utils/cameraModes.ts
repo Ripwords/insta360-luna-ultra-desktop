@@ -8,7 +8,17 @@
  * with similar names.
  */
 
-export type CaptureModeId = "video" | "pure" | "slowmo" | "photo" | "pano" | "panoHdr" | "timelapse";
+/**
+ * Pano HDR is deliberately absent. The shared schema defines PHOTO_INSTA_PANO_HDR
+ * and FUNCTION_MODE_HDR_POWER_PANO_IMAGE, but the Luna Ultra has no such mode —
+ * the schema describes a different camera, as it does for the colour enums.
+ *
+ * Pano's own 360 and 2:1 UltraPhoto variants are not here either, because their
+ * sub-mode values have not been measured. The camera was seen reporting
+ * photo_sub_mode = 8, which the schema cannot name, so guessing at these would
+ * be inventing numbers. Measure them with probe-colorspace.mjs before adding.
+ */
+export type CaptureModeId = "video" | "pure" | "slowmo" | "photo" | "pano" | "timelapse";
 
 export interface CameraMode {
   id: CaptureModeId;
@@ -66,14 +76,6 @@ export const CAPTURE_MODES: CameraMode[] = [
     field: "photo_sub_mode",
     subMode: "PHOTO_INSTA_PANO",
     functionMode: "FUNCTION_MODE_NORMAL_POWER_PANO_IMAGE",
-  },
-  {
-    id: "panoHdr",
-    label: "Pano HDR",
-    optionType: "PHOTO_SUB_MODE",
-    field: "photo_sub_mode",
-    subMode: "PHOTO_INSTA_PANO_HDR",
-    functionMode: "FUNCTION_MODE_HDR_POWER_PANO_IMAGE",
   },
   {
     id: "timelapse",

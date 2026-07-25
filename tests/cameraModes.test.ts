@@ -9,7 +9,6 @@ describe("CAPTURE_MODES", () => {
       "slowmo",
       "photo",
       "pano",
-      "panoHdr",
       "timelapse",
     ]);
   });
@@ -34,13 +33,11 @@ describe("CAPTURE_MODES", () => {
     expect(findMode("slowmo")!.functionMode).toBe("FUNCTION_MODE_SLOWMOTION_VIDEO");
     expect(findMode("photo")!.functionMode).toBe("FUNCTION_MODE_NORMAL_IMAGE");
     expect(findMode("pano")!.functionMode).toBe("FUNCTION_MODE_NORMAL_POWER_PANO_IMAGE");
-    expect(findMode("panoHdr")!.functionMode).toBe("FUNCTION_MODE_HDR_POWER_PANO_IMAGE");
   });
 
-  it("adds an HDR pano stills mode alongside the plain pano", () => {
-    expect(findMode("panoHdr")!.subMode).toBe("PHOTO_INSTA_PANO_HDR");
-    expect(findMode("panoHdr")!.optionType).toBe("PHOTO_SUB_MODE");
-    expect(isPhotoMode("panoHdr")).toBe(true);
+  it("has no Pano HDR, which this camera does not offer", () => {
+    expect(findMode("panoHdr")).toBeUndefined();
+    expect(CAPTURE_MODES.some((m) => m.subMode === "PHOTO_INSTA_PANO_HDR")).toBe(false);
   });
 
   it("gives stills modes a shutter rather than a record button", () => {
