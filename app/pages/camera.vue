@@ -6,6 +6,9 @@ const { isConnected } = useCamera();
 const { device, settings, loading, error, load } = useCameraSettings();
 const { active, starting, error: liveError, diagnostics, start, stop } = useLiveView();
 const { recording, elapsedLabel } = useCameraCapture();
+// Scrolling over the picture is the desktop way to zoom; the dial is a readout
+// you can also drag. Both drive the same gesture state.
+const { onWheel } = useCameraZoom();
 
 useHead({ title: "Camera" });
 
@@ -133,7 +136,10 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
 
       <div v-else class="flex min-h-0 flex-1 flex-col gap-3">
         <!-- Viewfinder: the hero. Everything else floats over it. -->
-        <div class="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
+        <div
+          class="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black"
+          @wheel="onWheel"
+        >
           <LiveView class="absolute inset-0" />
 
           <!-- Starting / stopped state, centred over the black stage -->
@@ -174,7 +180,7 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
           <div
             class="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 via-black/30 to-transparent pb-8"
           >
-            <div class="flex items-start justify-between gap-4 p-4 font-mono text-[11px] text-white/70">
+            <div class="flex items-start justify-between gap-4 p-4 pr-12 font-mono text-[11px] text-white/70">
               <div class="flex items-center gap-3">
                 <!--
                   Red appears exactly once in this interface, and it means
@@ -205,6 +211,14 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             </div>
           </div>
 
+          <!--
+            The zoom dial hugs the right edge, clear of the readout rail above
+            and the pro bar below, so a drag never lands on another control.
+          -->
+          <div class="absolute inset-y-20 right-2 z-20 flex items-center">
+            <CameraZoomDial />
+          </div>
+
           <!-- Errors sit below the readout rail, so neither ever moves -->
           <div v-if="topError" class="absolute inset-x-0 top-14 z-20 flex justify-center px-4">
             <span
@@ -217,7 +231,7 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
 
           <!-- Quick exposure bar + gear, along the bottom of the viewfinder -->
           <div
-            class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pt-10"
+            class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pr-12 pt-10"
           >
             <CameraProBar @open-settings="settingsOpen = true" />
           </div>

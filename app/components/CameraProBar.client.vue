@@ -6,6 +6,8 @@ import {
   shutterLabel,
   shutterNameForSeconds,
   shutterSteps,
+  resolutionParts,
+  composeResolution,
 } from "~/utils/cameraLabels";
 import {
   colorModesFor,
@@ -13,9 +15,13 @@ import {
   supportsColorMode,
   supportsFilter,
   supportsPanoAspect,
+  sizesFor,
+  aspectsFor,
+  fpsFor,
 } from "~/utils/cameraCapabilities";
 import { enumNames } from "~/utils/lunaProto";
 import { FEATURES } from "~/utils/features";
+import type { WheelStep } from "~/utils/cameraLabels";
 import type { ProtoObject } from "~/utils/lunaProto";
 
 /**
@@ -23,8 +29,17 @@ import type { ProtoObject } from "~/utils/lunaProto";
  * current value, one of which expands into a wheel. Only one wheel is open at
  * a time, which is what keeps the row readable on a narrow window.
  */
-const { settings, saving, status, update, setExposure, setWhiteBalanceKelvin, setColorMode } =
-  useCameraSettings();
+const {
+  settings,
+  saving,
+  status,
+  update,
+  setExposure,
+  setWhiteBalanceKelvin,
+  setColorMode,
+  setFilter,
+  setFilterIntensity,
+} = useCameraSettings();
 const { modeId } = useCameraCapture();
 
 /** The gear hands control back to the page, which owns the settings drawer. */
@@ -38,6 +53,9 @@ type ChipId =
   | "filter"
   | "strength"
   | "aspect"
+  | "res"
+  | "fps"
+  | "ratio"
   | "wb"
   | "sharpness";
 
@@ -127,6 +145,58 @@ const filterSteps = computed(() => {
   }));
 });
 
+/**
+ * The current resolution taken apart, so the three pickers each show their own
+ * axis. Falls back to the mode's first offering before anything has been read.
+ */
+const currentRes = computed(() => {
+  const parts = settings.value.record_resolution
+    ? resolutionParts(String(settings.value.record_resolution))
+    : null;
+  if (parts) return parts;
+  const size = sizesFor(modeId.value)[0];
+  if (!size) return null;
+  const aspect = aspectsFor(modeId.value, size)[0]!;
+  return { size, aspect, fps: fpsFor(modeId.value, size, aspect)[0]! };
+});
+
+const sizeSteps = computed(() =>
+  sizesFor(modeId.value).map((value) => ({ value, label: value })),
+);
+const aspectRatioSteps = computed(() =>
+  currentRes.value
+    ? aspectsFor(modeId.value, currentRes.value.size).map((value) => ({ value, label: value }))
+    : [],
+);
+const fpsSteps = computed(() =>
+  currentRes.value
+    ? fpsFor(modeId.value, currentRes.value.size, currentRes.value.aspect).map((value) => ({
+        value: String(value),
+        label: `${value}`,
+      }))
+    : [],
+);
+
+/**
+ * Changing one axis has to land on a combination that exists: 8K has no 120fps,
+ * so arriving from 4K120 keeps the framerate only if 8K has it, and otherwise
+ * takes that size's fastest. Same for aspect.
+ */
+function chooseResolution(next: Partial<{ size: string; aspect: string; fps: number }>) {
+  const from = currentRes.value;
+  if (!from) return;
+  const size = next.size ?? from.size;
+  const aspects = aspectsFor(modeId.value, size);
+  const aspect = aspects.includes(next.aspect ?? from.aspect)
+    ? (next.aspect ?? from.aspect)
+    : aspects[0]!;
+  const rates = fpsFor(modeId.value, size, aspect);
+  const fps = rates.includes(next.fps ?? from.fps) ? (next.fps ?? from.fps) : rates[0]!;
+
+  const name = composeResolution(size, aspect, fps);
+  if (name) void update("RECORD_RESOLUTION", "record_resolution", name);
+}
+
 const aspectSteps = computed(() =>
   enumNames("insta360.messages.PanoAspect").map((value) => ({
     value,
@@ -207,6 +277,26 @@ const chips = computed(() => [
     value: settings.value.pano_aspect ? optionLabel(String(settings.value.pano_aspect)) : "—",
   },
   {
+    // Three axes rather than one list of every combination: 37 entries in a
+    // strip is a scroll-hunt, and you end up passing 8K to reach 1080p60.
+    id: "res" as const,
+    group: "format",
+    label: "RES",
+    value: currentRes.value?.size ?? "—",
+  },
+  {
+    id: "fps" as const,
+    group: "format",
+    label: "FPS",
+    value: currentRes.value ? String(currentRes.value.fps) : "—",
+  },
+  {
+    id: "ratio" as const,
+    group: "format",
+    label: "RATIO",
+    value: currentRes.value?.aspect ?? "—",
+  },
+  {
     id: "wb" as const,
     group: "image",
     label: "WB",
@@ -223,8 +313,62 @@ const chips = computed(() => [
   if (chip.id === "filter") return filtersAvailable.value;
   if (chip.id === "strength") return strengthAvailable.value;
   if (chip.id === "aspect") return supportsPanoAspect(modeId.value);
+  // No measured resolutions for this mode means no picker, rather than one
+  // offering numbers the camera may not take
+  if (chip.id === "res") return sizeSteps.value.length > 0;
+  if (chip.id === "fps") return fpsSteps.value.length > 1;
+  // Only worth a chip where the size actually has more than one aspect
+  if (chip.id === "ratio") return aspectRatioSteps.value.length > 1;
   return true;
 }));
+
+/** What each chip's list holds, and where the current value sits in it. */
+const PICKERS: Record<ChipId, { steps: () => WheelStep[]; value: () => string | undefined }> = {
+  iso: { steps: () => isoSteps(), value: () => String(manualIso.value) },
+  shutter: { steps: () => shutterSteps(), value: () => manualShutter.value },
+  ev: { steps: () => evSteps, value: () => String(settings.value.exposure_bias ?? 0) },
+  colour: {
+    steps: () => colourSteps.value,
+    value: () => (settings.value.color_mode ? String(settings.value.color_mode) : undefined),
+  },
+  filter: { steps: () => filterSteps.value, value: () => currentFilter.value ?? "FILTER_NONE" },
+  strength: {
+    steps: () => strengthSteps.value,
+    value: () =>
+      settings.value.filter_intensity ? String(settings.value.filter_intensity) : undefined,
+  },
+  aspect: {
+    steps: () => aspectSteps.value,
+    value: () => (settings.value.pano_aspect ? String(settings.value.pano_aspect) : undefined),
+  },
+  res: { steps: () => sizeSteps.value, value: () => currentRes.value?.size },
+  fps: {
+    steps: () => fpsSteps.value,
+    value: () => (currentRes.value ? String(currentRes.value.fps) : undefined),
+  },
+  ratio: { steps: () => aspectRatioSteps.value, value: () => currentRes.value?.aspect },
+  wb: { steps: () => wbSteps, value: () => String(wbKelvin.value) },
+  sharpness: { steps: () => sharpnessSteps, value: () => String(settings.value.sharpness ?? 0) },
+};
+
+/** Apply a choice, then close — the decision is made, the list is in the way. */
+function choose(id: ChipId, value: string) {
+  open.value = null;
+  switch (id) {
+    case "iso": return void setExposure({ iso: Number(value) });
+    case "shutter": return void setExposure({ shutter_speed: value });
+    case "ev": return void update("EXPOSURE_BIAS", "exposure_bias", Number(value));
+    case "colour": return void setColorMode(value);
+    case "filter": return void setFilter(value);
+    case "strength": return void setFilterIntensity(value);
+    case "aspect": return void update("PANO_ASPECT", "pano_aspect", value);
+    case "res": return chooseResolution({ size: value });
+    case "fps": return chooseResolution({ fps: Number(value) });
+    case "ratio": return chooseResolution({ aspect: value });
+    case "wb": return selectWb(Number(value));
+    case "sharpness": return void update("SHARPNESS", "sharpness", Number(value));
+  }
+}
 
 const FIELD_OF: Record<ChipId, string> = {
   // Manual ISO/shutter now write video_exposure/still_exposure, so the verdict
@@ -236,6 +380,9 @@ const FIELD_OF: Record<ChipId, string> = {
   filter: "gamma_mode",
   strength: "filter_intensity",
   aspect: "pano_aspect",
+  res: "record_resolution",
+  fps: "record_resolution",
+  ratio: "record_resolution",
   wb: "white_balance_value",
   sharpness: "sharpness",
 };
@@ -257,112 +404,55 @@ const busy = (id: ChipId) => saving.value === FIELD_OF[id];
 
 <template>
   <div class="flex flex-col gap-2">
-    <div
-      v-if="open"
-      class="rounded-xl bg-black/60 p-1.5 backdrop-blur-md"
-    >
-      <CameraWheel
-        v-if="open === 'iso'"
-        :steps="isoSteps()"
-        :model-value="String(manualIso)"
-        :busy="busy('iso')"
-        @update:model-value="(value) => setExposure({ iso: Number(value) })"
-      />
-      <CameraWheel
-        v-else-if="open === 'shutter'"
-        :steps="shutterSteps()"
-        :model-value="manualShutter"
-        :busy="busy('shutter')"
-        @update:model-value="(value) => setExposure({ shutter_speed: value })"
-      />
-      <CameraWheel
-        v-else-if="open === 'ev'"
-        :steps="evSteps"
-        :model-value="String(settings.exposure_bias ?? 0)"
-        :busy="busy('ev')"
-        @update:model-value="(value) => update('EXPOSURE_BIAS', 'exposure_bias', Number(value))"
-      />
-      <CameraWheel
-        v-else-if="open === 'colour'"
-        :steps="colourSteps"
-        :model-value="settings.color_mode ? String(settings.color_mode) : undefined"
-        :busy="busy('colour')"
-        @update:model-value="(value) => setColorMode(value)"
-      />
-      <CameraWheel
-        v-else-if="open === 'filter'"
-        :steps="filterSteps"
-        :model-value="currentFilter ?? 'FILTER_NONE'"
-        :busy="busy('filter')"
-        @update:model-value="(value) => update('VIDEO_GAMMA_MODE', 'gamma_mode', value)"
-      />
-      <CameraWheel
-        v-else-if="open === 'strength'"
-        :steps="strengthSteps"
-        :model-value="settings.filter_intensity ? String(settings.filter_intensity) : undefined"
-        :busy="busy('strength')"
-        @update:model-value="(value) => update('FILTER_INTENSITY', 'filter_intensity', value)"
-      />
-      <CameraWheel
-        v-else-if="open === 'aspect'"
-        :steps="aspectSteps"
-        :model-value="settings.pano_aspect ? String(settings.pano_aspect) : undefined"
-        :busy="busy('aspect')"
-        @update:model-value="(value) => update('PANO_ASPECT', 'pano_aspect', value)"
-      />
-      <CameraWheel
-        v-else-if="open === 'wb'"
-        :steps="wbSteps"
-        :model-value="String(wbKelvin)"
-        :busy="busy('wb')"
-        @update:model-value="(value) => selectWb(Number(value))"
-      />
-      <CameraWheel
-        v-else-if="open === 'sharpness'"
-        :steps="sharpnessSteps"
-        :model-value="String(settings.sharpness ?? 0)"
-        :busy="busy('sharpness')"
-        @update:model-value="(value) => update('SHARPNESS', 'sharpness', Number(value))"
-      />
-    </div>
-
     <p
       v-if="(open === 'iso' && isoAuto) || (open === 'shutter' && shutterAuto)"
-      class="rounded-lg bg-black/50 px-2 py-1 text-center text-xs text-white/70 backdrop-blur-md"
+      class="rounded-lg bg-black/60 px-2 py-1 text-center text-xs text-white/70 backdrop-blur-md"
     >
       Pick a value to take this off Auto; leave both on Auto for full auto exposure.
     </p>
 
-    <div class="flex items-stretch gap-0.5 overflow-x-auto rounded-xl bg-black/50 p-1 backdrop-blur-md">
+    <div class="flex items-stretch gap-0.5 rounded-xl bg-black/50 p-1 backdrop-blur-md">
       <template v-for="(chip, index) in chips" :key="chip.id">
         <!--
-          A hairline wherever the concern changes: exposure, then the look being
-          baked in, then image adjustments. Eight chips in one undifferentiated
-          row is a list; three groups is a control panel you can scan.
+          A hairline wherever the concern changes: format, exposure, the look
+          being baked in, then image adjustments.
         -->
         <span
           v-if="index > 0 && chip.group !== chips[index - 1]!.group"
           class="my-1.5 w-px shrink-0 bg-white/15"
           aria-hidden="true"
         />
-        <button
-          type="button"
-          class="flex min-w-14 flex-1 flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
-          :class="open === chip.id ? 'bg-white/20' : 'hover:bg-white/10'"
-          :aria-pressed="open === chip.id"
-          @click="toggle(chip.id)"
-        >
-          <span class="flex items-center gap-1 text-[10px] font-medium tracking-wider text-white/50">
-            {{ chip.label }}
-            <UIcon
-              v-if="verdict(chip.id)"
-              :name="verdict(chip.id)!.icon"
-              :class="verdict(chip.id)!.color"
-              class="size-3"
-            />
-          </span>
-          <span class="max-w-full truncate text-sm font-medium text-white">{{ chip.value }}</span>
-        </button>
+        <div class="relative flex min-w-14 flex-1">
+          <button
+            type="button"
+            class="flex w-full flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
+            :class="open === chip.id ? 'bg-white/20' : 'hover:bg-white/10'"
+            :aria-expanded="open === chip.id"
+            @click="toggle(chip.id)"
+          >
+            <span
+              class="flex items-center gap-1 text-[10px] font-medium tracking-wider text-white/50"
+            >
+              {{ chip.label }}
+              <UIcon
+                v-if="verdict(chip.id)"
+                :name="verdict(chip.id)!.icon"
+                :class="verdict(chip.id)!.color"
+                class="size-3"
+              />
+            </span>
+            <span class="max-w-full truncate text-sm font-medium text-white">{{ chip.value }}</span>
+          </button>
+
+          <CameraPicker
+            v-if="open === chip.id"
+            :steps="PICKERS[chip.id].steps()"
+            :model-value="PICKERS[chip.id].value()"
+            :busy="busy(chip.id)"
+            @select="(value) => choose(chip.id, value)"
+            @dismiss="open = null"
+          />
+        </div>
       </template>
 
       <span v-if="FEATURES.allSettings" class="my-1.5 w-px shrink-0 bg-white/15" aria-hidden="true" />

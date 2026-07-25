@@ -10,8 +10,18 @@ import { optionLabel, visibleEnumNames } from "~/utils/cameraLabels";
 import { FEATURES } from "~/utils/features";
 import type { ProtoValue } from "~/utils/lunaProto";
 
-const { settings, device, saving, status, update, updateDevice, setWhiteBalance, setColorMode } =
-  useCameraSettings();
+const {
+  settings,
+  device,
+  saving,
+  status,
+  update,
+  updateDevice,
+  setWhiteBalance,
+  setColorMode,
+  setFilter,
+  setFilterIntensity,
+} = useCameraSettings();
 const { modeId } = useCameraCapture();
 
 /**
@@ -98,6 +108,10 @@ const apply = (control: Control, value: ProtoValue) => {
   // single-field write.
   if (control.field === "white_balance") return setWhiteBalance(String(value));
   if (control.field === "color_mode") return setColorMode(String(value));
+  // Filter and strength need the colour mode re-asserted alongside them, or the
+  // camera stores them without applying while it is in i-Log
+  if (control.field === "gamma_mode") return setFilter(String(value));
+  if (control.field === "filter_intensity") return setFilterIntensity(String(value));
   return control.scope === "device"
     ? updateDevice(control.option, control.field, value)
     : update(control.option, control.field, value);
