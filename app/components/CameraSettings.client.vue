@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+  colorModesFor,
+  filterHasIntensity,
+  supportsColorMode,
+  supportsFilter,
+} from "~/utils/cameraCapabilities";
 import { CONTROL_SECTIONS, type Control, type ControlSection } from "~/utils/cameraControls";
 import { optionLabel, visibleEnumNames } from "~/utils/cameraLabels";
 import { FEATURES } from "~/utils/features";
@@ -6,6 +12,7 @@ import type { ProtoValue } from "~/utils/lunaProto";
 
 const { settings, device, saving, status, update, updateDevice, setWhiteBalance, setColorMode } =
   useCameraSettings();
+const { modeId } = useCameraCapture();
 
 /**
  * Each control reports what the camera said when the value was read straight
@@ -34,12 +41,56 @@ const verdict = (field: string) => {
 const source = (control: Control) => (control.scope === "device" ? device : settings);
 const valueOf = (control: Control) => source(control).value[control.field];
 
-/** Drop controls behind an off feature flag (currently just the color mode). */
-const visibleControls = (section: ControlSection): Control[] =>
-  section.controls.filter((control) => FEATURES.colorMode || control.field !== "color_mode");
+const recordResolution = computed(() =>
+  settings.value.record_resolution === undefined
+    ? undefined
+    : String(settings.value.record_resolution),
+);
 
-const options = (name: string) =>
-  visibleEnumNames(name).map((value) => ({ label: optionLabel(value), value }));
+const filtersAvailable = computed(() =>
+  supportsFilter({
+    resolution: recordResolution.value,
+    colorMode: settings.value.color_mode ? String(settings.value.color_mode) : undefined,
+  }),
+);
+
+const currentFilter = computed(() =>
+  settings.value.gamma_mode === undefined ? undefined : String(settings.value.gamma_mode),
+);
+
+/**
+ * Drop controls behind an off feature flag, and ones the camera has no picker
+ * for in its current state. The camera parses every one of these option types
+ * regardless, so its `$supported` list cannot tell us any of this — only the
+ * manual can, backed by what the camera was measured to do.
+ */
+const visibleControls = (section: ControlSection): Control[] =>
+  section.controls.filter((control) => {
+    if (control.field === "color_mode") {
+      return FEATURES.colorMode && supportsColorMode(modeId.value);
+    }
+    // No filters in Dolby Vision, nor above 4K60 — the picker goes with them
+    if (control.field === "gamma_mode") {
+      return filtersAvailable.value;
+    }
+    // Strength belongs to the six cinematic filters and nothing else
+    if (control.field === "filter_intensity") {
+      return filtersAvailable.value && filterHasIntensity(currentFilter.value);
+    }
+    return true;
+  });
+
+const asOptions = (values: string[]) =>
+  values.map((value) => ({ label: optionLabel(value), value }));
+
+/**
+ * Colour mode's choices narrow with the capture mode (PureVideo cannot do
+ * i-Log), so it asks the capability table rather than the raw enum.
+ */
+const optionsFor = (control: Control) =>
+  control.field === "color_mode"
+    ? asOptions(colorModesFor(modeId.value))
+    : asOptions(visibleEnumNames(control.values!));
 
 const apply = (control: Control, value: ProtoValue) => {
   // White balance and colour profile each need a companion field written in the
@@ -100,7 +151,7 @@ const asNumber = (control: Control): number => {
           <USelect
             v-if="control.kind === 'select'"
             :model-value="asString(control)"
-            :items="options(control.values!)"
+            :items="optionsFor(control)"
             :disabled="!isSupported(control) || saving === control.field"
             :loading="saving === control.field"
             class="w-full"

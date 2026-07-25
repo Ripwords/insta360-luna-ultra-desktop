@@ -6,8 +6,15 @@ import {
   shutterLabel,
   shutterNameForSeconds,
   shutterSteps,
-  visibleEnumNames,
 } from "~/utils/cameraLabels";
+import {
+  colorModesFor,
+  filterHasIntensity,
+  supportsColorMode,
+  supportsFilter,
+  supportsPanoAspect,
+} from "~/utils/cameraCapabilities";
+import { enumNames } from "~/utils/lunaProto";
 import { FEATURES } from "~/utils/features";
 import type { ProtoObject } from "~/utils/lunaProto";
 
@@ -18,11 +25,21 @@ import type { ProtoObject } from "~/utils/lunaProto";
  */
 const { settings, saving, status, update, setExposure, setWhiteBalanceKelvin, setColorMode } =
   useCameraSettings();
+const { modeId } = useCameraCapture();
 
 /** The gear hands control back to the page, which owns the settings drawer. */
 const emit = defineEmits<{ "open-settings": [] }>();
 
-type ChipId = "iso" | "shutter" | "ev" | "colour" | "wb" | "sharpness";
+type ChipId =
+  | "iso"
+  | "shutter"
+  | "ev"
+  | "colour"
+  | "filter"
+  | "strength"
+  | "aspect"
+  | "wb"
+  | "sharpness";
 
 const open = ref<ChipId | null>(null);
 const toggle = (id: ChipId) => (open.value = open.value === id ? null : id);
@@ -75,33 +92,139 @@ const sharpnessSteps = [
   { value: "4", label: "Max" },
 ];
 
-const enumSteps = (name: string) =>
-  visibleEnumNames(name).map((value) => ({ value, label: optionLabel(value) }));
+/**
+ * Colour mode's choices depend on the capture mode — PureVideo has no i-Log —
+ * so the wheel is built from the capability table rather than the whole enum.
+ */
+const colourSteps = computed(() =>
+  colorModesFor(modeId.value).map((value) => ({ value, label: optionLabel(value) })),
+);
+
+/**
+ * The Filter picker, which the camera keeps on `gamma_mode`. Presented in the
+ * camera's own order — the three Leica profiles, then the six cinematic looks —
+ * rather than by enum number, which interleaves them (Leica Chrome is 36, in
+ * amongst the film filters).
+ */
+const FILTER_ORDER = [
+  "FILTER_NONE",
+  "FILTER_LEICA_NATURAL",
+  "FILTER_LEICA_VIVID",
+  "FILTER_LEICA_CHROME",
+  "FILTER_POS_FILM",
+  "FILTER_NEG_FILM",
+  "FILTER_CC_FILM",
+  "FILTER_NC_FILM",
+  "FILTER_FRESH",
+  "FILTER_CINEMATIC",
+];
+
+const filterSteps = computed(() => {
+  const known = new Set(enumNames("insta360.messages.GammaMode"));
+  return FILTER_ORDER.filter((value) => known.has(value)).map((value) => ({
+    value,
+    label: optionLabel(value),
+  }));
+});
+
+const aspectSteps = computed(() =>
+  enumNames("insta360.messages.PanoAspect").map((value) => ({
+    value,
+    label: optionLabel(value),
+  })),
+);
+
+const strengthSteps = computed(() =>
+  enumNames("insta360.messages.FilterIntensity").map((value) => ({
+    value,
+    label: optionLabel(value),
+  })),
+);
+
+const currentFilter = computed(() =>
+  settings.value.gamma_mode === undefined ? undefined : String(settings.value.gamma_mode),
+);
+
+const recordResolution = computed(() =>
+  settings.value.record_resolution === undefined
+    ? undefined
+    : String(settings.value.record_resolution),
+);
+
+const filtersAvailable = computed(() =>
+  supportsFilter({
+    resolution: recordResolution.value,
+    colorMode: settings.value.color_mode ? String(settings.value.color_mode) : undefined,
+  }),
+);
+const strengthAvailable = computed(
+  () => filtersAvailable.value && filterHasIntensity(currentFilter.value),
+);
 
 const chips = computed(() => [
-  { id: "iso" as const, label: "ISO", value: isoAuto.value ? "Auto" : isoLabel(manualIso.value) },
+  {
+    id: "iso" as const,
+    group: "exposure",
+    label: "ISO",
+    value: isoAuto.value ? "Auto" : isoLabel(manualIso.value),
+  },
   {
     id: "shutter" as const,
+    group: "exposure",
     label: "SHUTTER",
     value: shutterAuto.value ? "Auto" : shutterLabel(manualShutter.value),
   },
-  { id: "ev" as const, label: "EV", value: evLabel(Number(settings.value.exposure_bias ?? 0)) },
+  {
+    id: "ev" as const,
+    group: "exposure",
+    label: "EV",
+    value: evLabel(Number(settings.value.exposure_bias ?? 0)),
+  },
   {
     id: "colour" as const,
+    group: "look",
     label: "COLOR",
     value: settings.value.color_mode ? optionLabel(String(settings.value.color_mode)) : "—",
   },
   {
+    id: "filter" as const,
+    group: "look",
+    label: "FILTER",
+    value: optionLabel(currentFilter.value ?? "FILTER_NONE"),
+  },
+  {
+    id: "strength" as const,
+    group: "look",
+    label: "STRENGTH",
+    value: settings.value.filter_intensity
+      ? optionLabel(String(settings.value.filter_intensity))
+      : "—",
+  },
+  {
+    id: "aspect" as const,
+    group: "look",
+    label: "ASPECT",
+    value: settings.value.pano_aspect ? optionLabel(String(settings.value.pano_aspect)) : "—",
+  },
+  {
     id: "wb" as const,
+    group: "image",
     label: "WB",
     value: wbIsAuto.value ? "Auto" : `${wbKelvin.value / 1000}K`,
   },
   {
     id: "sharpness" as const,
+    group: "image",
     label: "SHARP",
     value: sharpnessSteps[Number(settings.value.sharpness ?? 0)]?.label ?? "—",
   },
-].filter((chip) => FEATURES.colorMode || chip.id !== "colour"));
+].filter((chip) => {
+  if (chip.id === "colour") return FEATURES.colorMode && supportsColorMode(modeId.value);
+  if (chip.id === "filter") return filtersAvailable.value;
+  if (chip.id === "strength") return strengthAvailable.value;
+  if (chip.id === "aspect") return supportsPanoAspect(modeId.value);
+  return true;
+}));
 
 const FIELD_OF: Record<ChipId, string> = {
   // Manual ISO/shutter now write video_exposure/still_exposure, so the verdict
@@ -110,6 +233,9 @@ const FIELD_OF: Record<ChipId, string> = {
   shutter: "video_exposure",
   ev: "exposure_bias",
   colour: "color_mode",
+  filter: "gamma_mode",
+  strength: "filter_intensity",
+  aspect: "pano_aspect",
   wb: "white_balance_value",
   sharpness: "sharpness",
 };
@@ -158,10 +284,31 @@ const busy = (id: ChipId) => saving.value === FIELD_OF[id];
       />
       <CameraWheel
         v-else-if="open === 'colour'"
-        :steps="enumSteps('insta360.messages.PhotographyOptions.COLOR_MODE')"
+        :steps="colourSteps"
         :model-value="settings.color_mode ? String(settings.color_mode) : undefined"
         :busy="busy('colour')"
         @update:model-value="(value) => setColorMode(value)"
+      />
+      <CameraWheel
+        v-else-if="open === 'filter'"
+        :steps="filterSteps"
+        :model-value="currentFilter ?? 'FILTER_NONE'"
+        :busy="busy('filter')"
+        @update:model-value="(value) => update('VIDEO_GAMMA_MODE', 'gamma_mode', value)"
+      />
+      <CameraWheel
+        v-else-if="open === 'strength'"
+        :steps="strengthSteps"
+        :model-value="settings.filter_intensity ? String(settings.filter_intensity) : undefined"
+        :busy="busy('strength')"
+        @update:model-value="(value) => update('FILTER_INTENSITY', 'filter_intensity', value)"
+      />
+      <CameraWheel
+        v-else-if="open === 'aspect'"
+        :steps="aspectSteps"
+        :model-value="settings.pano_aspect ? String(settings.pano_aspect) : undefined"
+        :busy="busy('aspect')"
+        @update:model-value="(value) => update('PANO_ASPECT', 'pano_aspect', value)"
       />
       <CameraWheel
         v-else-if="open === 'wb'"
@@ -187,27 +334,41 @@ const busy = (id: ChipId) => saving.value === FIELD_OF[id];
     </p>
 
     <div class="flex items-stretch gap-0.5 overflow-x-auto rounded-xl bg-black/50 p-1 backdrop-blur-md">
-      <button
-        v-for="chip in chips"
-        :key="chip.id"
-        type="button"
-        class="flex min-w-14 flex-1 flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 transition-colors"
-        :class="open === chip.id ? 'bg-white/20' : 'hover:bg-white/10'"
-        @click="toggle(chip.id)"
-      >
-        <span class="flex items-center gap-1 text-[10px] font-medium tracking-wider text-white/50">
-          {{ chip.label }}
-          <UIcon
-            v-if="verdict(chip.id)"
-            :name="verdict(chip.id)!.icon"
-            :class="verdict(chip.id)!.color"
-            class="size-3"
-          />
-        </span>
-        <span class="max-w-full truncate text-sm font-medium text-white">{{ chip.value }}</span>
-      </button>
+      <template v-for="(chip, index) in chips" :key="chip.id">
+        <!--
+          A hairline wherever the concern changes: exposure, then the look being
+          baked in, then image adjustments. Eight chips in one undifferentiated
+          row is a list; three groups is a control panel you can scan.
+        -->
+        <span
+          v-if="index > 0 && chip.group !== chips[index - 1]!.group"
+          class="my-1.5 w-px shrink-0 bg-white/15"
+          aria-hidden="true"
+        />
+        <button
+          type="button"
+          class="flex min-w-14 flex-1 flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
+          :class="open === chip.id ? 'bg-white/20' : 'hover:bg-white/10'"
+          :aria-pressed="open === chip.id"
+          @click="toggle(chip.id)"
+        >
+          <span class="flex items-center gap-1 text-[10px] font-medium tracking-wider text-white/50">
+            {{ chip.label }}
+            <UIcon
+              v-if="verdict(chip.id)"
+              :name="verdict(chip.id)!.icon"
+              :class="verdict(chip.id)!.color"
+              class="size-3"
+            />
+          </span>
+          <span class="max-w-full truncate text-sm font-medium text-white">{{ chip.value }}</span>
+        </button>
+      </template>
+
+      <span v-if="FEATURES.allSettings" class="my-1.5 w-px shrink-0 bg-white/15" aria-hidden="true" />
 
       <button
+        v-if="FEATURES.allSettings"
         type="button"
         class="flex min-w-14 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
         aria-label="Open camera settings"

@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { optionLabel } from "~/utils/cameraLabels";
+import { FEATURES } from "~/utils/features";
+
 const { isConnected } = useCamera();
 const { device, settings, loading, error, load } = useCameraSettings();
 const { active, starting, error: liveError, diagnostics, start, stop } = useLiveView();
+const { recording, elapsedLabel } = useCameraCapture();
 
 useHead({ title: "Camera" });
 
@@ -58,10 +62,27 @@ const remaining = computed(() => {
   return hours > 0 ? `${hours}h${minutes}m` : `${minutes}m`;
 });
 
-const resolution = computed(() =>
-  settings.value.record_resolution
-    ? String(settings.value.record_resolution).replace("RES_", "").replace(/_/g, " ")
-    : null,
+/**
+ * RES_3840_2160P30 reads as "3840×2160 · 30p" — the way a camera prints it,
+ * rather than the enum name with its underscores swapped for spaces.
+ */
+const resolution = computed(() => {
+  const raw = settings.value.record_resolution;
+  if (!raw) return null;
+  const match = /^RES_(\d+)_(\d+)P(\d+)$/.exec(String(raw));
+  if (!match) return String(raw).replace("RES_", "").replace(/_/g, " ");
+  return `${match[1]}×${match[2]} · ${match[3]}p`;
+});
+
+/** The look that is being baked into the recording, worth knowing at a glance. */
+const activeFilter = computed(() => {
+  const filter = settings.value.gamma_mode;
+  if (!filter || String(filter) === "FILTER_NONE") return null;
+  return optionLabel(String(filter));
+});
+
+const colorMode = computed(() =>
+  settings.value.color_mode ? optionLabel(String(settings.value.color_mode)) : null,
 );
 
 /** One quiet line at the top of the stage, so errors never reflow the layout. */
@@ -83,9 +104,10 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             :loading="loading"
             :disabled="!isConnected"
             aria-label="Reload settings"
-            @click="load"
+            @click="() => load()"
           />
           <UButton
+            v-if="FEATURES.allSettings"
             icon="i-lucide-sliders-horizontal"
             color="neutral"
             variant="ghost"
@@ -98,8 +120,15 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
     </template>
 
     <template #body>
-      <div v-if="!isConnected" class="flex flex-1 items-center justify-center text-muted">
-        Connect to the camera to control it.
+      <div v-if="!isConnected" class="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+        <UIcon name="i-lucide-video-off" class="size-8 text-dimmed" />
+        <div class="space-y-1">
+          <p class="font-medium text-highlighted">No camera connected</p>
+          <p class="max-w-sm text-sm text-muted">
+            Join the Luna Ultra's Wi-Fi network and connect, and the viewfinder starts here.
+          </p>
+        </div>
+        <UButton label="Connect" icon="i-lucide-plug" to="/" />
       </div>
 
       <div v-else class="flex min-h-0 flex-1 flex-col gap-3">
@@ -126,48 +155,70 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             />
           </div>
 
-          <!-- Top HUD -->
+          <!--
+            Frame marks. A viewfinder shows you the bounds of what it is
+            recording, and the brackets are how every camera says it. They also
+            give the black stage a job when the preview has not started.
+          -->
+          <div class="pointer-events-none absolute inset-4 z-10">
+            <span class="absolute left-0 top-0 size-5 border-l border-t border-white/25" />
+            <span class="absolute right-0 top-0 size-5 border-r border-t border-white/25" />
+            <span class="absolute bottom-0 left-0 size-5 border-b border-l border-white/25" />
+            <span class="absolute bottom-0 right-0 size-5 border-b border-r border-white/25" />
+          </div>
+
+          <!--
+            One scrim carries every readout, instead of each getting its own
+            pill. Camera markings are engraved onto the finder, not stuck on it.
+          -->
           <div
-            class="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 font-mono text-xs text-white"
+            class="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 via-black/30 to-transparent pb-8"
           >
-            <div class="flex flex-col items-start gap-1">
-              <span v-if="remaining" class="rounded bg-black/50 px-2 py-1 backdrop-blur-md">
-                {{ remaining }} left
-              </span>
-              <span v-if="storage" class="rounded bg-black/50 px-2 py-1 backdrop-blur-md">
-                {{ storage.toFixed(1) }} GB
-              </span>
-            </div>
-            <div class="flex flex-col items-end gap-1">
-              <span v-if="resolution" class="rounded bg-black/50 px-2 py-1 backdrop-blur-md">
-                {{ resolution }}
-              </span>
-              <span
-                v-if="battery !== null"
-                class="flex items-center gap-1 rounded bg-black/50 px-2 py-1 backdrop-blur-md"
-                :class="batteryClass"
-              >
-                <UIcon name="i-lucide-battery" class="size-3.5" />
-                {{ battery }}%
-              </span>
+            <div class="flex items-start justify-between gap-4 p-4 font-mono text-[11px] text-white/70">
+              <div class="flex items-center gap-3">
+                <!--
+                  Red appears exactly once in this interface, and it means
+                  recording. Anything else wearing it would dilute the one
+                  signal you must never misread.
+                -->
+                <span v-if="recording" class="flex items-center gap-1.5 text-white">
+                  <span class="size-2 rounded-full bg-red-500 motion-safe:animate-pulse" />
+                  <span class="tabular-nums tracking-wider">{{ elapsedLabel }}</span>
+                </span>
+                <span v-if="remaining" class="tracking-wider">{{ remaining }} left</span>
+                <span v-if="storage" class="tracking-wider">{{ storage.toFixed(1) }} GB</span>
+              </div>
+
+              <div class="flex items-center gap-3 text-right">
+                <span v-if="activeFilter" class="tracking-wider text-white">{{ activeFilter }}</span>
+                <span v-if="colorMode" class="tracking-wider">{{ colorMode }}</span>
+                <span v-if="resolution" class="tracking-wider">{{ resolution }}</span>
+                <span
+                  v-if="battery !== null"
+                  class="flex items-center gap-1 tabular-nums tracking-wider"
+                  :class="batteryClass"
+                >
+                  <UIcon name="i-lucide-battery" class="size-3.5" />
+                  {{ battery }}%
+                </span>
+              </div>
             </div>
           </div>
 
-          <!-- Error strip, sitting under the HUD so nothing shifts -->
-          <div
-            v-if="topError"
-            class="absolute inset-x-0 top-12 flex justify-center px-3"
-          >
+          <!-- Errors sit below the readout rail, so neither ever moves -->
+          <div v-if="topError" class="absolute inset-x-0 top-14 z-20 flex justify-center px-4">
             <span
-              class="flex items-center gap-1.5 rounded-lg bg-warning/85 px-3 py-1.5 text-xs text-white backdrop-blur-md"
+              class="flex items-center gap-1.5 rounded-lg bg-warning/90 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-md"
             >
-              <UIcon name="i-lucide-triangle-alert" class="size-3.5" />
+              <UIcon name="i-lucide-triangle-alert" class="size-3.5 shrink-0" />
               {{ topError }}
             </span>
           </div>
 
           <!-- Quick exposure bar + gear, along the bottom of the viewfinder -->
-          <div class="absolute inset-x-0 bottom-0 p-2">
+          <div
+            class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pt-10"
+          >
             <CameraProBar @open-settings="settingsOpen = true" />
           </div>
         </div>
