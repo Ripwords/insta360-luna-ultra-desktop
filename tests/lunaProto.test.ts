@@ -289,3 +289,43 @@ describe("PhotoSubMode, as this firmware numbers it", () => {
     }
   });
 });
+
+/**
+ * Photography field 91 is a nested message the extraction has no entry for.
+ * Toggling Deep Track on the camera drives its fourth field 2 <-> 5 while the
+ * other three hold at 2/2/3, so it tracks the feature.
+ *
+ * It is NOT a setting. Writing it comes back `differs` — the camera takes the
+ * message and reports something else — and the value read on connect did not
+ * match what the camera was actually doing. So this is status we cannot yet
+ * interpret, and every field here stays a raw number: naming 2 "off" and 5 "on"
+ * would assert a direction that has already been wrong once.
+ */
+describe("deep_track, status rather than a setting", () => {
+  it("decodes the nested message without interpreting it", () => {
+    // field 91 (tag 0xda05), 8 bytes: {2, 2, 3, 2}
+    const decoded = decodeMessage(MSG.PhotographyOptions, hex("da05080802100218032002"));
+    expect(decoded.deep_track).toEqual({
+      unknown_1: 2,
+      unknown_2: 2,
+      unknown_3: 3,
+      state: 2,
+    });
+  });
+
+  it("reports the other observed state as its number too", () => {
+    const decoded = decodeMessage(MSG.PhotographyOptions, hex("da05080802100218032005"));
+    expect((decoded.deep_track as Record<string, unknown>).state).toBe(5);
+  });
+
+  it("names no state, so nothing can render 2 or 5 as a claim about tracking", () => {
+    expect(enumValue("insta360.messages.DeepTrackState", "TRACK_ON")).toBeNull();
+  });
+
+  it("still round-trips, which is what a future read-modify-write would need", () => {
+    const bytes = encodeMessage(MSG.PhotographyOptions, {
+      deep_track: { unknown_1: 2, unknown_2: 2, unknown_3: 3, state: 5 },
+    });
+    expect(bytes).toEqual(hex("da05080802100218032005"));
+  });
+});

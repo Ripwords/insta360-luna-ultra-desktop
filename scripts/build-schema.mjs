@@ -140,11 +140,42 @@ const ENUM_OVERRIDES = {
  * correct and only need extending.
  */
 const ENUM_ADDITIONS = {
+  // Resolutions this camera has and the extraction does not, each named from
+  // what the camera's own screen showed while it was selected. The camera reuses
+  // the extraction's id where one exists (3K 1:1 at 30 is still 121) and numbers
+  // the rest from 258 upward, so these extend rather than replace.
+  //
+  "insta360.messages.VideoResolution": {
+    258: "RES_3840_2160P48",
+    260: "RES_1920_1080P48",
+    433: "RES_3840_1632P120",
+    434: "RES_3840_1632P100",
+    435: "RES_3840_1632P60",
+    437: "RES_3840_1632P48",
+    438: "RES_3840_1632P30",
+    439: "RES_3840_1632P25",
+    440: "RES_3840_1632P24",
+    446: "RES_3072_3072P60",
+    447: "RES_3072_3072P50",
+    436: "RES_3840_1632P50",
+    // 2.7K is 2688x1520. Note 48fps sits outside the run at 331, the same way
+    // every other 48fps variant is numbered apart from its family.
+    242: "RES_2688_1520P120",
+    243: "RES_2688_1520P100",
+    244: "RES_2688_1520P60",
+    245: "RES_2688_1520P50",
+    331: "RES_2688_1520P48",
+    246: "RES_2688_1520P30",
+    247: "RES_2688_1520P25",
+    248: "RES_2688_1520P24",
+  },
+
   // Option type 104 carries filter intensity. Confirmed by asking for type 104
   // on its own and getting field 104 back — this protocol numbers option types
   // to match field numbers, and the `scan` sweep found that true for all 60
   // types this firmware has beyond the extraction's 54.
   "insta360.messages.PhotographyOptionType": {
+    91: "DEEP_TRACK",
     98: "PANO_ASPECT",
     104: "FILTER_INTENSITY",
   },
@@ -158,7 +189,30 @@ const ENUM_ADDITIONS = {
  * resolves field numbers by name.
  */
 const MESSAGE_ADDITIONS = {
+  // The three fields we cannot name are `unknown_*` on purpose. We know their
+  // values, not their meaning, and writing Deep Track is a read-modify-write
+  // that carries them back untouched — a confident wrong name is what made
+  // gamma_mode look like a gamma curve for months.
+  "insta360.messages.DeepTrack": {
+    1: { name: "unknown_1", type: "uint32", repeated: false },
+    2: { name: "unknown_2", type: "uint32", repeated: false },
+    3: { name: "unknown_3", type: "uint32", repeated: false },
+    // Left as a raw number on purpose. Toggling Deep Track on the camera drives
+    // this 2 <-> 5, so it tracks the feature — but writing it comes back
+    // `differs`, and the value read on connect did not match what the camera was
+    // doing. So this reports STATUS we cannot yet interpret, not a setting, and
+    // naming 2 "off" and 5 "on" would be asserting a direction we got wrong once
+    // already. An unnamed number reads as "we don't know this", which is true.
+    4: { name: "state", type: "uint32", repeated: false },
+  },
+
   "insta360.messages.PhotographyOptions": {
+    91: {
+      name: "deep_track",
+      type: "message",
+      repeated: false,
+      ref: "insta360.messages.DeepTrack",
+    },
     98: {
       name: "pano_aspect",
       type: "enum",
@@ -199,14 +253,18 @@ if (missing.length > 0) {
 // An override for an enum the app never reaches is dead weight that still reads
 // as applied. Wholly new enums are exempt: they are pulled in by MESSAGE_ADDITIONS
 // below, which walk() cannot see because it only reads the extraction.
-const NEW_ENUMS = new Set(
-  Object.values(MESSAGE_ADDITIONS).flatMap((fields) =>
-    Object.values(fields)
-      .map((field) => field.ref)
-      .filter(Boolean),
-  ),
+const ADDED_REFS = Object.values(MESSAGE_ADDITIONS).flatMap((fields) =>
+  Object.values(fields)
+    .map((field) => field.ref)
+    .filter(Boolean),
 );
-for (const name of NEW_ENUMS) enums.add(name);
+for (const ref of ADDED_REFS) {
+  // A ref is either a message this file defines outright (Deep Track's nested
+  // payload has no entry in the extraction at all) or an enum the overrides
+  // above supply. Either way it is genuinely used, so register it.
+  if (MESSAGE_ADDITIONS[ref]) messages.add(ref);
+  else enums.add(ref);
+}
 
 const unusedOverrides = Object.keys(ENUM_OVERRIDES).filter((n) => !enums.has(n));
 const unusedAdditions = Object.keys(ENUM_ADDITIONS).filter((n) => !enums.has(n));
