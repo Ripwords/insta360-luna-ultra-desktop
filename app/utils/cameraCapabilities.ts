@@ -20,6 +20,7 @@
  */
 
 import type { CaptureModeId } from "~/utils/cameraModes";
+import { resolutionParts } from "~/utils/cameraLabels";
 
 /** Every colour mode this firmware has, in the order the camera lists them. */
 const ALL_COLOR_MODES = ["COLOR_MODE_NORMAL", "COLOR_MODE_LOG", "COLOR_MODE_HDR"] as const;
@@ -134,3 +135,161 @@ export const supportsColorMode = (modeId: string): boolean =>
 export const colorModesFor = (modeId: string): string[] => [
   ...(COLOR_MODES_BY_CAPTURE_MODE[modeId as CaptureModeId] ?? []),
 ];
+
+/**
+ * Recording resolutions, measured on the camera and nothing else.
+ *
+ * The `VideoResolution` enum cannot be used as the source here. It carries 229
+ * entries describing a 2020 camera, most of which this one does not offer, and
+ * it was missing whole families until they were measured and added. Offering an
+ * entry we have not seen the camera produce would be offering a number it may
+ * not recognise, which fails the way everything else in this protocol fails —
+ * accepted, read back, ignored.
+ *
+ * So this list only grows by measurement. See
+ * docs/superpowers/specs/2026-07-25-camera-protocol-calibration.md, and
+ * PENDING_RESOLUTIONS below for the ones still waiting on a name.
+ */
+export const MEASURED_RESOLUTIONS = [
+  "RES_7680_4320P30",
+  "RES_7680_4320P25",
+  "RES_7680_4320P24",
+  "RES_3840_2160P120",
+  "RES_3840_2160P100",
+  "RES_3840_2160P50",
+  "RES_3840_2160P30",
+  "RES_3840_2160P24",
+  "RES_1920_1080P240",
+  "RES_1920_1080P200",
+  "RES_1920_1080P120",
+  "RES_1920_1080P100",
+  "RES_1920_1080P60",
+  "RES_1920_1080P50",
+  "RES_1920_1080P30",
+  "RES_1920_1080P25",
+  "RES_1920_1080P24",
+  // Named from the camera's screen in a later pass
+  "RES_3840_2160P48",
+  "RES_1920_1080P48",
+  "RES_3840_1632P120",
+  "RES_3840_1632P100",
+  "RES_3840_1632P60",
+  "RES_3840_1632P48",
+  "RES_3840_1632P30",
+  "RES_3840_1632P25",
+  "RES_3840_1632P24",
+  "RES_3072_3072P60",
+  "RES_3072_3072P50",
+  "RES_3840_1632P50",
+  "RES_2688_1520P120",
+  "RES_2688_1520P100",
+  "RES_2688_1520P60",
+  "RES_2688_1520P50",
+  "RES_2688_1520P48",
+  "RES_2688_1520P30",
+  "RES_2688_1520P25",
+  "RES_2688_1520P24",
+];
+
+/**
+ * Values the camera was seen to use that we cannot name yet. Currently none —
+ * every number observed on the wire has been named from the camera's screen.
+ *
+ * TO ADD ONE:
+ *   1. `node scripts/probe-colorspace.mjs monitor`, set it on the camera, and
+ *      type what the screen says when the probe asks.
+ *   2. Add the number and name to ENUM_ADDITIONS for
+ *      `insta360.messages.VideoResolution` in scripts/build-schema.mjs, using
+ *      the RES_<width>_<height>P<fps> form, then `node scripts/build-schema.mjs`.
+ *   3. Add it to MEASURED_RESOLUTIONS. The per-mode rules below pick it up.
+ *
+ * Do NOT infer one from its position in the picker. That was tried once: 258
+ * sat exactly where 4K25 belongs and was read as such, and the camera's screen
+ * said 4K48.
+ */
+export const PENDING_RESOLUTIONS: number[] = [];
+
+/** Split `RES_3840_2160P120` into the parts the per-mode rules care about. */
+function parseResolution(name: string) {
+  const match = /^RES_(\d+)_(\d+)P(\d+)$/.exec(name);
+  if (!match) return null;
+  return { width: Number(match[1]), height: Number(match[2]), fps: Number(match[3]) };
+}
+
+/**
+ * Framerate alone is not a sufficient filter, which cost a bug: 8K tops out at
+ * 30fps, so a rule of "60 and below" happily admitted it to PureVideo and a
+ * rule of "30 only" admitted it to Timelapse, neither of which shoots 8K.
+ * Every rule below constrains the frame size as well.
+ */
+const rule =
+  (maxWidth: number, fps: number[], allowSquare = false) =>
+  (name: string) => {
+    const res = parseResolution(name);
+    if (!res) return false;
+    if (res.width > maxWidth) return false;
+    if (!allowSquare && res.width === res.height) return false;
+    return fps.includes(res.fps);
+  };
+
+/**
+ * Which resolutions each mode offers, from the manual's per-mode tables
+ * intersected with what we have measured. A mode with no entry gets no picker
+ * rather than an unrestricted one.
+ */
+const RESOLUTIONS_BY_CAPTURE_MODE: Partial<Record<CaptureModeId, readonly string[]>> = {
+  video: MEASURED_RESOLUTIONS,
+  // "4K / 3K 9:16 / 2.7K / 1080p at 24-60" — no 8K, and the 1:1 crop is
+  // Video-only, so the square frames are excluded here too
+  pure: MEASURED_RESOLUTIONS.filter(rule(3840, [60, 50, 48, 30, 25, 24])),
+  // "4K and 2.7K at 100/120; 1080p also 200/240"
+  slowmo: MEASURED_RESOLUTIONS.filter(rule(3840, [240, 200, 120, 100])),
+  // "4K / 2.7K / 1080p at 30 only"
+  timelapse: MEASURED_RESOLUTIONS.filter(rule(3840, [30])),
+};
+
+/** The recording resolutions this capture mode offers, in the camera's order. */
+export const resolutionsFor = (modeId: string): string[] => [
+  ...(RESOLUTIONS_BY_CAPTURE_MODE[modeId as CaptureModeId] ?? []),
+];
+
+/**
+ * The three pickers, each narrowed by the one before it.
+ *
+ * Order matters and is not alphabetical: sizes run largest first and framerates
+ * fastest first, because that is how a camera lists them and how you think about
+ * them. Each list is derived from what this mode actually offers, so a choice
+ * can never strand you on a combination that does not exist — 8K has no 120fps,
+ * and coming from 4K120 has to land somewhere real.
+ */
+const SIZE_ORDER = ["8K", "4K", "3K", "2.7K", "1080p"];
+const ASPECT_ORDER = ["16:9", "2.35:1", "1:1", "9:16"];
+
+const partsFor = (modeId: string) =>
+  resolutionsFor(modeId)
+    .map((name) => resolutionParts(name))
+    .filter((parts): parts is NonNullable<typeof parts> => parts !== null);
+
+const ordered = <T>(values: Iterable<T>, order: T[]): T[] =>
+  [...new Set(values)].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+/** Frame sizes this mode offers, largest first. */
+export const sizesFor = (modeId: string): string[] =>
+  ordered(partsFor(modeId).map((parts) => parts.size), SIZE_ORDER);
+
+/** Aspects that frame size has in this mode. */
+export const aspectsFor = (modeId: string, size: string): string[] =>
+  ordered(
+    partsFor(modeId).filter((parts) => parts.size === size).map((parts) => parts.aspect),
+    ASPECT_ORDER,
+  );
+
+/** Framerates that size and aspect have in this mode, fastest first. */
+export const fpsFor = (modeId: string, size: string, aspect: string): number[] =>
+  [
+    ...new Set(
+      partsFor(modeId)
+        .filter((parts) => parts.size === size && parts.aspect === aspect)
+        .map((parts) => parts.fps),
+    ),
+  ].sort((a, b) => b - a);

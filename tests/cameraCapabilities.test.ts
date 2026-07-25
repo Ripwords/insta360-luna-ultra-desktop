@@ -6,8 +6,14 @@ import {
   supportsFilter,
   supportsPanoAspect,
   resetsToStandard,
+  resolutionsFor,
+  sizesFor,
+  aspectsFor,
+  fpsFor,
+  MEASURED_RESOLUTIONS,
 } from "~/utils/cameraCapabilities";
 import { CAPTURE_MODES } from "~/utils/cameraModes";
+import { composeResolution } from "~/utils/cameraLabels";
 
 describe("supportsColorMode", () => {
   it("offers a colour mode readout in every video mode", () => {
@@ -157,5 +163,111 @@ describe("supportsPanoAspect", () => {
     for (const id of ["photo", "video", "pure", "slowmo", "timelapse"]) {
       expect(supportsPanoAspect(id), `${id} should have no aspect`).toBe(false);
     }
+  });
+});
+
+describe("resolutionsFor", () => {
+  it("offers the video list, which is the one fully measured", () => {
+    const list = resolutionsFor("video");
+    expect(list).toContain("RES_7680_4320P30");
+    expect(list).toContain("RES_3840_2160P120");
+    expect(list).toContain("RES_1920_1080P240");
+  });
+
+  it("caps PureVideo at 60fps, as the manual does", () => {
+    const list = resolutionsFor("pure");
+    expect(list).toContain("RES_3840_2160P30");
+    expect(list).not.toContain("RES_3840_2160P120");
+    expect(list).not.toContain("RES_1920_1080P240");
+  });
+
+  /**
+   * Framerate alone is not enough of a filter. 8K tops out at 30fps, so a
+   * fps-only rule let it through into PureVideo and Timelapse, neither of which
+   * the manual says shoots 8K at all.
+   */
+  it("keeps 8K out of the modes that cannot shoot it", () => {
+    for (const mode of ["pure", "slowmo", "timelapse"]) {
+      expect(
+        resolutionsFor(mode).some((r) => r.startsWith("RES_7680_")),
+        `${mode} should not offer 8K`,
+      ).toBe(false);
+    }
+  });
+
+  it("keeps the 1:1 crop to Video, the only mode the manual lists it for", () => {
+    expect(resolutionsFor("video")).toContain("RES_3072_3072P60");
+    expect(resolutionsFor("pure")).not.toContain("RES_3072_3072P60");
+  });
+
+  it("offers Slow-mo only the high frame rates", () => {
+    const list = resolutionsFor("slowmo");
+    expect(list).toContain("RES_1920_1080P240");
+    expect(list).toContain("RES_3840_2160P120");
+    expect(list).not.toContain("RES_3840_2160P30");
+  });
+
+  it("offers Timelapse 30fps only", () => {
+    expect(resolutionsFor("timelapse").every((r) => r.endsWith("P30"))).toBe(true);
+  });
+
+  it("offers nothing for stills modes, which use a photo size instead", () => {
+    expect(resolutionsFor("photo")).toEqual([]);
+    expect(resolutionsFor("pano")).toEqual([]);
+  });
+
+  /**
+   * The guard that matters: the camera uses 258 for a resolution the schema
+   * calls RES_3840_2160P25 = 48, so entries we have not seen on the wire cannot
+   * be trusted. Every value offered must have been measured.
+   */
+  it("only ever offers resolutions measured on the camera", () => {
+    for (const mode of CAPTURE_MODES) {
+      for (const value of resolutionsFor(mode.id)) {
+        expect(MEASURED_RESOLUTIONS.includes(value), `${value} was never measured`).toBe(true);
+      }
+    }
+  });
+});
+
+describe("resolution pickers", () => {
+  it("offers the frame sizes this mode has, largest first", () => {
+    expect(sizesFor("video")).toEqual(["8K", "4K", "3K", "2.7K", "1080p"]);
+    expect(sizesFor("slowmo")).toEqual(["4K", "2.7K", "1080p"]);
+  });
+
+  it("offers only the aspects that frame size actually has", () => {
+    expect(aspectsFor("video", "4K")).toEqual(["16:9", "2.35:1"]);
+    expect(aspectsFor("video", "8K")).toEqual(["16:9"]);
+    expect(aspectsFor("video", "3K")).toEqual(["1:1"]);
+  });
+
+  it("offers only the framerates that size and aspect actually have", () => {
+    expect(fpsFor("video", "8K", "16:9")).toEqual([30, 25, 24]);
+    expect(fpsFor("slowmo", "1080p", "16:9")).toEqual([240, 200, 120, 100]);
+    expect(fpsFor("timelapse", "4K", "16:9")).toEqual([30]);
+  });
+
+  /**
+   * Picking a size must not strand you on a combination that does not exist —
+   * 8K has no 120fps, so coming from 4K120 has to land somewhere real.
+   */
+  it("never offers a combination the camera does not have", () => {
+    for (const mode of CAPTURE_MODES) {
+      for (const size of sizesFor(mode.id)) {
+        for (const aspect of aspectsFor(mode.id, size)) {
+          const rates = fpsFor(mode.id, size, aspect);
+          expect(rates.length, `${mode.id} ${size} ${aspect} has no framerates`).toBeGreaterThan(0);
+          for (const fps of rates) {
+            expect(resolutionsFor(mode.id)).toContain(composeResolution(size, aspect, fps));
+          }
+        }
+      }
+    }
+  });
+
+  it("gives nothing for a mode with no resolutions at all", () => {
+    expect(sizesFor("photo")).toEqual([]);
+    expect(aspectsFor("photo", "4K")).toEqual([]);
   });
 });

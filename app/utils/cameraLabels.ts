@@ -135,3 +135,103 @@ export const ISO_STEPS = [0, 100, 200, 400, 800, 1600, 3200, 6400];
 
 export const isoSteps = (): WheelStep[] =>
   ISO_STEPS.map((value) => ({ value: String(value), label: isoLabel(value) }));
+
+/**
+ * The zoom dial, 1x to 12x.
+ *
+ * `zoom_scale` is a double and the camera takes anything in range, so this is a
+ * continuous control rather than a set of stops — the dial is dragged.
+ *
+ * Position maps to zoom logarithmically, the way a lens barrel is marked: going
+ * 1x to 2x reframes the shot far more than 11x to 12x does, so the wide end
+ * earns more travel. Linear would squeeze everything useful into a sliver at
+ * the bottom of the dial.
+ */
+export const ZOOM_MIN = 1;
+export const ZOOM_MAX = 12;
+
+const ZOOM_RANGE = Math.log(ZOOM_MAX / ZOOM_MIN);
+
+const clamp = (value: number, low: number, high: number): number =>
+  Math.min(high, Math.max(low, value));
+
+/** Where along the dial (0 at the wide end, 1 at the long end) a zoom sits. */
+export const zoomFraction = (scale: number): number =>
+  clamp(Math.log(clamp(scale, ZOOM_MIN, ZOOM_MAX) / ZOOM_MIN) / ZOOM_RANGE, 0, 1);
+
+/** The zoom for a position on the dial, rounded to the 0.1 the label shows. */
+export function zoomForFraction(fraction: number): number {
+  const scale = ZOOM_MIN * Math.exp(clamp(fraction, 0, 1) * ZOOM_RANGE);
+  return Math.round(clamp(scale, ZOOM_MIN, ZOOM_MAX) * 10) / 10;
+}
+
+/**
+ * `4.9x`, and `2x` rather than `2.0x` — a trailing zero reads as precision the
+ * dial does not have, and it makes the label jitter in width as you drag.
+ */
+export const zoomLabel = (scale: number): string => `${Math.round(scale * 10) / 10}x`;
+
+/** Marked stops on the dial. Everything between them is a plain tick. */
+export const ZOOM_MARKS = [1, 2, 3, 5, 8, 12];
+
+/**
+ * Resolutions, split into the three things you actually choose between.
+ *
+ * A single list of every combination is 37 entries long and useless to pick
+ * from — you end up scrolling past 8K to reach 1080p60. But 37 combinations are
+ * really a handful of frame sizes times a handful of aspects times a handful of
+ * framerates, so the honest control is three short lists, not one long one.
+ *
+ * Frame size and aspect both live in the dimensions, which is why they are
+ * derived here rather than stored: 3840x2160 is 4K at 16:9, and 3840x1632 is
+ * the same 4K sensor read at 2.35:1.
+ */
+export interface ResolutionParts {
+  size: string;
+  aspect: string;
+  fps: number;
+}
+
+/** Every frame size this camera has been seen to use, keyed by dimensions. */
+const FRAME_SIZES: Record<string, { size: string; aspect: string }> = {
+  "7680x4320": { size: "8K", aspect: "16:9" },
+  "7680x3264": { size: "8K", aspect: "2.35:1" },
+  "3840x2160": { size: "4K", aspect: "16:9" },
+  "3840x1632": { size: "4K", aspect: "2.35:1" },
+  "3072x3072": { size: "3K", aspect: "1:1" },
+  "1728x3072": { size: "3K", aspect: "9:16" },
+  "2688x1520": { size: "2.7K", aspect: "16:9" },
+  "1520x2688": { size: "2.7K", aspect: "9:16" },
+  "1920x1080": { size: "1080p", aspect: "16:9" },
+  "1080x1920": { size: "1080p", aspect: "9:16" },
+};
+
+/** `RES_3840_1632P50` -> 4K, 2.35:1, 50. Null when the name is unreadable. */
+export function resolutionParts(name: string): ResolutionParts | null {
+  const match = /^RES_(\d+)_(\d+)P(\d+)$/.exec(name);
+  if (!match) return null;
+  const frame = FRAME_SIZES[`${match[1]}x${match[2]}`];
+  if (!frame) return null;
+  return { ...frame, fps: Number(match[3]) };
+}
+
+/** The reverse, for turning three picker choices back into a value to write. */
+export function composeResolution(size: string, aspect: string, fps: number): string | null {
+  const dimensions = Object.entries(FRAME_SIZES).find(
+    ([, frame]) => frame.size === size && frame.aspect === aspect,
+  )?.[0];
+  if (!dimensions) return null;
+  return `RES_${dimensions.replace("x", "_")}P${fps}`;
+}
+
+/** `4K 2.35:1 50`, or the raw name if it cannot be read. */
+export function resolutionLabel(name: string): string {
+  const parts = resolutionParts(name);
+  if (!parts) {
+    const match = /^RES_(\d+)_(\d+)P(\d+)$/.exec(name);
+    return match ? `${match[1]}×${match[2]} ${match[3]}` : name;
+  }
+  return parts.aspect === "16:9"
+    ? `${parts.size} ${parts.fps}`
+    : `${parts.size} ${parts.aspect} ${parts.fps}`;
+}
