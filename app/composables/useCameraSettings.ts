@@ -61,7 +61,12 @@ export function useCameraSettings() {
   const describe = (value: ProtoValue): string =>
     typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
 
-  async function load() {
+  /**
+   * `keepStatus` is for reloads that follow a write we just reported on: the
+   * verdict is the only feedback the user gets that the write landed, and
+   * throwing it away a moment later reads as the write having been forgotten.
+   */
+  async function load(options_?: { keepStatus?: boolean }) {
     if (!isConnected.value || loading.value) return;
     loading.value = true;
     error.value = null;
@@ -73,7 +78,7 @@ export function useCameraSettings() {
       settings.value = photography;
       device.value = options;
       // A fresh read supersedes any per-field verdict from earlier writes
-      status.value = {};
+      if (!options_?.keepStatus) status.value = {};
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : String(cause);
     } finally {
@@ -171,16 +176,28 @@ export function useCameraSettings() {
     );
 
   /**
-   * Color mode (Standard / i-Log / Dolby Vision). Sent on its own — an earlier
-   * attempt bundled gamma_mode, but on-device that didn't take, and the camera
-   * was picky about bundled fields for exposure too, so color_mode goes alone.
+   * Color mode (Standard / i-Log / Dolby Vision). Sent on its own: toggling the
+   * mode on the camera and diffing every candidate field showed `color_mode`
+   * moving and nothing else — `gamma_mode` in particular stayed put, so the
+   * earlier attempt to pair the two was pairing it with a bystander.
+   *
+   * The camera mirrors this field across all four function modes at once, so
+   * writing it for the current mode is enough to set it everywhere.
    */
-  const setColorMode = (colorMode: string) =>
-    writeAndVerify(
+  async function setColorMode(colorMode: string) {
+    await writeAndVerify(
       ["COLOR_MODE"],
       { color_mode: colorMode },
       { option: "COLOR_MODE", field: "color_mode" },
     );
+    // Changing the colour mode makes the camera rewrite OTHER settings —
+    // `sharpness` was measured moving 1 -> 2 -> 1 across an i-Log -> Standard ->
+    // i-Log round trip, and Dolby Vision clears the filter outright. Re-reading
+    // only COLOR_MODE would leave the panel showing values the camera has
+    // already discarded, so read everything back. The verdict survives, since
+    // it is the only evidence the user has that the write landed.
+    await load({ keepStatus: true });
+  }
 
   /** The same write-then-verify cycle, for options that live on the device. */
   async function updateDevice(optionType: string, field: string, value: ProtoValue) {
@@ -265,9 +282,23 @@ export function useCameraSettings() {
   }
 
   watch(mode, () => void load());
-  watch(isConnected, (connected) => {
-    if (connected) void load();
-  });
+
+  /**
+   * `immediate` matters: you connect on the home page and then navigate here, so
+   * by the time this composable initialises `isConnected` is already true and a
+   * plain watcher never fires. Settings then stay empty until something writes,
+   * which is why the colour mode read "—" until it was set by hand — every other
+   * control has a falsy-friendly default ("Auto", "Off") and so looked fine
+   * while holding nothing. The live view and capture-status watchers were always
+   * immediate; this one being the odd one out is what hid it.
+   */
+  watch(
+    isConnected,
+    (connected) => {
+      if (connected) void load();
+    },
+    { immediate: true },
+  );
 
   return {
     settings,
