@@ -202,6 +202,67 @@ Standard — the only value it can offer there — while the camera shot somethi
 else. `selectMode` writes `color_mode = Standard` and `gamma_mode = FILTER_NONE`
 on entering any of those modes rather than assuming.
 
+## The dividing line: stored settings yes, live control no
+
+Five features were driven successfully. Five were chased and abandoned. The
+split is not luck — it is the shape of what this protocol exposes.
+
+| Reachable (a stored option) | Not reachable (live or interactive) |
+|---|---|
+| Colour modes | Colour Recovery |
+| Filters + strength | Deep Track (status only, not settable) |
+| Pano aspect | Tap to focus |
+| Capture modes | Gimbal control |
+| Zoom (`zoom_scale`) | Gimbal attitude |
+
+Everything in the left column is a value the camera stores and reports. Nothing
+in the right column is. Before spending a day on the next feature, ask which
+column it belongs in.
+
+**Gimbal, specifically.** `PTZ_CTRL` is option type 87 and the only pan/tilt
+name in the schema, but `Options` has no field 87 — the type has a name and no
+payload, which is why it answers empty. `PHONE_COMMAND_GET_GYRO` (19) is
+defined (`GetGyro { count }` → `GetGyroResp { gyroes: bytes }`, samples of
+`Gyro { ax, ay, az, gx, gy, gz }`) but **answers nothing to any of 20 request
+shapes**, so it is not implemented here.
+`NotificationCameraPostureUpdate` carries only ROTATE_0/90/180/270/UP/DOWN —
+"is the camera upside down", not an angle. Device field 176 looks like attitude
+at a glance and is storage free/total repeated.
+
+**Deep Track** is photography field 91, a nested `{2, 2, 3, state}`. Toggling it
+on the camera drives `state` 2 <-> 5, so the field is real — but writing it comes
+back `differs`, and the value read on connect did not match the camera. It is
+status we cannot interpret, so every field stays a raw number and there is no
+control in the app.
+
+The only remaining route for the right-hand column is capturing the phone app's
+traffic (`scripts/decode-capture.mjs`), because those commands demonstrably exist
+— the phone issues them — they just never touch anything we can read.
+
+## Colour Recovery: not reachable on this protocol
+
+Firmware v1.0.283 added Colour Recovery — an i-Log-only monitoring mode that
+shows a colour-corrected preview of log footage and disables filters while on.
+It visibly changes the preview, so the setting is real. It is not observable
+anywhere on the control protocol. Exhausted, all read-only:
+
+| Probed | Result |
+|---|---|
+| Photography option types 1–400 | nothing returns a value above 104 |
+| Device option types 1–400 | 12 unnamed types found; none move with the toggle |
+| The 11 named `PHONE_COMMAND_GET_*` commands | unchanged |
+| `GET_SUBMODE_OPTIONS` (43), 16 request shapes | every one empty |
+| Unsolicited notifications (`listen`) | nothing correlates with any setting |
+
+**A camera that echoes anything.** Asked for photography option types 1–400 it
+echoed back 399 of them, including hundreds that cannot exist. The echo in
+field 1 is NOT evidence of support — only a returned VALUE is. `scan` originally
+treated the echo as the signal and reported 349 phantom types; it now requires a
+value. Silence and support are indistinguishable on this camera.
+
+Only unnamed command codes above 152 remain untried, and firing those blind is
+refused by design: an unnamed code could be a setter, a format or a reset.
+
 ## Things deliberately not done
 
 - **Command codes above 152 were never scanned.** This firmware certainly has

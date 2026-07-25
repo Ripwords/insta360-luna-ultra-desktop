@@ -137,6 +137,8 @@ export class LunaSession {
     this.seq = 0x24;
     this.requestId = 100;
     this.keepalive = null;
+    /** Set to receive frames that answer no request of ours — camera notifications. */
+    this.onUnsolicited = null;
   }
 
   nextSeq() {
@@ -156,6 +158,8 @@ export class LunaSession {
           if (settle) {
             this.pending.delete(frame.requestId);
             settle(frame);
+          } else {
+            this.onUnsolicited?.(frame);
           }
         }
       });

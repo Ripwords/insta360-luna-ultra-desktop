@@ -45,6 +45,19 @@
 //   4. node scripts/probe-colorspace.mjs diff standard ilog
 //      node scripts/probe-colorspace.mjs diff standard dolby
 //
+// `monitor` is for GESTURES rather than settings — a tap-to-focus or a track
+// drag is an event, not a state that sits still to be diffed. It polls the
+// option fields AND listens for camera notifications on one connection, stamps
+// everything with a time, and lets you press Enter to drop a labelled marker in.
+// Do one thing on the camera, mark it, do the next; the markers are what make
+// the log readable afterwards. Writes ./probe-out/monitor.log on Ctrl-C.
+//
+//   node scripts/probe-colorspace.mjs monitor [--interval 700] [--max 200]
+//
+// `listen` is the passive half on its own: notifications only, nothing sent.
+//
+//   node scripts/probe-colorspace.mjs listen
+//
 // `watch` polls continuously and prints changes as they happen, for when the
 // camera can be driven while this stays connected:
 //
@@ -232,6 +245,49 @@ function echoedTypes(body) {
   return out;
 }
 
+/**
+ * Code 8293: the camera announcing that a photography option changed.
+ *
+ * Not in the extraction, found by watching the resolution picker. Shape is
+ * { 1: option type, 2: a PhotographyOptions fragment holding the new value,
+ * 3: function mode } — so it names what changed, to what, and where, which is
+ * everything a polling loop was being used to infer.
+ *
+ * This is the good way to measure any photography setting: cycle it on the
+ * camera and read the announcements, instead of diffing snapshots and hoping
+ * the poll lands between changes.
+ */
+const CODE_OPTION_CHANGED = 8293;
+
+function describeOptionChange(body) {
+  const top = decodeRaw(body);
+  const type = top.find((r) => r.field === 1 && r.wire === 0)?.value;
+  const fragment = top.find((r) => r.field === 2 && r.wire === 2)?.value;
+  const mode = top.find((r) => r.field === 3 && r.wire === 0)?.value;
+  if (type === undefined || !fragment) return null;
+
+  const typeName = nameOf("insta360.messages.PhotographyOptionType", type) ?? `#${type}`;
+  const modeName = nameOf("insta360.messages.FunctionMode", mode) ?? `#${mode}`;
+  const spec = schema.messages["insta360.messages.PhotographyOptions"]?.[String(type)];
+
+  const values = decodeRaw(fragment).map((record) => {
+    if (record.wire !== 0) return `field ${record.field} = 0x${record.value.toString("hex")}`;
+    const named = spec?.ref ? nameOf(spec.ref, record.value) : null;
+    return `${record.value}${named ? `  ${named}` : spec?.ref ? "  << NOT IN ENUM >>" : ""}`;
+  });
+
+  const unnamed = decodeRaw(fragment).some(
+    (record) => record.wire === 0 && spec?.ref && !nameOf(spec.ref, record.value),
+  );
+  const raw = decodeRaw(fragment).find((r) => r.wire === 0)?.value;
+  return {
+    text: `${typeName} = ${values.join(", ")}   [${modeName}]`,
+    unnamed,
+    raw,
+    typeName,
+  };
+}
+
 const describe = (raw, enumName) => {
   if (raw === undefined) return "(omitted — proto3 default, or unsupported)";
   const name = enumName ? nameOf(enumName, raw) : null;
@@ -399,13 +455,17 @@ async function scanTypes(session, { code, extra, optionTypeEnum, message, max })
     const body = Buffer.concat([fieldVarint(1, type), extra ?? Buffer.alloc(0)]);
     const frame = await session.send(code, body, 2500);
     if (!frame?.body?.length) continue;
-    if (!echoedTypes(frame.body).has(type)) continue;
 
+    // The echo in field 1 is NOT evidence of support. Asked for photography
+    // types 1-400 this camera echoed 399 of them, including hundreds that
+    // plainly do not exist — it simply parrots the request. Only a returned
+    // VALUE means the type is real, so that is the whole test.
     const values = [...allValueFields(frame.body)].map(([field, raw]) => ({
       field,
       name: fields[String(field)]?.name ?? null,
       raw,
     }));
+    if (values.length === 0) continue;
     hits.push({ type, name: known[String(type)] ?? null, values });
   }
   return hits;
@@ -414,20 +474,22 @@ async function scanTypes(session, { code, extra, optionTypeEnum, message, max })
 function reportScan(title, hits) {
   console.log(`\n${"=".repeat(72)}\n${title}\n${"=".repeat(72)}`);
   const novel = hits.filter((hit) => !hit.name);
-  console.log(`${hits.length} option type(s) acknowledged, ${novel.length} of them unnamed\n`);
+  console.log(`${hits.length} option type(s) returned a value, ${novel.length} of them unnamed\n`);
 
   if (novel.length === 0) {
-    console.log("No option types beyond the vendored enum. Whatever we are hunting");
-    console.log("is not reachable as a photography/device option on this firmware.");
+    console.log("No option types beyond the vendored enum returned anything. Whatever");
+    console.log("we are hunting is not reachable as a photography/device option here.");
   } else {
     console.log("UNNAMED — these postdate the schema and are the interesting ones:");
     for (const hit of novel) {
-      const shown = hit.values.length
-        ? hit.values.map((v) => `field ${v.field}${v.name ? ` (${v.name})` : ""} = ${v.raw}`).join(", ")
-        : "(acknowledged, no value — likely sitting at its default)";
+      const shown = hit.values
+        .map((v) => `field ${v.field}${v.name ? ` (${v.name})` : ""} = ${v.raw}`)
+        .join(", ");
       console.log(`  type ${String(hit.type).padStart(3)}   ${shown}`);
     }
   }
+  console.log("\nTypes that answered with nothing are not listed: this camera echoes");
+  console.log("any type number back, so silence and support look identical.");
 
   const unnamedFields = hits.flatMap((hit) =>
     hit.values.filter((v) => !v.name).map((v) => `${v.field} (via type ${hit.type})`),
@@ -675,6 +737,7 @@ async function seriesCommand(labels, all, max) {
 const CALIBRATION = [
   {
     field: 35,
+    key: "color",
     enumName: "insta360.messages.PhotographyOptions.COLOR_MODE",
     heading: "COLOUR MODE  (Pro > Color Mode)",
     steps: [
@@ -685,6 +748,7 @@ const CALIBRATION = [
   },
   {
     field: 18,
+    key: "filter",
     enumName: "insta360.messages.GammaMode",
     heading: "FILTER  (swipe from the right edge > Filter)",
     // Set Color Mode back to Standard and the resolution to 4K30 or lower
@@ -705,6 +769,7 @@ const CALIBRATION = [
   },
   {
     field: 104,
+    key: "strength",
     enumName: "insta360.messages.FilterIntensity",
     heading: "FILTER STRENGTH  (with a cinematic filter selected — Leica has none)",
     steps: [
@@ -720,6 +785,7 @@ const CALIBRATION = [
     // your camera's dial — a duplicate number in the output says as much.
     scope: "device",
     field: 40,
+    key: "photo-modes",
     enumName: "insta360.messages.PhotoSubMode",
     heading: "STILLS MODES  (the capture-mode strip)",
     steps: [
@@ -732,6 +798,7 @@ const CALIBRATION = [
   {
     scope: "device",
     field: 41,
+    key: "video-modes",
     enumName: "insta360.messages.VideoSubMode",
     heading: "VIDEO MODES  (the capture-mode strip)",
     steps: [
@@ -743,7 +810,376 @@ const CALIBRATION = [
   },
 ];
 
-async function calibrateCommand(max) {
+/**
+ * Narrow a calibration run to the groups you actually need.
+ *
+ * Re-measuring one setting should not mean stepping through all ten filters
+ * again. `--only` takes the listed groups, `--skip` drops them; an unknown name
+ * is an error rather than a silent no-op, because a typo that quietly ran
+ * everything would waste exactly the time this is meant to save.
+ */
+function selectGroups(only, skip) {
+  const known = CALIBRATION.map((group) => group.key);
+  const parse = (value) => (value ? value.split(",").map((s) => s.trim()).filter(Boolean) : []);
+  const wanted = parse(only);
+  const unwanted = parse(skip);
+
+  const unknown = [...wanted, ...unwanted].filter((name) => !known.includes(name));
+  if (unknown.length > 0) {
+    console.error(`unknown group(s): ${unknown.join(", ")}`);
+    console.error(`known groups: ${known.join(", ")}`);
+    process.exit(1);
+  }
+
+  return CALIBRATION.filter(
+    (group) =>
+      (wanted.length === 0 || wanted.includes(group.key)) && !unwanted.includes(group.key),
+  );
+}
+
+/**
+ * Sit on the control socket and print every frame the camera sends unprompted.
+ *
+ * Colour Recovery moves nothing in photography or device options, but it plainly
+ * changes the preview — so the likely home is the live-stream side, and the
+ * camera announces those through CAMERA_NOTIFICATION_UPDATE_LIVE_STREAM_PARAMS
+ * rather than parking them in an option you can read back.
+ *
+ * Purely passive: this sends no commands at all beyond the keepalive that holds
+ * the session open. Anything printed is the camera talking on its own.
+ */
+async function listenCommand() {
+  await withSession(async (session) => {
+    const codes = schema.enums["insta360.messages.MessageCode"] ?? {};
+    let seen = 0;
+
+    session.onUnsolicited = (frame) => {
+      // Frames with no code are transport-level keepalives, not protocol
+      // messages. They arrive about once a second and would bury anything real.
+      if (frame.code === undefined) return;
+      seen += 1;
+      if (frame.code === CODE_OPTION_CHANGED && frame.body?.length) {
+        const changed = describeOptionChange(frame.body);
+        if (changed) {
+          console.log(`\n[${seen}] CHANGED  ${changed.text}`);
+          return;
+        }
+      }
+      const name = codes[String(frame.code)] ?? "(no name in schema)";
+      console.log(`\n[${seen}] code ${frame.code}  ${name}`);
+      if (!frame.body?.length) {
+        console.log("     empty body");
+        return;
+      }
+      console.log(`     ${frame.body.length}B  ${frame.body.toString("hex")}`);
+      for (const record of decodeRaw(frame.body)) {
+        const value =
+          record.value instanceof Buffer ? `0x${record.value.toString("hex")}` : record.value;
+        console.log(`       field ${record.field} (wire ${record.wire}) = ${value}`);
+      }
+    };
+
+    console.log("listening — toggle the setting on the camera now. Ctrl-C to stop.\n");
+    console.log("Nothing is sent to the camera; every line below is the camera");
+    console.log("volunteering something.\n");
+
+    // Hold the process open. The keepalive inside LunaSession does the rest.
+    await new Promise(() => {});
+  });
+}
+
+/**
+ * Fire one command with a range of plausible request shapes.
+ *
+ * Some commands in the MessageCode enum have no message definition anywhere in
+ * the extraction — GET_SUBMODE_OPTIONS (43) is the one that matters here. An
+ * empty reply from a body we invented says "wrong shape" at least as often as
+ * it says "nothing there", so guessing once and concluding is not good enough.
+ *
+ * Read-only by construction: the caller passes a code the schema names
+ * PHONE_COMMAND_GET_*, and nothing here invents a code.
+ */
+function requestShapes(videoMode, imageMode) {
+  const f = fieldVarint;
+  const cat = (...parts) => Buffer.concat(parts);
+  const optionTypes = (n) => cat(...Array.from({ length: n }, (_, i) => f(1, i + 1)));
+
+  return [
+    { label: "empty", body: Buffer.alloc(0) },
+    { label: "f1=0", body: f(1, 0) },
+    { label: "f1=videoMode", body: f(1, videoMode) },
+    { label: "f2=videoMode", body: f(2, videoMode) },
+    { label: "f1=0 f2=videoMode", body: cat(f(1, 0), f(2, videoMode)) },
+    { label: "f1=videoMode f2=0", body: cat(f(1, videoMode), f(2, 0)) },
+    { label: "f1=imageMode", body: f(1, imageMode) },
+    { label: "f1=0 f2=imageMode", body: cat(f(1, 0), f(2, imageMode)) },
+    // Sub-mode ids rather than function modes: VIDEO_NORMAL 0, VIDEO_PURE 11,
+    // VIDEO_SLOW_MOTION 9, and the Pano stills sub-mode 8.
+    { label: "f1=subMode(0)", body: f(1, 0) },
+    { label: "f1=subMode(11)", body: f(1, 11) },
+    { label: "f1=subMode(8)", body: f(1, 8) },
+    { label: "f1=0 f2=11", body: cat(f(1, 0), f(2, 11)) },
+    // option_types-shaped, the pattern every other Get* request follows
+    { label: "f1=[1..12]", body: optionTypes(12) },
+    { label: "f1=[1..12] f2=videoMode", body: cat(optionTypes(12), f(2, videoMode)) },
+    { label: "f1=[1..12] f2=videoMode f3=1", body: cat(optionTypes(12), f(2, videoMode), f(3, 1)) },
+    { label: "f1=[1..40]", body: optionTypes(40) },
+    // GetGyro is `{ count: uint32 }`, and a batch read may want a real batch —
+    // asking for one sample is not obviously a valid request.
+    { label: "f1=10 (count)", body: f(1, 10) },
+    { label: "f1=100 (count)", body: f(1, 100) },
+    { label: "f1=200 (count)", body: f(1, 200) },
+    { label: "f1=1 f2=0", body: cat(f(1, 1), f(2, 0)) },
+  ];
+}
+
+async function shapesCommand(code) {
+  const name = schema.enums["insta360.messages.MessageCode"]?.[String(code)];
+  if (!name?.startsWith("PHONE_COMMAND_GET_")) {
+    console.error(`refusing code ${code}: the schema names it "${name ?? "nothing"}".`);
+    console.error("Only commands the schema names PHONE_COMMAND_GET_* are safe to fire blind.");
+    process.exit(1);
+  }
+
+  await withSession(async (session) => {
+    const videoMode = valueOf("insta360.messages.FunctionMode", "FUNCTION_MODE_NORMAL_VIDEO");
+    const imageMode = valueOf("insta360.messages.FunctionMode", "FUNCTION_MODE_NORMAL_IMAGE");
+    console.log(`trying request shapes against code ${code} (${name})\n`);
+
+    let answered = 0;
+    for (const shape of requestShapes(videoMode, imageMode)) {
+      const frame = await session.send(code, shape.body, 3000);
+      const reply = !frame ? "timed out" : !frame.body?.length ? "empty" : null;
+      if (reply) {
+        console.log(`  ${shape.label.padEnd(30)} ${reply}`);
+        continue;
+      }
+      answered += 1;
+      console.log(`  ${shape.label.padEnd(30)} ${frame.body.length}B  ${frame.body.toString("hex")}`);
+      for (const record of decodeRaw(frame.body)) {
+        const value =
+          record.value instanceof Buffer ? `0x${record.value.toString("hex")}` : record.value;
+        console.log(`      field ${record.field} (wire ${record.wire}) = ${value}`);
+      }
+    }
+
+    console.log(
+      answered === 0
+        ? "\nNo shape got an answer. This command is not simply mis-shaped — the\ncamera has nothing to say to it."
+        : `\n${answered} shape(s) answered. The ones with a body are the real request form.`,
+    );
+  });
+}
+
+/**
+ * Watch everything at once while you use the camera, and let you mark the moment.
+ *
+ * `pair` and `series` compare two steady states, which is useless for a gesture:
+ * a tap-to-focus or a track drag is an event, not a setting that sits still to
+ * be read. So this polls the option fields AND listens for notifications on the
+ * same connection, stamps everything with a time, and lets you press Enter to
+ * drop a labelled marker into the stream.
+ *
+ * Read-only: the poll sends GET_* and nothing else.
+ *
+ * Use it by starting it, then doing ONE thing on the camera, pressing Enter to
+ * mark it, and doing the next. The markers are what make the log readable
+ * afterwards — without them a wall of timestamps tells you nothing about which
+ * line was your tap.
+ */
+async function monitorCommand(max, intervalMs) {
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  const logFile = path.join(OUT_DIR, "monitor.log");
+  const lines = [];
+  const started = Date.now();
+
+  const stamp = () => `${((Date.now() - started) / 1000).toFixed(1)}s`.padStart(7);
+  const say = (text) => {
+    lines.push(text);
+    console.log(text);
+  };
+
+  await withSession(async (session) => {
+    const codes = schema.enums["insta360.messages.MessageCode"] ?? {};
+
+    let keepalives = 0;
+    let awaiting = null;
+    const labelled = [];
+    session.onUnsolicited = (frame) => {
+      // See listenCommand: codeless frames are transport keepalives. Counted
+      // rather than printed, so their absence is still visible if it matters.
+      if (frame.code === undefined) {
+        keepalives += 1;
+        return;
+      }
+      if (frame.code === CODE_OPTION_CHANGED && frame.body?.length) {
+        const changed = describeOptionChange(frame.body);
+        if (changed) {
+          say(`${stamp()}  CHANGED  ${changed.text}`);
+          if (changed.unnamed) {
+            // The schema has no name for this one, and the camera's screen is
+            // the only place the answer exists. Ask while it is on screen —
+            // reconstructing it afterwards from the order of a log is guesswork.
+            awaiting = { raw: changed.raw, typeName: changed.typeName };
+            say(`         ^^ NO NAME. Type what the camera shows, then Enter.`);
+          }
+          return;
+        }
+      }
+      const name = codes[String(frame.code)] ?? "UNNAMED CODE";
+      const body = frame.body?.length ? frame.body.toString("hex") : "(empty)";
+      say(`${stamp()}  PUSH  code ${frame.code} ${name}  ${body}`);
+    };
+
+    // One function mode, not four. A gesture wants to be noticed quickly, and
+    // the picture-profile fields mirror across modes anyway.
+    const videoMode = valueOf("insta360.messages.FunctionMode", "FUNCTION_MODE_NORMAL_VIDEO");
+    const sample = async () => ({
+      ...Object.fromEntries(
+        Object.entries(
+          await sweep(session, { code: CODE.GET_OPTIONS, max }),
+        ).map(([k, v]) => [`device.${k}`, v.raw]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(
+          await sweep(session, {
+            code: CODE.GET_PHOTOGRAPHY_OPTIONS,
+            extra: fieldVarint(2, videoMode),
+            max,
+          }),
+        ).map(([k, v]) => [`photo.${k}`, v.raw]),
+      ),
+    });
+
+    say(`monitoring ${HOST} — option types 1-${max}, polling every ${intervalMs}ms`);
+    say("Do ONE thing on the camera, then press Enter to mark it. Ctrl-C to stop.\n");
+
+    let previous = await sample();
+    say(`${stamp()}  baseline captured, ${Object.keys(previous).length} fields\n`);
+
+    let markers = 0;
+    const rl = readline.createInterface({ input: process.stdin });
+    rl.on("line", (text) => {
+      const label = text.trim();
+      // A typed line answers the outstanding "what is this?" if there is one,
+      // which is what turns a log of bare numbers into a usable mapping.
+      if (awaiting && label) {
+        say(`${stamp()}  LABEL  ${awaiting.typeName} ${awaiting.raw} = ${label}`);
+        labelled.push(`${awaiting.typeName} ${awaiting.raw} = ${label}`);
+        awaiting = null;
+        return;
+      }
+      markers += 1;
+      say(`\n${stamp()}  ===== MARK ${markers}${label ? `: ${label}` : ""} =====`);
+    });
+
+    process.on("SIGINT", () => {
+      fs.writeFileSync(logFile, lines.join("\n"));
+      console.log(`\n\n${keepalives} keepalive frame(s) ignored.`);
+      if (labelled.length > 0) {
+        console.log(`\n${labelled.length} value(s) you named:`);
+        for (const entry of labelled) console.log(`  ${entry}`);
+      }
+      console.log(`\nwritten to ${logFile}`);
+      process.exit(0);
+    });
+
+    for (;;) {
+      await new Promise((done) => setTimeout(done, intervalMs));
+      const next = await sample();
+      for (const key of Object.keys(next)) {
+        // media_time and battery move on their own; they would bury everything
+        if (key.includes("media_time") || key.includes("battery_status")) continue;
+        if (String(previous[key]) !== String(next[key])) {
+          say(`${stamp()}  ${key.padEnd(34)} ${previous[key]}  ->  ${next[key]}`);
+        }
+      }
+      previous = next;
+    }
+  });
+}
+
+/**
+ * A live attitude readout, for working on anything gimbal-shaped.
+ *
+ * GET_GYRO answers with a blob of IMU samples — `Gyro { ax, ay, az, gx, gy, gz }`,
+ * six doubles each, accelerometer then gyroscope. Unlike every setting we have
+ * chased, this changes on its own the moment the camera moves, so you can just
+ * pick the camera up and watch whether the numbers follow.
+ *
+ * NOT IMPLEMENTED on firmware v1.0.283: GET_GYRO answered nothing to any of the
+ * 20 request shapes `shapes 19` tries. Kept because the message is defined in
+ * the protocol and a later firmware may well turn it on — but do not expect it
+ * to work today.
+ *
+ * Note what this would NOT be: the camera body's IMU, not the gimbal's motor angles.
+ * It tells you which way the camera is pointing, not where the gimbal has driven
+ * its axes to. Worth knowing before building anything on top of it.
+ *
+ * Read-only.
+ */
+const GYRO_SAMPLE_BYTES = 48; // six little-endian doubles
+
+function decodeGyro(blob) {
+  const samples = [];
+  for (let at = 0; at + GYRO_SAMPLE_BYTES <= blob.length; at += GYRO_SAMPLE_BYTES) {
+    const view = new DataView(blob.buffer, blob.byteOffset + at, GYRO_SAMPLE_BYTES);
+    samples.push({
+      ax: view.getFloat64(0, true),
+      ay: view.getFloat64(8, true),
+      az: view.getFloat64(16, true),
+      gx: view.getFloat64(24, true),
+      gy: view.getFloat64(32, true),
+      gz: view.getFloat64(40, true),
+    });
+  }
+  return samples;
+}
+
+async function gimbalCommand(intervalMs, count) {
+  await withSession(async (session) => {
+    const postures = schema.enums["insta360.messages.Options.CameraPostureType"] ?? {};
+    console.log(`reading attitude from ${HOST} every ${intervalMs}ms. Ctrl-C to stop.`);
+    console.log("Move the camera and watch whether the numbers follow.\n");
+
+    let warned = false;
+    for (;;) {
+      const frame = await session.send(19, fieldVarint(1, count), 2500);
+      const postureFrame = await session.send(CODE.GET_OPTIONS, fieldVarint(1, 93), 2500);
+
+      const posture = postureFrame?.body?.length
+        ? [...valueFields(postureFrame.body)].map(([, v]) => postures[String(v)] ?? v).join(" ")
+        : "—";
+
+      if (!frame?.body?.length) {
+        if (!warned) {
+          console.log("GET_GYRO answered nothing. Try `shapes 19` to find the request form.");
+          warned = true;
+        }
+      } else {
+        // Field 1 of GetGyroResp is the sample blob
+        const blob = decodeRaw(frame.body).find((r) => r.field === 1 && r.wire === 2)?.value;
+        const samples = blob ? decodeGyro(blob) : [];
+        const last = samples.at(-1);
+        if (!last) {
+          console.log(`posture ${posture}  |  ${frame.body.length}B, no whole sample: ${frame.body.toString("hex").slice(0, 80)}`);
+        } else {
+          const n = (value) => value.toFixed(3).padStart(9);
+          console.log(
+            `posture ${String(posture).padEnd(26)} accel ${n(last.ax)} ${n(last.ay)} ${n(last.az)}` +
+              `   gyro ${n(last.gx)} ${n(last.gy)} ${n(last.gz)}   (${samples.length} sample/s)`,
+          );
+        }
+      }
+      await new Promise((done) => setTimeout(done, intervalMs));
+    }
+  });
+}
+
+async function calibrateCommand(max, only, skip) {
+  // Resolve the group list BEFORE opening a connection, so a typo fails
+  // instantly instead of after a network timeout.
+  const groups = selectGroups(only, skip);
   fs.mkdirSync(OUT_DIR, { recursive: true });
   await withSession(async (session) => {
     console.log("CALIBRATION — every colour mode, filter and strength in one pass.");
@@ -751,8 +1187,10 @@ async function calibrateCommand(max) {
     console.log("Before starting: Color Mode = Standard, resolution 4K30 or lower,");
     console.log("normal Video mode. Filters are unavailable above 4K60.\n");
 
+    console.log(`groups: ${groups.map((g) => g.key).join(", ")}\n`);
+
     const results = {};
-    for (const group of CALIBRATION) {
+    for (const group of groups) {
       console.log(`\n${"=".repeat(72)}\n${group.heading}\n${"=".repeat(72)}`);
       const observed = {};
       for (const step of group.steps) {
@@ -843,7 +1281,7 @@ if (command === "diff") {
   }
   await pairCommand(before, after, ALL, MAX);
 } else if (command === "calibrate") {
-  await calibrateCommand(MAX);
+  await calibrateCommand(MAX, flag("only", ""), flag("skip", ""));
 } else if (command === "series") {
   const labels = args.slice(1).filter((a) => !a.startsWith("--"));
   if (labels.length < 2) {
@@ -851,6 +1289,19 @@ if (command === "diff") {
     process.exit(1);
   }
   await seriesCommand(labels, ALL, MAX);
+} else if (command === "shapes") {
+  const code = Number(args[1]);
+  if (!Number.isInteger(code)) {
+    console.error("usage: node scripts/probe-colorspace.mjs shapes <command-code>");
+    process.exit(1);
+  }
+  await shapesCommand(code);
+} else if (command === "gimbal") {
+  await gimbalCommand(Number(flag("interval", "300")), Number(flag("count", "1")));
+} else if (command === "monitor") {
+  await monitorCommand(MAX, Number(flag("interval", "700")));
+} else if (command === "listen") {
+  await listenCommand();
 } else if (command === "scan") {
   await scanCommand(MAX);
 } else if (command === "watch") {
@@ -863,6 +1314,6 @@ if (command === "diff") {
   }
   await snapshotCommand(label, ALL, MAX);
 } else {
-  console.error(`unknown command "${command}" — expected calibrate, pair, series, snapshot, diff, watch or scan`);
+  console.error(`unknown command "${command}" — expected calibrate, gimbal, monitor, pair, series, snapshot, diff, watch, scan, listen or shapes`);
   process.exit(1);
 }
