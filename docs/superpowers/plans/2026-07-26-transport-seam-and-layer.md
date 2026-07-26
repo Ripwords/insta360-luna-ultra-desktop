@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Put a swappable `CameraTransport` behind every camera call, then extract the shared UI into a Nuxt layer, so a second Nuxt app (the docs site) can render the real components against a mock camera.
+**Goal:** Put a swappable `CameraTransport` behind every camera call, so a second Nuxt app (the docs site) can render the real components against a mock camera without any change to how the desktop app is organised.
 
 **Architecture:** A module-level registry in `utils/transport.ts` holds the current transport, defaulting to the existing `lunaClient` object — so the desktop app's behaviour is unchanged by construction. Ten call sites move from importing `lunaClient` directly to reading the registry. Nothing moves on disk: the docs site will consume the desktop app as a Nuxt layer in place via `extends: ["../.."]`.
 
@@ -32,17 +32,17 @@ Spec: `docs/superpowers/specs/2026-07-26-docs-site-and-live-demo-design.md`
 
 **Created:**
 
-| File                                        | Responsibility                                             |
-| ------------------------------------------- | ---------------------------------------------------------- |
-| `app/utils/transport.ts`                    | `CameraTransport` interface + registry. No I/O of its own. |
-| `tests/helpers/fakeTransport.ts`            | Reusable fully-stubbed `CameraTransport` for tests.        |
-| `tests/transport.test.ts`                   | Registry default/override/reset (node env).                |
-| `vitest.nuxt.config.ts`                     | Second vitest config, `environment: "nuxt"`.               |
-| `tests/nuxt/useCamera.test.ts`              | Connect, disconnect, reconnect, library refresh.           |
-| `tests/nuxt/useGallery.test.ts`             | Delete calls `deleteFiles` with camera paths.              |
-| `tests/nuxt/useLiveView.test.ts`            | OSC preferred, annexb fallback, stop.                      |
-| `tests/nuxt/harness.ts`                     | `mountComposable()` — runs a composable in a Nuxt app.     |
-| `tests/helpers/media.ts`                    | `makeMediaItem()` — a complete, valid `MediaItem`.         |
+| File                             | Responsibility                                             |
+| -------------------------------- | ---------------------------------------------------------- |
+| `app/utils/transport.ts`         | `CameraTransport` interface + registry. No I/O of its own. |
+| `tests/helpers/fakeTransport.ts` | Reusable fully-stubbed `CameraTransport` for tests.        |
+| `tests/transport.test.ts`        | Registry default/override/reset (node env).                |
+| `vitest.nuxt.config.ts`          | Second vitest config, `environment: "nuxt"`.               |
+| `tests/nuxt/useCamera.test.ts`   | Connect, disconnect, reconnect, library refresh.           |
+| `tests/nuxt/useGallery.test.ts`  | Delete calls `deleteFiles` with camera paths.              |
+| `tests/nuxt/useLiveView.test.ts` | OSC preferred, annexb fallback, stop.                      |
+| `tests/nuxt/harness.ts`          | `mountComposable()` — runs a composable in a Nuxt app.     |
+| `tests/helpers/media.ts`         | `makeMediaItem()` — a complete, valid `MediaItem`.         |
 
 **Modified:** `app/utils/lunaClient.ts` (add `fetch`, `probe`, `onDisconnect`; un-export `cameraFetch`/`probeCamera`), the ten call sites, `vitest.config.ts`, `package.json`, `.github/workflows/ci.yml`, `README.md`.
 
@@ -989,6 +989,7 @@ git commit --allow-empty -m "chore: verify transport seam against luna_mock_serv
 ```
 
 ---
+
 ### Task 7: Document the seam
 
 **Files:**
