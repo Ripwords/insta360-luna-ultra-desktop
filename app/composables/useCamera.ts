@@ -1,5 +1,5 @@
 import type { CameraInfo, CameraStatus, MediaItem } from "~/types/media";
-import { useCameraTransport } from "~/utils/transport";
+import { getCameraTransport } from "~/utils/transport";
 import { armCameraHealth, disarmCameraHealth, FAILURE_THRESHOLD } from "~/utils/cameraHealth";
 
 const DEFAULT_HOST = "192.168.42.1";
@@ -40,7 +40,7 @@ export function useCamera() {
 
   const isConnected = computed(() => status.value === "connected");
   const isBusy = computed(() => status.value === "connecting");
-  const available = computed(() => useCameraTransport().available);
+  const available = computed(() => getCameraTransport().available);
 
   let disconnectUnlisten: (() => void) | null = null;
 
@@ -55,7 +55,7 @@ export function useCamera() {
     if (!wantConnection.value || isConnected.value || isBusy.value) return;
     status.value = "connecting";
     try {
-      info.value = await useCameraTransport().connect(host.value);
+      info.value = await getCameraTransport().connect(host.value);
       status.value = "connected";
       error.value = null;
       retryAttempt.value = 0;
@@ -63,7 +63,7 @@ export function useCamera() {
         () => {
           void forceDisconnect();
         },
-        () => useCameraTransport().probe(host.value),
+        () => getCameraTransport().probe(host.value),
       );
       await refreshLibrary();
     } catch {
@@ -95,7 +95,7 @@ export function useCamera() {
   }
 
   async function watchDisconnect() {
-    const transport = useCameraTransport();
+    const transport = getCameraTransport();
     if (!transport.available || disconnectUnlisten) return;
     disconnectUnlisten = await transport.onDisconnect(() => {
       status.value = "disconnected";
@@ -117,7 +117,7 @@ export function useCamera() {
     loadingLibrary.value = true;
     error.value = null;
     try {
-      library.value = await useCameraTransport().listMedia(host.value);
+      library.value = await getCameraTransport().listMedia(host.value);
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Failed to read the media library.";
     } finally {
@@ -128,7 +128,7 @@ export function useCamera() {
   async function connect() {
     if (isConnected.value || isBusy.value) return;
     error.value = null;
-    if (!useCameraTransport().available) {
+    if (!getCameraTransport().available) {
       error.value =
         "Camera control requires the desktop app. Run the packaged Luna Ultra app to connect.";
       return;
@@ -137,7 +137,7 @@ export function useCamera() {
     try {
       await watchDisconnect();
       watchNetwork();
-      info.value = await useCameraTransport().connect(host.value);
+      info.value = await getCameraTransport().connect(host.value);
       status.value = "connected";
       // Auto-reconnect only after a session the user established succeeds
       wantConnection.value = true;
@@ -145,7 +145,7 @@ export function useCamera() {
         () => {
           void forceDisconnect();
         },
-        () => useCameraTransport().probe(host.value),
+        () => getCameraTransport().probe(host.value),
       );
       retryAttempt.value = 0;
       await refreshLibrary();
@@ -163,7 +163,7 @@ export function useCamera() {
   async function teardown() {
     clearRetryTimer();
     disarmCameraHealth();
-    await useCameraTransport().disconnect();
+    await getCameraTransport().disconnect();
     status.value = "disconnected";
     info.value = null;
     library.value = [];

@@ -1,7 +1,7 @@
 import type { MediaItem } from "~/types/media";
 import { dayLabel, groupByDay } from "~/utils/media";
 import { rangeSelect, toggleGroup, toggleId } from "~/utils/selection";
-import { useCameraTransport } from "~/utils/transport";
+import { getCameraTransport } from "~/utils/transport";
 
 export type MediaFilter = "all" | "photo" | "video";
 export type StorageFilter = "all" | "internal" | "sdcard";
@@ -70,7 +70,7 @@ export function useGallery() {
     if (removed.length === 0 || deleting.value) return;
     deleting.value = true;
     try {
-      await useCameraTransport().deleteFiles(removed.map((item) => item.cameraPath));
+      await getCameraTransport().deleteFiles(removed.map((item) => item.cameraPath));
       removeFromLibrary(removed.map((item) => item.cameraPath));
       clearSelection();
       toast.add({

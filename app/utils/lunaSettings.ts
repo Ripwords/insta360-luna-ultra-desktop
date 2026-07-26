@@ -7,7 +7,7 @@ import {
   enumNames,
   type ProtoObject,
 } from "~/utils/lunaProto";
-import { useCameraTransport } from "~/utils/transport";
+import { getCameraTransport } from "~/utils/transport";
 
 const CODE_SET_OPTIONS = 7;
 const CODE_GET_OPTIONS = 8;
@@ -42,7 +42,7 @@ async function readBatched(
   for (const batch of chunk(types, BATCH)) {
     let response: Uint8Array;
     try {
-      response = await useCameraTransport().command(
+      response = await getCameraTransport().command(
         code,
         encodeMessage(requestMessage, { option_types: batch, ...extra }),
       );
@@ -76,7 +76,7 @@ export async function readPhotographyOption(
   mode: string,
   optionType: string,
 ): Promise<ProtoObject> {
-  const response = await useCameraTransport().command(
+  const response = await getCameraTransport().command(
     CODE_GET_PHOTOGRAPHY_OPTIONS,
     encodeMessage(MSG.GetPhotographyOptions, {
       option_types: [optionType],
@@ -90,7 +90,7 @@ export async function readPhotographyOption(
 
 /** Read back one device option, to verify a write the same way settings do. */
 export async function readDeviceOption(optionType: string): Promise<ProtoObject> {
-  const response = await useCameraTransport().command(
+  const response = await getCameraTransport().command(
     CODE_GET_OPTIONS,
     encodeMessage(MSG.GetOptions, { option_types: [optionType] }),
   );
@@ -111,7 +111,7 @@ export async function writePhotographyOptions(
   optionTypes: string[],
   patch: ProtoObject,
 ): Promise<string[]> {
-  const response = await useCameraTransport().command(
+  const response = await getCameraTransport().command(
     CODE_SET_PHOTOGRAPHY_OPTIONS,
     encodeMessage(MSG.SetPhotographyOptions, {
       option_types: optionTypes,
@@ -128,7 +128,7 @@ export async function writeDeviceOptions(
   optionTypes: string[],
   patch: ProtoObject,
 ): Promise<string[]> {
-  const response = await useCameraTransport().command(
+  const response = await getCameraTransport().command(
     CODE_SET_OPTIONS,
     encodeMessage(MSG.SetOptions, { option_types: optionTypes, value: patch }),
   );

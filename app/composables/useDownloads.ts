@@ -1,7 +1,7 @@
 import type { DownloadEntry, MediaItem } from "~/types/media";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
-import { useCameraTransport } from "~/utils/transport";
+import { getCameraTransport } from "~/utils/transport";
 
 export function useDownloads() {
   const queue = useState<DownloadEntry[]>("download-queue", () => []);
@@ -28,7 +28,7 @@ export function useDownloads() {
       }
       patch(entry.id, { status: "downloading", progress: 4 });
       try {
-        const response = await useCameraTransport().fetch(entry.item.srcUrl);
+        const response = await getCameraTransport().fetch(entry.item.srcUrl);
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
         patch(entry.id, { progress: 45 });
         let blob = await response.blob();

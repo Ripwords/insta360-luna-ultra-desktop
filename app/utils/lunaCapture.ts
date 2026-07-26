@@ -1,5 +1,5 @@
 import { MSG, decodeMessage, encodeMessage, type ProtoObject } from "~/utils/lunaProto";
-import { useCameraTransport } from "~/utils/transport";
+import { getCameraTransport } from "~/utils/transport";
 
 const CODE_TAKE_PICTURE = 3;
 const CODE_START_CAPTURE = 4;
@@ -15,21 +15,21 @@ export interface CaptureStatus {
 }
 
 export async function startCapture(captureMode: string): Promise<void> {
-  await useCameraTransport().command(
+  await getCameraTransport().command(
     CODE_START_CAPTURE,
     encodeMessage(MSG.StartCapture, { mode: captureMode }),
   );
 }
 
 export async function stopCapture(captureMode: string): Promise<void> {
-  await useCameraTransport().command(
+  await getCameraTransport().command(
     CODE_STOP_CAPTURE,
     encodeMessage(MSG.StopCapture, { mode: captureMode }),
   );
 }
 
 export async function takePicture(mode = "NORMAL"): Promise<void> {
-  await useCameraTransport().command(CODE_TAKE_PICTURE, encodeMessage(MSG.TakePicture, { mode }));
+  await getCameraTransport().command(CODE_TAKE_PICTURE, encodeMessage(MSG.TakePicture, { mode }));
 }
 
 /**
@@ -38,7 +38,7 @@ export async function takePicture(mode = "NORMAL"): Promise<void> {
  * the request was understood.
  */
 export async function readCaptureStatus(): Promise<CaptureStatus> {
-  const response = await useCameraTransport().command(
+  const response = await getCameraTransport().command(
     CODE_GET_CURRENT_CAPTURE_STATUS,
     new Uint8Array(0),
   );

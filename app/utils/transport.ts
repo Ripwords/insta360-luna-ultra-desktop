@@ -38,6 +38,6 @@ export function resetCameraTransport(): void {
   current = lunaClient;
 }
 
-export function useCameraTransport(): CameraTransport {
+export function getCameraTransport(): CameraTransport {
   return current;
 }

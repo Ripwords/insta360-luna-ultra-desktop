@@ -1,5 +1,5 @@
 import type { LiveViewStats } from "~/types/media";
-import { useCameraTransport } from "~/utils/transport";
+import { getCameraTransport } from "~/utils/transport";
 
 export type LiveTransport = "mjpeg" | "annexb";
 
@@ -31,7 +31,7 @@ export function useLiveView() {
     diagnostics.value = [];
 
     try {
-      const osc = await useCameraTransport().probeOscPreview(host.value);
+      const osc = await getCameraTransport().probeOscPreview(host.value);
       if (osc) {
         note("OSC MJPEG preview available; using it.");
         transport.value = "mjpeg";
@@ -41,7 +41,7 @@ export function useLiveView() {
       }
       note("No OSC MJPEG preview; falling back to the control-session stream.");
 
-      const info = await useCameraTransport().liveViewStart();
+      const info = await getCameraTransport().liveViewStart();
       note(`Camera accepted START_LIVE_STREAM. Serving on port ${info.port}.`);
       transport.value = "annexb";
       streamUrl.value = info.url;
@@ -50,7 +50,7 @@ export function useLiveView() {
       // If nothing arrives, say so rather than showing an empty canvas
       setTimeout(async () => {
         if (!active.value || transport.value !== "annexb") return;
-        const stats = await useCameraTransport()
+        const stats = await getCameraTransport()
           .liveViewStats()
           .catch(() => null);
         if (stats && stats.bytes === 0) {
@@ -71,14 +71,14 @@ export function useLiveView() {
     active.value = false;
     transport.value = null;
     streamUrl.value = null;
-    await useCameraTransport()
+    await getCameraTransport()
       .liveViewStop()
       .catch(() => {});
   }
 
   async function refreshStats(): Promise<LiveViewStats | null> {
     if (!active.value) return null;
-    return useCameraTransport()
+    return getCameraTransport()
       .liveViewStats()
       .catch(() => null);
   }
