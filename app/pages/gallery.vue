@@ -268,36 +268,17 @@ defineShortcuts({
         />
       </div>
 
-      <div v-else class="space-y-8 pb-24">
-        <section v-for="group in groups" :key="group.key" :aria-label="group.label">
-          <div class="mb-2.5 flex items-baseline gap-3">
-            <h2 class="text-sm font-semibold text-highlighted">{{ group.label }}</h2>
-            <span class="font-mono text-xs text-muted tabular-nums">{{ group.items.length }}</span>
-            <UButton
-              :label="group.items.every((i) => selected.has(i.id)) ? 'Deselect day' : 'Select day'"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              @click="selectGroup(group.items.map((i) => i.id))"
-            />
-          </div>
-
-          <div
-            class="grid gap-2"
-            :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${tileMin}px, 1fr))` }"
-          >
-            <MediaTile
-              v-for="item in group.items"
-              :key="item.id"
-              :item
-              :selected="selected.has(item.id)"
-              :selection-active="selectionActive"
-              @open="openPreview(item)"
-              @select="select(item, $event)"
-              @loaded="annotateDimensions(item, $event)"
-            />
-          </div>
-        </section>
+      <div v-else class="pb-24">
+        <MediaGrid
+          :groups
+          :tile-min="tileMin"
+          :selected
+          :selection-active="selectionActive"
+          @open="openPreview"
+          @select="select"
+          @select-group="selectGroup"
+          @loaded="annotateDimensions"
+        />
       </div>
 
       <SelectionBar
