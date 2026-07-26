@@ -16,10 +16,16 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       # Each check runs independently so one failure doesn't mask the others
-      # (a failing step would otherwise abort every step after it).
-      - name: Unit tests
+      # (a failing step would otherwise abort every step after it). The unit
+      # tests are further split by project: `bun run test` chains the node
+      # and nuxt vitest runs with `&&`, so a node failure would otherwise
+      # abort the run before the nuxt project's 12 tests ever get reported.
+      - name: Unit tests (node)
         if: ${{ !cancelled() }}
-        run: bun run test
+        run: bunx vitest run
+      - name: Unit tests (nuxt)
+        if: ${{ !cancelled() }}
+        run: bunx vitest run -c vitest.nuxt.config.ts
       - name: Typecheck
         if: ${{ !cancelled() }}
         run: bun run typecheck
