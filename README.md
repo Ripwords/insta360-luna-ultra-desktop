@@ -10,13 +10,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Ripwords/luna-ultra-desktop/releases/latest"><img src="https://img.shields.io/badge/Mac-3F454D?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" /></a>
-  <a href="https://github.com/Ripwords/luna-ultra-desktop/releases/latest"><img src="https://img.shields.io/badge/Windows-3F454D?style=for-the-badge&logo=windows11&logoColor=white" alt="Download for Windows" /></a>
-  <a href="https://github.com/Ripwords/luna-ultra-desktop/releases/latest"><img src="https://img.shields.io/badge/Linux-3F454D?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux" /></a>
-  <br />
-  <sub>Apple Silicon &amp; Intel · Windows x64 · AppImage, .deb, .rpm — with signed auto-updates</sub>
+  <a href="https://github.com/Ripwords/insta360-luna-ultra-desktop/releases/latest/download/Luna-Ultra-Desktop-mac-apple-silicon.dmg"><img src="https://img.shields.io/badge/Apple%20Silicon-3F454D?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Apple Silicon)" /></a>
+  <a href="https://github.com/Ripwords/insta360-luna-ultra-desktop/releases/latest/download/Luna-Ultra-Desktop-mac-intel.dmg"><img src="https://img.shields.io/badge/Intel-3F454D?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Intel)" /></a>
+  <a href="https://github.com/Ripwords/insta360-luna-ultra-desktop/releases/latest/download/Luna-Ultra-Desktop-windows-x64.exe"><img src="https://img.shields.io/badge/Windows-3F454D?style=for-the-badge&logo=windows11&logoColor=white" alt="Download for Windows" /></a>
+  <a href="https://github.com/Ripwords/insta360-luna-ultra-desktop/releases/latest/download/Luna-Ultra-Desktop-linux-x86_64.AppImage"><img src="https://img.shields.io/badge/Linux-3F454D?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux" /></a>
   <br /><br />
-  <a href="https://github.com/Ripwords/luna-ultra-desktop/releases/latest"><img src="https://img.shields.io/github/v/release/Ripwords/luna-ultra-desktop?style=flat-square&label=latest&labelColor=24292F&color=3F454D" alt="Latest release" /></a>
+  <a href="https://github.com/Ripwords/insta360-luna-ultra-desktop/releases/latest"><img src="https://img.shields.io/github/v/release/Ripwords/insta360-luna-ultra-desktop?style=flat-square&label=latest&labelColor=24292F&color=3F454D" alt="Latest release" /></a>
 </p>
 
 Connect over Wi-Fi to drive the camera from a live viewfinder, browse its media library, batch-download photos and videos with the official Luna Ultra watermark, delete files, and explore the camera as an interactive 3D model. Native desktop app for macOS, Windows, and Linux, with signed auto-updates.
