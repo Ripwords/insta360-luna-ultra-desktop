@@ -18,7 +18,7 @@
     "release": "bun scripts/release.mjs"
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.118",
+    "@iconify-json/lucide": "^1.2.119",
     "@iconify-json/simple-icons": "^1.2.91",
     "@nuxt/ui": "^4.10.0",
     "@tauri-apps/plugin-fs": "^2.5.1",
@@ -34,10 +34,10 @@
     "@tauri-apps/cli": "^2.11.4",
     "@types/three": "^0.185.1",
     "changelogen": "^0.6.2",
-    "oxfmt": "^0.59.0",
-    "oxlint": "^1.74.0",
-    "typescript": "^5.9.0",
+    "oxfmt": "^0.60.0",
+    "oxlint": "^1.75.0",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.8"
   }
 }

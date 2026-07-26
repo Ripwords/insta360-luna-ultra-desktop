@@ -24,7 +24,8 @@ screen is. Everything below is graded on that bar.
 | ✅ | **Shipping.** In the packaged release, verified on-device. |
 | 🧪 | **Dev-only.** Built, but behind a flag in `app/utils/features.ts` that is off in release builds. |
 | 🚧 | **Partial.** Works, with a known limitation stated in the row. |
-| ⛔ | **Blocked.** Investigated and found unreachable on this protocol — see [Not reachable](#not-reachable-on-this-protocol). |
+| ⏸ | **On hold.** Probed hard, nothing readable found yet — parked for further experimentation, see [On hold](#on-hold--no-readable-lever-yet). |
+| ⛔ | **Not on this camera.** Described by the extraction, does not exist on this firmware. |
 | ○ | **Not started.** Understood, not built. |
 
 ---
@@ -178,25 +179,27 @@ time.
 
 ---
 
-## Not reachable on this protocol
+## On hold — no readable lever yet
 
-Five features were driven successfully; five were chased and abandoned. The
-split is not luck — it is the shape of what the control protocol exposes.
+Five features were driven successfully; five are parked here. The split is not
+luck — it is the shape of what the control protocol exposes so far.
 
 **Everything reachable is a value the camera stores and reports. Nothing in this
-list is.** Before spending a day on the next feature, ask which column it is in.
+list is — yet.** Before spending a day on the next feature, ask which column it
+is in. These are not dead: each is waiting on a new angle of experimentation,
+not on a decision to stop.
 
 | Feature | Status | What was tried |
 |---|---|---|
-| Colour Recovery (v1.0.283) | ⛔ | Photography option types 1–400, device option types 1–400, all 11 named `PHONE_COMMAND_GET_*`, `GET_SUBMODE_OPTIONS` in 16 request shapes, unsolicited notifications. Nothing moves with the toggle. It visibly changes the preview, so it is real — just not observable here. |
-| Gimbal pan/tilt control | ⛔ | `PTZ_CTRL` is option type 87 and the only pan/tilt name in the schema, but `Options` has **no field 87** — the type has a name and no payload, so it answers empty. |
-| Gimbal attitude / gyro | ⛔ | `PHONE_COMMAND_GET_GYRO` is fully defined and answers nothing to any of 20 request shapes. `NotificationCameraPostureUpdate` carries only ROTATE_0/90/180/270/UP/DOWN — "is it upside down", not an angle. |
-| Deep Track | 🚧 ⛔ | Field 91 is real: toggling it on the camera drives a nested `state` 2 ↔ 5. But writes come back `differs`, and the value read on connect did not match the camera. Status we cannot interpret is not a control, so there isn't one. |
-| Tap to focus | ⛔ | No stored option corresponds to it. |
+| Colour Recovery (v1.0.283) | ⏸ | Photography option types 1–400, device option types 1–400, all 11 named `PHONE_COMMAND_GET_*`, `GET_SUBMODE_OPTIONS` in 16 request shapes, unsolicited notifications. Nothing moves with the toggle. It visibly changes the preview, so it is real — just not observable here. |
+| Gimbal pan/tilt control | ⏸ | `PTZ_CTRL` is option type 87 and the only pan/tilt name in the schema, but `Options` has **no field 87** — the type has a name and no payload, so it answers empty. |
+| Gimbal attitude / gyro | ⏸ | `PHONE_COMMAND_GET_GYRO` is fully defined and answers nothing to any of 20 request shapes. `NotificationCameraPostureUpdate` carries only ROTATE_0/90/180/270/UP/DOWN — "is it upside down", not an angle. |
+| Deep Track | 🚧 ⏸ | Field 91 is real: toggling it on the camera drives a nested `state` 2 ↔ 5. But writes come back `differs`, and the value read on connect did not match the camera. Status we cannot interpret is not a control, so there isn't one. |
+| Tap to focus | ⏸ | No stored option corresponds to it. |
 
-The one remaining route for all of these is capturing the phone app's traffic
+The next route to try for all of these is capturing the phone app's traffic
 (`scripts/decode-capture.mjs`) — those commands demonstrably exist, since the
-phone issues them; they just never touch anything readable.
+phone issues them; they just never touch anything readable from here yet.
 
 **Deliberately not done:** command codes above 152 were never scanned. This
 firmware certainly has them, but an unnamed code could be a setter, a format or
