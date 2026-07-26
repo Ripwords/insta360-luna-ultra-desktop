@@ -37,7 +37,7 @@
     "lint-staged": "^17.2.0",
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.0",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.8"
   },
