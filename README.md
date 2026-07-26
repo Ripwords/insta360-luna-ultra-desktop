@@ -159,12 +159,19 @@ Camera control requires the desktop app; a browser cannot open the raw TCP
 socket. In `ui:dev` the Connect screen says so.
 
 ```bash
-bun x vitest run                                   # frontend unit tests
+bun run test                                       # frontend unit tests (node + Nuxt runtime)
 bun run typecheck                                  # Nuxt/vue-tsc
 bun run lint                                       # oxlint
 cargo test --manifest-path src-tauri/Cargo.toml    # Rust protocol + integration tests
 bun run build                                      # bundles → src-tauri/target/release/bundle/
 ```
+
+Every camera call goes through `CameraTransport` (`app/utils/transport.ts`).
+`lunaClient` — the real TCP/HTTP implementation — is imported by that one module
+and nowhere else, which is what lets tests and a future docs-site demo swap in a
+fake camera. An oxlint `no-restricted-imports` rule enforces this (see
+`.oxlintrc.json`): importing `lunaClient` from anywhere but `transport.ts` fails
+the build instead of silently eroding the seam.
 
 <details>
 <summary><strong>Testing against the mock camera</strong></summary>
@@ -192,11 +199,12 @@ app/                     Nuxt frontend (pages, components, composables, utils)
   composables/useUpdater    Auto-update checker
   utils/lunaClient.ts       Bridge to the Rust commands + HTTP listing
   utils/lunaIndex.ts        Camera HTTP index parser
+  utils/transport.ts        CameraTransport interface + registry (the swappable seam)
   utils/watermark*.ts       Official watermark placement engine
 src-tauri/src/luna.rs    Luna Ultra TCP control protocol (Rust)
 luna_mock_server/        Camera emulator for development and tests
 scripts/probe-*.mjs      On-device protocol probes (calibration, live view, file list)
-tests/                   Vitest unit tests
+tests/                   Vitest unit tests, plus tests/nuxt/ composable tests needing a Nuxt runtime
 docs/FEATURES.md         Feature map: shipped, gated, and on hold
 docs/superpowers/specs/  Protocol findings of record
 screenshots/             Product screenshots
