@@ -15,6 +15,13 @@ description: What is shipped, what is built but gated off, and what is on hold â
 
 const rawBody = await readFile(source, "utf8");
 
+// FEATURES.md opens with its own `# Feature map â€” ...` heading. `UPageHeader`
+// on the docs page already renders the frontmatter `title` as the page's H1,
+// so keeping this one too gives every reader two H1s. Strip only the single
+// leading heading line (and the blank line after it), not any `#` that shows
+// up further down as prose or in a code block.
+const body_ = rawBody.replace(/^#\s+.*\n+/, "");
+
 // FEATURES.md links relative to its own location on GitHub (e.g. to a spec
 // file under docs/superpowers/specs/), a context this site doesn't have: that
 // spec markdown isn't part of the `docs` collection, so the relative link
@@ -22,8 +29,8 @@ const rawBody = await readFile(source, "utf8");
 // every link it finds and hard-fails the whole `generate` on a 404, so
 // rewrite any non-absolute, non-fragment link target to point at the real
 // file on GitHub instead of a route on this site.
-const REPO_BLOB_ROOT = "https://github.com/Ripwords/luna-ultra-desktop/blob/master/docs/";
-const body = rawBody.replace(/\]\(([^)]+)\)/g, (match, target_) => {
+const REPO_BLOB_ROOT = "https://github.com/Ripwords/insta360-luna-ultra-desktop/blob/master/docs/";
+const body = body_.replace(/\]\(([^)]+)\)/g, (match, target_) => {
   if (/^([a-z]+:)?\/\//i.test(target_) || target_.startsWith("#")) return match;
   return `](${REPO_BLOB_ROOT}${target_})`;
 });

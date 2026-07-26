@@ -1,8 +1,13 @@
 <script setup lang="ts">
 const route = useRoute();
 
-const { data: page } = await useAsyncData(`docs-${route.path}`, () =>
-  queryCollection("docs").path(route.path).first(),
+// GitHub Pages 301-redirects extensionless directory paths to a trailing
+// slash, but the content collection stores paths without one — so look up
+// the normalised path or the page body silently renders empty on hydration.
+const contentPath = computed(() => route.path.replace(/\/+$/, "") || "/");
+
+const { data: page } = await useAsyncData(`docs-${contentPath.value}`, () =>
+  queryCollection("docs").path(contentPath.value).first(),
 );
 
 if (!page.value) {

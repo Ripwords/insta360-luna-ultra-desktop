@@ -13,7 +13,7 @@ useSeoMeta({
     :links="[
       {
         label: 'Download',
-        to: 'https://github.com/Ripwords/luna-ultra-desktop/releases/latest',
+        to: 'https://github.com/Ripwords/insta360-luna-ultra-desktop/releases/latest',
         icon: 'i-lucide-download',
       },
       { label: 'Read the docs', to: '/docs/install', variant: 'subtle' },

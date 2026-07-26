@@ -3,7 +3,12 @@ import { fileURLToPath } from "node:url";
 
 // Shared with `app.baseURL` below and with the `routeRules` redirect targets,
 // so the two can never drift out of sync.
-const baseURL = "/luna-ultra-desktop/";
+//
+// The repo was renamed to `insta360-luna-ultra-desktop` (the old
+// `luna-ultra-desktop` name now only resolves via a GitHub 301), so this is
+// the actual path segment GitHub Pages serves the project site under:
+// https://ripwords.github.io/insta360-luna-ultra-desktop/.
+const baseURL = "/insta360-luna-ultra-desktop/";
 
 export default defineNuxtConfig({
   // The desktop app at the repo root is the layer: its components,
@@ -96,7 +101,7 @@ export default defineNuxtConfig({
   // The targets MUST carry the base path. `nuxt generate` bakes these into
   // static meta-refresh stubs and emits the target verbatim — there is no
   // server on GitHub Pages to correct a root-relative one, so `/demo/camera`
-  // would 404 while `/luna-ultra-desktop/demo/camera` resolves. (A root-
+  // would 404 while `/insta360-luna-ultra-desktop/demo/camera` resolves. (A root-
   // relative target only "works" under `nuxt preview`'s Nitro server, which
   // silently issues its own corrective redirect — that server doesn't exist
   // in the static-hosting production topology, so it can't be trusted as a
@@ -132,7 +137,7 @@ export default defineNuxtConfig({
 
   // Origin only — no path. `@nuxtjs/seo` combines `site.url` with
   // `app.baseURL` itself; including the path in both produces a
-  // doubled-up prefix (`https://ripwords.github.io/luna-ultra-desktop/luna-ultra-desktop`)
+  // doubled-up prefix (`https://ripwords.github.io/insta360-luna-ultra-desktop/insta360-luna-ultra-desktop`)
   // in sitemap.xml and the canonical link tag. Origin-only + baseURL
   // produces the correct single-prefixed URLs.
   site: {
@@ -144,7 +149,7 @@ export default defineNuxtConfig({
   // any non-root `app.baseURL` (the trigger is baseURL, not site.url) — a
   // build-time `logger.error` that self-disables robots.txt, not a runtime
   // throw. This is a permanent decision, not a workaround: a GitHub Pages
-  // project site can only ever serve `/luna-ultra-desktop/robots.txt`,
+  // project site can only ever serve `/insta360-luna-ultra-desktop/robots.txt`,
   // which crawlers ignore — only `https://ripwords.github.io/robots.txt`
   // (repo root) is authoritative, and this site doesn't own that path.
   // robots.txt is out of scope for this site.

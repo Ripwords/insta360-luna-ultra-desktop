@@ -10,7 +10,7 @@ const links = [
   { label: "Demo", to: "/demo" },
   {
     label: "GitHub",
-    to: "https://github.com/Ripwords/luna-ultra-desktop",
+    to: "https://github.com/Ripwords/insta360-luna-ultra-desktop",
     target: "_blank",
     icon: "i-simple-icons-github",
   },
