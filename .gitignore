@@ -34,3 +34,8 @@ logs
 
 # Live view probe output
 probe-out
+
+# Docs site build output
+docs/site/.nuxt
+docs/site/.output
+docs/site/.data

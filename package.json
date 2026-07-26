@@ -2,6 +2,9 @@
   "name": "luna-ultra-desktop",
   "version": "0.3.0",
   "private": true,
+  "workspaces": [
+    "docs/site"
+  ],
   "type": "module",
   "scripts": {
     "build": "tauri build",
@@ -9,6 +12,8 @@
     "ui:dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "docs:dev": "bun --cwd=docs/site run dev",
+    "docs:generate": "bun --cwd=docs/site run generate",
     "postinstall": "git config core.hooksPath .githooks || true && nuxt prepare",
     "test": "vitest run && vitest run -c vitest.nuxt.config.ts",
     "lint": "oxlint --deny-warnings",
