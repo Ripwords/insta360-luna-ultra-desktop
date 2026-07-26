@@ -31,26 +31,32 @@ const H264_PPS = 8;
 const H264_IDR = 5;
 const H264_NON_IDR = 1;
 
-/** Split a raw Annex-B stream into NAL payloads, start codes removed. */
+/**
+ * Split a raw Annex-B stream into NAL payloads, start codes removed.
+ *
+ * Single pass: a unit is emitted when the *next* start code proves where it
+ * ended, so the scan needs no intermediate list of start positions. This runs
+ * on every socket read for the whole of a live session, which is the only
+ * reason it is written this tersely.
+ */
 export function splitNalUnits(bytes: Uint8Array): Uint8Array[] {
-  const starts: Array<{ at: number; size: number }> = [];
-  for (let i = 0; i + 2 < bytes.length; i++) {
+  const units: Uint8Array[] = [];
+  const { length } = bytes;
+  /** Payload start of the unit currently open, or -1 before the first one. */
+  let from = -1;
+
+  for (let i = 0; i + 2 < length; i++) {
     if (bytes[i] !== 0 || bytes[i + 1] !== 0) continue;
-    if (bytes[i + 2] === 1) {
-      starts.push({ at: i, size: 3 });
-      i += 2;
-    } else if (bytes[i + 2] === 0 && bytes[i + 3] === 1) {
-      starts.push({ at: i, size: 4 });
-      i += 3;
-    }
+    let size: number;
+    if (bytes[i + 2] === 1) size = 3;
+    else if (bytes[i + 2] === 0 && bytes[i + 3] === 1) size = 4;
+    else continue;
+    if (from >= 0 && i > from) units.push(bytes.subarray(from, i));
+    from = i + size;
+    i += size - 1;
   }
 
-  const units: Uint8Array[] = [];
-  for (let i = 0; i < starts.length; i++) {
-    const from = starts[i]!.at + starts[i]!.size;
-    const to = starts[i + 1]?.at ?? bytes.length;
-    if (to > from) units.push(bytes.subarray(from, to));
-  }
+  if (from >= 0 && length > from) units.push(bytes.subarray(from, length));
   return units;
 }
 
