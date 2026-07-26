@@ -26,13 +26,13 @@ Everything camera-facing funnels through two modules. There are seven
 `@tauri-apps` import sites in the entire frontend, all dynamic and all behind
 an `isTauri()` guard.
 
-| Seam                          | Call sites                                                            | Demo substitute                        |
-| ----------------------------- | --------------------------------------------------------------------- | -------------------------------------- |
-| `lunaClient`                  | `useCamera`, `useGallery`, `useLiveView`, `lunaCapture`, `lunaSettings` | in-browser mock, fixture-backed        |
-| `cameraFetch`                 | `CameraImage`, `PanoViewer`, `RawImage`, `WatermarkCanvas`, `useDownloads` | plain `fetch` at static fixture URLs |
-| `saveBlob` / `isTauri`        | `app/utils/saveFile.ts`                                                | **already has an anchor-download fallback** |
-| Tauri event `listen`          | `useCamera.watchDisconnect` only                                       | no-op                                  |
-| updater                       | `useUpdater`                                                           | no-op                                  |
+| Seam                   | Call sites                                                                 | Demo substitute                             |
+| ---------------------- | -------------------------------------------------------------------------- | ------------------------------------------- |
+| `lunaClient`           | `useCamera`, `useGallery`, `useLiveView`, `lunaCapture`, `lunaSettings`    | in-browser mock, fixture-backed             |
+| `cameraFetch`          | `CameraImage`, `PanoViewer`, `RawImage`, `WatermarkCanvas`, `useDownloads` | plain `fetch` at static fixture URLs        |
+| `saveBlob` / `isTauri` | `app/utils/saveFile.ts`                                                    | **already has an anchor-download fallback** |
+| Tauri event `listen`   | `useCamera.watchDisconnect` only                                           | no-op                                       |
+| updater                | `useUpdater`                                                               | no-op                                       |
 
 Everything else — all 22 components, the watermark engine, DNG/raw preview, the
 protobuf codecs, selection logic, the Annex-B decoder — runs unmodified in a
@@ -52,7 +52,6 @@ layers/camera/                    NEW — shared app layer
 app/                              root Tauri app, now thin
   app.vue                           unchanged
   layouts/default.vue               <AppShell><slot /></AppShell>
-  plugins/transport.client.ts       registers the real lunaClient
 
 docs/site/                        NEW — the docs site
   nuxt.config.ts                    extends ../../layers/camera
@@ -100,7 +99,9 @@ export interface CameraTransport {
 }
 
 let current: CameraTransport = lunaClient; // real client is the DEFAULT
-export const setCameraTransport = (t: CameraTransport) => { current = t };
+export const setCameraTransport = (t: CameraTransport) => {
+  current = t;
+};
 export const useCameraTransport = (): CameraTransport => current;
 ```
 
@@ -108,9 +109,8 @@ Ten files swap `lunaClient.foo()` → `useCameraTransport().foo()`, and
 `cameraFetch(url)` → `useCameraTransport().fetch(url)`.
 
 **Desktop behaviour is unchanged by construction**: the default value is the
-object those call sites already used. No plugin is required for the Tauri app
-to keep working; `app/plugins/transport.client.ts` is added only for
-explicitness.
+object those call sites already used. The desktop app therefore needs no plugin
+and no registration call at all — only the docs-site demo registers a transport.
 
 Two Tauri touch-points do **not** belong to the transport and need separate
 handling, or the demo will import Tauri modules in a plain browser and throw:
@@ -120,8 +120,10 @@ handling, or the demo will import Tauri modules in a plain browser and throw:
   Since the mock reports `available: true`, that guard is not enough. The listener
   moves behind `transport.onDisconnect()`; the real client wraps `listen`, the
   mock returns a no-op unlisten.
-- **`useUpdater`** must be guarded by `isTauri()`, not by transport
-  availability. In the demo it is a no-op and renders no update banner.
+- **`useUpdater`** needs no change. It is already guarded by `isTauri()`:
+  `check()` returns early, `install()` can only run from a `pending` that only
+  `check()` sets, and `available` is `computed(() => isTauri())`. In the demo it
+  is already a no-op and renders no update banner.
 
 ### Testing
 
@@ -137,6 +139,13 @@ break, but nothing existing protects this either. This step adds:
 
 This is coverage the project does not have today and cannot get without the
 seam, since the camera path currently requires hardware or the mock server.
+
+**A Nuxt test environment must be added first.** `vitest.config.ts` runs
+`environment: "node"` with only a `~` → `./app` alias; composables calling
+`useState`, `computed` or `useToast` cannot run under it. The composable tests
+above require `@nuxt/test-utils`, `@vue/test-utils` and `happy-dom` as
+devDependencies, plus a second vitest config for `environment: "nuxt"`. The pure
+registry test runs under the existing node project unchanged.
 
 ### Verification gate
 
@@ -168,13 +177,13 @@ is what earns rich results for a downloadable app.
 
 Pages, sourced from README content:
 
-| Page                     | Content                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| Landing                  | Hero, download buttons per OS, feature sections, embedded demo                                   |
+| Page                     | Content                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Landing                  | Hero, download buttons per OS, feature sections, embedded demo                                                |
 | Install & first run      | Per-OS download; macOS quarantine/`xattr`, Local Network permission; Windows SmartScreen; Linux AppImage/FUSE |
-| Connecting to the camera | Joining the camera Wi-Fi, Connect screen, auto-reconnect, troubleshooting                        |
-| Using the app            | Viewfinder + HUD, pro bar, gallery, multi-select, downloads/watermark, delete, 3D showpiece, themes |
-| Feature status           | Shipped / gated / on hold                                                                        |
+| Connecting to the camera | Joining the camera Wi-Fi, Connect screen, auto-reconnect, troubleshooting                                     |
+| Using the app            | Viewfinder + HUD, pro bar, gallery, multi-select, downloads/watermark, delete, 3D showpiece, themes           |
+| Feature status           | Shipped / gated / on hold                                                                                     |
 
 **Feature status has one source of truth.** A prebuild script copies
 `docs/FEATURES.md` into `docs/site/content/` rather than duplicating it.
@@ -240,12 +249,12 @@ free selection ships under the iStock Content License, which forbids making
 images available as standalone downloadable files. Since downloading files is
 the demo's headline feature, that license is disqualifying.
 
-| Asset            | Spec                                                       |
-| ---------------- | ---------------------------------------------------------- |
-| Photos           | ~16, WebP, ~150 KB each, Luna-convention filenames          |
-| Video clips      | 2–3, five seconds, 720p, ~500 KB each                       |
-| Live-view stream | one `.264` Annex-B elementary stream, 1280×960, ~60 s       |
-| 3D model         | STL → Draco-compressed GLB, ~2–4 MB                         |
+| Asset            | Spec                                                  |
+| ---------------- | ----------------------------------------------------- |
+| Photos           | ~16, WebP, ~150 KB each, Luna-convention filenames    |
+| Video clips      | 2–3, five seconds, 720p, ~500 KB each                 |
+| Live-view stream | one `.264` Annex-B elementary stream, 1280×960, ~60 s |
+| 3D model         | STL → Draco-compressed GLB, ~2–4 MB                   |
 
 The GLB feeds the glTF path `LunaModel.vue:139` already has, so the 61 MB
 `public/Insta360+LunaUltra.stl` is never shipped to the web.
@@ -285,15 +294,15 @@ in dev.
 
 ## Risks
 
-| Risk                                                              | Mitigation                                                                          |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Transport refactor regresses the shipping app                     | Default value is the existing `lunaClient`; new tests; verified against mock server before Step 2 |
-| Layer/project layout precedence hijacks docs pages                 | Shell is a component, not a layout; each app writes its own explicit layout          |
-| Layer routes collide with docs routes                              | `pages:extend` prefixes layer-sourced routes to `/demo/*`                            |
-| `ssr: false` in the layer leaks into the docs site                 | Docs site sets `ssr: true`; demo wrapped in `<ClientOnly>`                           |
-| Icon `clientBundle: { scan: true }` inflates the docs bundle       | Measure; scope the scan to the layer if needed                                       |
-| Demo JS weight hurts landing-page LCP                              | Demo is client-only and below the fold; prose prerenders                             |
-| `baseURL` breaks fixture and asset paths                           | All fixture URLs built through the runtime base URL, never hardcoded                 |
+| Risk                                                         | Mitigation                                                                                        |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Transport refactor regresses the shipping app                | Default value is the existing `lunaClient`; new tests; verified against mock server before Step 2 |
+| Layer/project layout precedence hijacks docs pages           | Shell is a component, not a layout; each app writes its own explicit layout                       |
+| Layer routes collide with docs routes                        | `pages:extend` prefixes layer-sourced routes to `/demo/*`                                         |
+| `ssr: false` in the layer leaks into the docs site           | Docs site sets `ssr: true`; demo wrapped in `<ClientOnly>`                                        |
+| Icon `clientBundle: { scan: true }` inflates the docs bundle | Measure; scope the scan to the layer if needed                                                    |
+| Demo JS weight hurts landing-page LCP                        | Demo is client-only and below the fold; prose prerenders                                          |
+| `baseURL` breaks fixture and asset paths                     | All fixture URLs built through the runtime base URL, never hardcoded                              |
 
 ## Out of scope
 
