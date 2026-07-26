@@ -7,6 +7,7 @@ const { data: navigation } = await useAsyncData("docs-navigation", () =>
 
 const links = [
   { label: "Docs", to: "/docs/install" },
+  { label: "Contributing", to: "/docs/contributing" },
   { label: "Demo", to: "/demo" },
   {
     label: "GitHub",
@@ -18,7 +19,7 @@ const links = [
 </script>
 
 <template>
-  <UHeader :links>
+  <UHeader>
     <template #title>
       <span class="flex items-center gap-2.5">
         <span class="flex size-8 items-center justify-center rounded-lg bg-inverted">
@@ -26,6 +27,12 @@ const links = [
         </span>
         <span class="font-semibold tracking-tight">Luna Ultra Desktop</span>
       </span>
+    </template>
+
+    <UNavigationMenu :items="links" variant="link" />
+
+    <template #body>
+      <UNavigationMenu :items="links" orientation="vertical" />
     </template>
   </UHeader>
 

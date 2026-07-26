@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in the app behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most hard bugs in this project are state-dependent, so the camera's
+        state at the time matters as much as the steps.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what occurred instead.
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      placeholder: "0.3.0 — see the Settings page"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Camera firmware
+      description: Shown on the Connect screen once paired. Leave blank if unknown.
+  - type: textarea
+    id: camera-state
+    attributes:
+      label: Camera state
+      description: >
+        Which mode was the camera in? Was a recording running? Had the app just
+        connected, or been running a while? Was this the first action after
+        connecting?
+    validations:
+      required: true

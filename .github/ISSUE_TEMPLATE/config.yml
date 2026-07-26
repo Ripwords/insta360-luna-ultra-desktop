@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contribution guide
+    url: https://ripwords.github.io/insta360-luna-ultra-desktop/docs/contributing
+    about: Conventions, the verification bar for camera features, and dev setup.
+  - name: Feature map
+    url: https://ripwords.github.io/insta360-luna-ultra-desktop/docs/feature-status
+    about: What is shipped, what is built but gated off, and what is on hold.
