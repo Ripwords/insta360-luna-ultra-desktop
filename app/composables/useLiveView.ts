@@ -1,5 +1,5 @@
 import type { LiveViewStats } from "~/types/media";
-import { lunaClient } from "~/utils/lunaClient";
+import { useCameraTransport } from "~/utils/transport";
 
 export type LiveTransport = "mjpeg" | "annexb";
 
@@ -31,7 +31,7 @@ export function useLiveView() {
     diagnostics.value = [];
 
     try {
-      const osc = await lunaClient.probeOscPreview(host.value);
+      const osc = await useCameraTransport().probeOscPreview(host.value);
       if (osc) {
         note("OSC MJPEG preview available; using it.");
         transport.value = "mjpeg";
@@ -41,7 +41,7 @@ export function useLiveView() {
       }
       note("No OSC MJPEG preview; falling back to the control-session stream.");
 
-      const info = await lunaClient.liveViewStart();
+      const info = await useCameraTransport().liveViewStart();
       note(`Camera accepted START_LIVE_STREAM. Serving on port ${info.port}.`);
       transport.value = "annexb";
       streamUrl.value = info.url;
@@ -50,7 +50,9 @@ export function useLiveView() {
       // If nothing arrives, say so rather than showing an empty canvas
       setTimeout(async () => {
         if (!active.value || transport.value !== "annexb") return;
-        const stats = await lunaClient.liveViewStats().catch(() => null);
+        const stats = await useCameraTransport()
+          .liveViewStats()
+          .catch(() => null);
         if (stats && stats.bytes === 0) {
           error.value = "The camera accepted the command but sent no video.";
           note("0 bytes received. The stream may use a frame type we do not yet recognise.");
@@ -69,12 +71,16 @@ export function useLiveView() {
     active.value = false;
     transport.value = null;
     streamUrl.value = null;
-    await lunaClient.liveViewStop().catch(() => {});
+    await useCameraTransport()
+      .liveViewStop()
+      .catch(() => {});
   }
 
   async function refreshStats(): Promise<LiveViewStats | null> {
     if (!active.value) return null;
-    return lunaClient.liveViewStats().catch(() => null);
+    return useCameraTransport()
+      .liveViewStats()
+      .catch(() => null);
   }
 
   return {
