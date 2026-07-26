@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
+    "sync:features": "node scripts/sync-features.mjs",
+    "dev": "node scripts/sync-features.mjs && nuxt dev",
+    "generate": "node scripts/sync-features.mjs && nuxt generate",
     "preview": "nuxt preview"
   },
   "dependencies": {

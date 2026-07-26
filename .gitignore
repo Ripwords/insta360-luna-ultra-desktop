@@ -39,3 +39,6 @@ probe-out
 docs/site/.nuxt
 docs/site/.output
 docs/site/.data
+
+# Synced from docs/FEATURES.md at build time; never hand-edit or commit
+docs/site/content/docs/4.feature-status.md
