@@ -1,6 +1,10 @@
 import { useNuxt } from "@nuxt/kit";
 import { fileURLToPath } from "node:url";
 
+// Shared with `app.baseURL` below and with the `routeRules` redirect targets,
+// so the two can never drift out of sync.
+const baseURL = "/luna-ultra-desktop/";
+
 export default defineNuxtConfig({
   // The desktop app at the repo root is the layer: its components,
   // composables, utils and pages are all available here, with no files moved.
@@ -82,17 +86,26 @@ export default defineNuxtConfig({
     },
   },
 
-  // The layer's pages contain hardcoded absolute links (`to="/gallery"` etc.)
-  // that assume the desktop app's root-level routing. Rather than editing the
+  // The layer's pages hardcode absolute links (`to="/gallery"` etc.) that
+  // assume the desktop app's root-level routing. Rather than editing the
   // desktop app (an explicit project decision — the app must not be modified
   // for the docs site's benefit), redirect the unprefixed paths to their
   // /demo equivalents. `/` is deliberately absent: it must stay the landing
   // page, not redirect anywhere.
+  //
+  // The targets MUST carry the base path. `nuxt generate` bakes these into
+  // static meta-refresh stubs and emits the target verbatim — there is no
+  // server on GitHub Pages to correct a root-relative one, so `/demo/camera`
+  // would 404 while `/luna-ultra-desktop/demo/camera` resolves. (A root-
+  // relative target only "works" under `nuxt preview`'s Nitro server, which
+  // silently issues its own corrective redirect — that server doesn't exist
+  // in the static-hosting production topology, so it can't be trusted as a
+  // verification target here.)
   routeRules: {
-    "/camera": { redirect: "/demo/camera" },
-    "/gallery": { redirect: "/demo/gallery" },
-    "/downloads": { redirect: "/demo/downloads" },
-    "/settings": { redirect: "/demo/settings" },
+    "/camera": { redirect: `${baseURL}demo/camera` },
+    "/gallery": { redirect: `${baseURL}demo/gallery` },
+    "/downloads": { redirect: `${baseURL}demo/downloads` },
+    "/settings": { redirect: `${baseURL}demo/settings` },
   },
 
   modules: ["@nuxt/content", "@nuxtjs/seo"],
@@ -114,7 +127,7 @@ export default defineNuxtConfig({
   ssr: true,
 
   app: {
-    baseURL: "/luna-ultra-desktop/",
+    baseURL,
   },
 
   // Origin only — no path. `@nuxtjs/seo` combines `site.url` with
