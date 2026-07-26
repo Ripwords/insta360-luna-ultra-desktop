@@ -853,7 +853,7 @@ git commit -m "refactor(camera): route gallery and live view through the transpo
 - Modify: `app/components/PanoViewer.vue:3,25`
 - Modify: `app/components/RawImage.vue:2,127`
 - Modify: `app/components/WatermarkCanvas.vue:4,59`
-- Modify: `app/composables/useDownloads.ts:4,44`
+- Modify: `app/composables/useDownloads.ts:4,31`
 - Modify: `app/utils/lunaCapture.ts:2,18,25,32,41`
 - Modify: `app/utils/lunaSettings.ts:10,45,79,93,114,131`
 - Modify: `app/utils/lunaClient.ts` (drop the now-unused standalone exports)
@@ -889,7 +889,7 @@ const response = await useCameraTransport().fetch(props.src);
 
 - [ ] **Step 2: Replace `cameraFetch` in `useDownloads`**
 
-Replace line 4's import with `import { useCameraTransport } from "~/utils/transport";` and line 44 with:
+Replace line 4's import with `import { useCameraTransport } from "~/utils/transport";` and line 31 with:
 
 ```ts
 const response = await useCameraTransport().fetch(entry.item.srcUrl);
@@ -996,7 +996,7 @@ git commit --allow-empty -m "chore: verify transport seam against luna_mock_serv
 - Create: `layers/camera/nuxt.config.ts`
 - Create: `layers/camera/app/components/AppShell.vue`
 - Create: `app/layouts/default.vue` (replacing the old one)
-- Move: `app/{components,composables,utils,types,assets,pages}` → `layers/camera/app/`
+- Move: `app/{components,composables,utils,types,assets,pages,workers}` → `layers/camera/app/`
 - Move: `app/app.config.ts` → `layers/camera/app/app.config.ts`
 - Modify: `nuxt.config.ts`, `vitest.config.ts`, `.gitignore` (if it references `app/`)
 - Keep in place: `app/app.vue`
@@ -1015,6 +1015,7 @@ mkdir -p layers/camera/app
 git mv app/components layers/camera/app/components
 git mv app/composables layers/camera/app/composables
 git mv app/utils layers/camera/app/utils
+git mv app/workers layers/camera/app/workers
 git mv app/types layers/camera/app/types
 git mv app/assets layers/camera/app/assets
 git mv app/pages layers/camera/app/pages
@@ -1022,6 +1023,13 @@ git mv app/app.config.ts layers/camera/app/app.config.ts
 ```
 
 `git mv` keeps rename detection intact, which makes this reviewable. `app/app.vue` stays where it is — it is the root app's entry, not shared.
+
+`app/workers/` moves too. `watermarkClient.ts` reaches the worker by relative URL
+(`new Worker(new URL("../workers/watermark.worker.ts", import.meta.url))`) and by
+type import (`~/workers/watermark.worker`). Moving `utils/` and `workers/`
+together keeps the relative path valid, and `~` resolves to the layer's own
+`app/`, so the type import survives. Verify both in Step 8 by running a
+watermarked download.
 
 - [ ] **Step 2: Turn the layout into a component**
 
