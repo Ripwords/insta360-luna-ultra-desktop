@@ -50,6 +50,12 @@ export default defineNuxtConfig({
     // Routes inherited from the desktop-app layer live under /demo/* so they
     // cannot collide with docs routes. Identified by file path: the layer's
     // pages resolve to the repo root's app/pages, not this app's.
+    //
+    // This only walks the flat top-level array, never `page.children`. That
+    // is safe today because all five layer pages (index, camera, gallery,
+    // downloads, settings) are flat top-level routes with no nesting — but a
+    // future nested layer route would silently stay unprefixed. Revisit with
+    // a recursive walk if the layer ever grows nested pages.
     "pages:extend"(pages) {
       const isFromLayer = (file?: string) =>
         !!file && file.includes("/app/pages/") && !file.includes("/docs/site/");
@@ -60,7 +66,33 @@ export default defineNuxtConfig({
         page.name = page.name ? `demo-${page.name}` : undefined;
         page.meta = { ...page.meta, layout: "demo" };
       }
+
+      // Nuxt's layer-merge page scan deduplicates the `/` collision between
+      // the layer's `app/pages/index.vue` and this app's own
+      // `app/pages/index.vue` *before* this hook runs — only this app's
+      // index survives into `pages`, so the loop above never sees the
+      // layer's Connect page and has nothing to rename. Re-add it here,
+      // pointing straight at the layer's file, so `/demo` still resolves.
+      pages.push({
+        name: "demo",
+        path: "/demo",
+        file: fileURLToPath(new URL("../../app/pages/index.vue", import.meta.url)),
+        meta: { layout: "demo" },
+      });
     },
+  },
+
+  // The layer's pages contain hardcoded absolute links (`to="/gallery"` etc.)
+  // that assume the desktop app's root-level routing. Rather than editing the
+  // desktop app (an explicit project decision — the app must not be modified
+  // for the docs site's benefit), redirect the unprefixed paths to their
+  // /demo equivalents. `/` is deliberately absent: it must stay the landing
+  // page, not redirect anywhere.
+  routeRules: {
+    "/camera": { redirect: "/demo/camera" },
+    "/gallery": { redirect: "/demo/gallery" },
+    "/downloads": { redirect: "/demo/downloads" },
+    "/settings": { redirect: "/demo/settings" },
   },
 
   modules: ["@nuxt/content", "@nuxtjs/seo"],
