@@ -46,6 +46,21 @@ export default defineNuxtConfig({
           : entry,
       );
     },
+
+    // Routes inherited from the desktop-app layer live under /demo/* so they
+    // cannot collide with docs routes. Identified by file path: the layer's
+    // pages resolve to the repo root's app/pages, not this app's.
+    "pages:extend"(pages) {
+      const isFromLayer = (file?: string) =>
+        !!file && file.includes("/app/pages/") && !file.includes("/docs/site/");
+
+      for (const page of pages) {
+        if (!isFromLayer(page.file)) continue;
+        page.path = page.path === "/" ? "/demo" : `/demo${page.path}`;
+        page.name = page.name ? `demo-${page.name}` : undefined;
+        page.meta = { ...page.meta, layout: "demo" };
+      }
+    },
   },
 
   modules: ["@nuxt/content", "@nuxtjs/seo"],
