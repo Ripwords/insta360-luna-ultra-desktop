@@ -12,11 +12,16 @@ function buildRawDng(opts: {
   samples: number[]; // width*height 16-bit values, row-major
   whiteLevel?: number;
   blackLevel?: number;
+  /** 2x2 CFA colour indices, row-major. Defaults to RGGB. */
+  cfa?: [number, number, number, number];
+  /** Byte order. Big-endian exercises the decoder's non-typed-array path. */
+  little?: boolean;
 }): ArrayBuffer {
   const { width, height, samples } = opts;
   const white = opts.whiteLevel ?? 65535;
   const black = opts.blackLevel ?? 0;
-  const little = true;
+  const cfa = opts.cfa ?? [0, 1, 1, 2];
+  const little = opts.little ?? true;
 
   const tags: Array<{ tag: number; type: number; value: number }> = [
     { tag: 0x0100, type: 3, value: width }, // ImageWidth
@@ -39,7 +44,7 @@ function buildRawDng(opts: {
   const buf = new ArrayBuffer(total);
   const v = new DataView(buf);
 
-  v.setUint16(0, 0x4949, false);
+  v.setUint16(0, little ? 0x4949 : 0x4d4d, false);
   v.setUint16(2, 42, little);
   v.setUint32(4, 8, little);
 
@@ -51,10 +56,10 @@ function buildRawDng(opts: {
       // CFAPattern: 4 BYTEs RGGB = [0,1,1,2], value > 4 bytes? no, exactly 4 -> inline
       v.setUint16(o + 2, 1, little); // type BYTE
       v.setUint32(o + 4, 4, little); // count 4
-      v.setUint8(o + 8, 0);
-      v.setUint8(o + 9, 1);
-      v.setUint8(o + 10, 1);
-      v.setUint8(o + 11, 2);
+      v.setUint8(o + 8, cfa[0]);
+      v.setUint8(o + 9, cfa[1]);
+      v.setUint8(o + 10, cfa[2]);
+      v.setUint8(o + 11, cfa[3]);
     } else if (t.tag === 0x0111) {
       v.setUint16(o + 2, 4, little);
       v.setUint32(o + 4, 1, little);
@@ -81,6 +86,28 @@ function flatFrame(width: number, height: number, r: number, g: number, b: numbe
       out[y * width + x + 1] = g; // G
       out[(y + 1) * width + x] = g; // G
       out[(y + 1) * width + x + 1] = b; // B
+    }
+  }
+  return out;
+}
+
+/**
+ * Fill a frame giving each of the four positions in every 2x2 block its own
+ * value, in the order the decoder samples them:
+ * 0=(x,y) 1=(x+1,y) 2=(x,y+1) 3=(x+1,y+1).
+ */
+function positionFrame(
+  width: number,
+  height: number,
+  values: [number, number, number, number],
+): number[] {
+  const out = Array.from({ length: width * height }, () => 0);
+  for (let y = 0; y < height; y += 2) {
+    for (let x = 0; x < width; x += 2) {
+      out[y * width + x] = values[0];
+      out[y * width + x + 1] = values[1];
+      out[(y + 1) * width + x] = values[2];
+      out[(y + 1) * width + x + 1] = values[3];
     }
   }
   return out;
@@ -148,6 +175,66 @@ describe("decodeRawPreview", () => {
     const out = decodeRawPreview(truncated, meta, 8);
     expect(out).not.toBeNull();
     expect(out!.height).toBeGreaterThan(0);
+  });
+
+  /**
+   * The decoder resolves the CFA once and reuses it for every pixel, so each
+   * layout has to be pinned independently: a bug that hard-codes RGGB still
+   * passes every RGGB test. In each case the red-filtered position holds the
+   * bright sample, so red must dominate the output.
+   */
+  const layouts: Array<{ name: string; cfa: [number, number, number, number]; redAt: number }> = [
+    { name: "RGGB", cfa: [0, 1, 1, 2], redAt: 0 },
+    { name: "BGGR", cfa: [2, 1, 1, 0], redAt: 3 },
+    { name: "GRBG", cfa: [1, 0, 2, 1], redAt: 1 },
+    { name: "GBRG", cfa: [1, 2, 0, 1], redAt: 2 },
+  ];
+
+  for (const { name, cfa, redAt } of layouts) {
+    it(`routes the ${name} mosaic to the right output channels`, () => {
+      const values: [number, number, number, number] = [12000, 12000, 12000, 12000];
+      values[redAt] = 60000;
+      const buf = buildRawDng({
+        width: 16,
+        height: 16,
+        samples: positionFrame(16, 16, values),
+        cfa,
+      });
+      const meta = parseRawImageMeta(buf)!;
+      expect(meta.cfaPattern).toEqual(cfa);
+      const out = decodeRawPreview(buf, meta, 4, { whiteBalance: "none" })!;
+      const [r, g, b] = [out.data[0]!, out.data[1]!, out.data[2]!];
+      expect(r).toBeGreaterThan(g);
+      expect(r).toBeGreaterThan(b);
+    });
+  }
+
+  it("averages both green positions rather than taking one", () => {
+    // Greens sit at positions 1 and 2 under RGGB; give them different values so
+    // taking either one alone lands measurably away from their mean.
+    const buf = buildRawDng({
+      width: 16,
+      height: 16,
+      samples: positionFrame(16, 16, [30000, 20000, 40000, 30000]),
+    });
+    const meta = parseRawImageMeta(buf)!;
+    const out = decodeRawPreview(buf, meta, 4, { whiteBalance: "none" })!;
+    // Mean of 20000 and 40000 is 30000 — the same level as R and B here, so a
+    // correctly averaged green makes the pixel neutral.
+    const [r, g, b] = [out.data[0]!, out.data[1]!, out.data[2]!];
+    expect(Math.abs(g - r)).toBeLessThanOrEqual(1);
+    expect(Math.abs(g - b)).toBeLessThanOrEqual(1);
+  });
+
+  it("decodes a big-endian raw the same as its little-endian twin", () => {
+    const samples = positionFrame(16, 16, [50000, 20000, 30000, 10000]);
+    const meta = (buf: ArrayBuffer) => parseRawImageMeta(buf)!;
+    const le = buildRawDng({ width: 16, height: 16, samples });
+    const be = buildRawDng({ width: 16, height: 16, samples, little: false });
+    const a = decodeRawPreview(le, meta(le), 8)!;
+    const b = decodeRawPreview(be, meta(be), 8)!;
+    expect(a.width).toBe(b.width);
+    expect([...b.data]).toEqual([...a.data]);
   });
 
   it("routes CFA channels correctly (red-dominant raw -> red output) with WB off", () => {

@@ -178,6 +178,23 @@ function encodeSrgb(linear: number): number {
 }
 
 /**
+ * Precomputed sRGB curve. The encode runs three times per output pixel — a few
+ * million `Math.pow` calls on a full-frame preview — and the curve only ever
+ * maps [0,1] to a byte, so a table costs one build and no transcendentals.
+ * At this resolution the table lands within one 0-255 level of `encodeSrgb`,
+ * which is far below the noise of a gray-world preview.
+ */
+const SRGB_STEPS = 4096;
+const SRGB_TABLE = /* @__PURE__ */ (() => {
+  const table = new Uint8Array(SRGB_STEPS + 1);
+  for (let i = 0; i <= SRGB_STEPS; i++) table[i] = encodeSrgb(i / SRGB_STEPS);
+  return table;
+})();
+
+const srgb = (linear: number): number =>
+  SRGB_TABLE[linear <= 0 ? 0 : linear >= 1 ? SRGB_STEPS : (linear * SRGB_STEPS) | 0]!;
+
+/**
  * Demosaic an uncompressed Bayer strip to a downscaled RGBA preview no larger
  * than `maxDim` on its longest side. Each output pixel samples one 2x2 CFA
  * block (nearest-block downsampling) so cost scales with the *preview* size,
@@ -215,47 +232,80 @@ export function decodeRawPreview(
   const range = meta.whiteLevel - meta.blackLevel || 1;
   const black = meta.blackLevel;
 
+  // Black/white-level normalisation for every possible 16-bit sample. Building
+  // 65536 entries once is cheaper than dividing and clamping per sample, of
+  // which a full-frame preview takes several million.
+  const norm = new Float32Array(65536);
+  for (let raw = 0; raw < 65536; raw++) {
+    const val = (raw - black) / range;
+    norm[raw] = val < 0 ? 0 : val > 1 ? 1 : val;
+  }
+
+  // The strip is 16-bit samples, so when the file's byte order matches the
+  // platform's (always little-endian here) and the strip is 2-byte aligned, it
+  // can be read as a Uint16Array instead of through DataView. Big-endian or
+  // odd-offset files keep the DataView path.
+  const usableSamples = usableRows * width;
+  const direct =
+    little && stripOffset % 2 === 0 ? new Uint16Array(buffer, stripOffset, usableSamples) : null;
+  const sampleAt = (index: number): number =>
+    direct ? direct[index]! : view.getUint16(stripOffset + index * 2, little);
+
+  // Resolve the mosaic once rather than re-testing every sample's colour inside
+  // the pixel loop. Sample offsets are relative to the block's top-left sample;
+  // positions are 0=(0,0) 1=(1,0) 2=(0,1) 3=(1,1). As before the last red and
+  // blue position wins, and anything that is neither counts toward green.
+  const positions = [0, 1, width, width + 1];
+  let redOffset = -1;
+  let blueOffset = -1;
+  const greenOffsets: number[] = [];
+  for (let k = 0; k < 4; k++) {
+    if (p[k] === 0) redOffset = positions[k]!;
+    else if (p[k] === 2) blueOffset = positions[k]!;
+    else greenOffsets.push(positions[k]!);
+  }
+  const greenCount = greenOffsets.length;
+  // Two greens per block is the universal case; bind them so it needs no loop.
+  const green0 = greenOffsets[0] ?? 0;
+  const green1 = greenOffsets[1] ?? 0;
+
+  // Hoist the output-pixel -> block mapping; it depends only on the axis.
+  const colBase = new Int32Array(outW);
+  for (let ox = 0; ox < outW; ox++) {
+    colBase[ox] = Math.min(blockW - 1, Math.floor((ox / outW) * blockW)) * 2;
+  }
+  const rowBase = new Int32Array(outH);
+  for (let oy = 0; oy < outH; oy++) {
+    rowBase[oy] = Math.min(blockH - 1, Math.floor((oy / outH) * blockH)) * 2 * width;
+  }
+
   // First pass: gather linear RGB per output pixel + channel sums for WB.
   const lin = new Float32Array(outW * outH * 3);
   let sumR = 0;
   let sumG = 0;
   let sumB = 0;
-  const sample = (x: number, y: number): number => {
-    const o = stripOffset + (y * width + x) * 2;
-    return little ? view.getUint16(o, true) : view.getUint16(o, false);
-  };
-  const norm = (raw: number): number => {
-    const val = (raw - black) / range;
-    return val < 0 ? 0 : val > 1 ? 1 : val;
-  };
 
+  let i = 0;
   for (let oy = 0; oy < outH; oy++) {
-    const by = Math.min(blockH - 1, Math.floor((oy / outH) * blockH));
-    const y0 = by * 2;
+    const rowStart = rowBase[oy]!;
     for (let ox = 0; ox < outW; ox++) {
-      const bx = Math.min(blockW - 1, Math.floor((ox / outW) * blockW));
-      const x0 = bx * 2;
-      // Four CFA samples of this block, positions: 0=(0,0) 1=(0,1) 2=(1,0) 3=(1,1)
-      const s = [sample(x0, y0), sample(x0 + 1, y0), sample(x0, y0 + 1), sample(x0 + 1, y0 + 1)];
-      let r = 0;
-      let g = 0;
-      let gN = 0;
-      let b = 0;
-      for (let k = 0; k < 4; k++) {
-        const c = p[k];
-        const val = norm(s[k]!);
-        if (c === 0) r = val;
-        else if (c === 2) b = val;
-        else {
-          g += val;
-          gN++;
-        }
+      const base = rowStart + colBase[ox]!;
+      const r = redOffset < 0 ? 0 : norm[sampleAt(base + redOffset)]!;
+      const b = blueOffset < 0 ? 0 : norm[sampleAt(base + blueOffset)]!;
+      let g: number;
+      if (greenCount === 2) {
+        g = (norm[sampleAt(base + green0)]! + norm[sampleAt(base + green1)]!) / 2;
+      } else if (greenCount === 1) {
+        g = norm[sampleAt(base + green0)]!;
+      } else {
+        g = 0;
+        for (let k = 0; k < greenCount; k++) g += norm[sampleAt(base + greenOffsets[k]!)]!;
+        if (greenCount) g /= greenCount;
       }
-      g = gN ? g / gN : g;
-      const i = (oy * outW + ox) * 3;
       lin[i] = r;
       lin[i + 1] = g;
       lin[i + 2] = b;
+      i += 3;
       sumR += r;
       sumG += g;
       sumB += b;
@@ -275,13 +325,12 @@ export function decodeRawPreview(
     if (mB > 1e-4) gainB = clamp(mG / mB);
   }
 
-  const data = new Uint8ClampedArray(outW * outH * 4);
-  for (let px = 0; px < outW * outH; px++) {
-    const i = px * 3;
-    const o = px * 4;
-    data[o] = encodeSrgb(lin[i]! * gainR);
-    data[o + 1] = encodeSrgb(lin[i + 1]!);
-    data[o + 2] = encodeSrgb(lin[i + 2]! * gainB);
+  const pixels = outW * outH;
+  const data = new Uint8ClampedArray(pixels * 4);
+  for (let px = 0, s = 0, o = 0; px < pixels; px++, s += 3, o += 4) {
+    data[o] = srgb(lin[s]! * gainR);
+    data[o + 1] = srgb(lin[s + 1]!);
+    data[o + 2] = srgb(lin[s + 2]! * gainB);
     data[o + 3] = 255;
   }
 
