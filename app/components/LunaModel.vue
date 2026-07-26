@@ -41,6 +41,13 @@ let disposeScene: (() => void) | null = null;
 let bodyMaterial: THREE.MeshStandardMaterial | null = null;
 let observer: ResizeObserver | null = null;
 let spinStart: number | null = null;
+/** Render-loop gating: the scene auto-rotates, so it never idles on its own. */
+let onScreen = true;
+let looping = false;
+let visibility: IntersectionObserver | null = null;
+let startLoop: (() => void) | null = null;
+let stopLoop: (() => void) | null = null;
+const onVisibilityChange = () => (document.hidden ? stopLoop?.() : startLoop?.());
 
 const BODY_COLORS = {
   black: { color: 0x161616, roughness: 0.38, metalness: 0.45 },
@@ -174,6 +181,7 @@ onMounted(async () => {
 
   const baseAutoRotateSpeed = controls.autoRotateSpeed;
   function animate() {
+    if (!looping) return;
     frame = requestAnimationFrame(animate);
     if (controls && spinStart !== null) {
       // Celebration: briefly boost the orbit auto-rotation and let it decay,
@@ -191,7 +199,29 @@ onMounted(async () => {
     controls?.update();
     renderer?.render(scene, camera);
   }
-  animate();
+  // The model auto-rotates forever, so without gating this draws every frame
+  // for as long as the page is mounted — including while it sits scrolled out
+  // of view in the stacked layout, or behind another window.
+  function start() {
+    if (looping || !onScreen || document.hidden) return;
+    looping = true;
+    animate();
+  }
+  function stop() {
+    looping = false;
+    cancelAnimationFrame(frame);
+  }
+  startLoop = start;
+  stopLoop = stop;
+
+  visibility = new IntersectionObserver((entries) => {
+    onScreen = entries.some((entry) => entry.isIntersecting);
+    if (onScreen) start();
+    else stop();
+  });
+  visibility.observe(el);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  start();
 
   disposeScene = () => {
     scene.traverse((object) => {
@@ -201,6 +231,10 @@ onMounted(async () => {
         for (const material of materials) material.dispose();
       }
     });
+    // The PMREM render target survives its generator, so releasing only the
+    // generator left the environment map on the GPU after every unmount.
+    scene.environment?.dispose();
+    scene.environment = null;
     pmrem.dispose();
   };
 });
@@ -217,7 +251,10 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  looping = false;
   cancelAnimationFrame(frame);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+  visibility?.disconnect();
   observer?.disconnect();
   controls?.dispose();
   disposeScene?.();
