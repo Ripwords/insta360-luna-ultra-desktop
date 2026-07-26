@@ -73,7 +73,7 @@ export default defineNuxtConfig({
         if (!isFromLayer(page.file)) continue;
         page.path = page.path === "/" ? "/demo" : `/demo${page.path}`;
         page.name = page.name ? `demo-${page.name}` : undefined;
-        page.meta = { ...page.meta, layout: "demo" };
+        page.meta = { ...page.meta, layout: "demo", robots: "noindex, nofollow" };
       }
 
       // Nuxt's layer-merge page scan deduplicates the `/` collision between
@@ -114,6 +114,140 @@ export default defineNuxtConfig({
   },
 
   modules: ["@nuxt/content", "@nuxtjs/seo"],
+
+  sitemap: {
+    // /demo/* is client-rendered app chrome inherited from the desktop-app
+    // layer, not prose — keep it out of search results. There is no
+    // robots.txt for a project-page baseURL (see the `robots` config below),
+    // so this exclusion plus the per-route `noindex` meta tag set in the
+    // `pages:extend` hook above is what actually keeps /demo/* out.
+    //
+    // Both a bare and a baseURL-prefixed form are listed because by the time
+    // `@nuxtjs/sitemap`'s exclude filter runs, each candidate URL has already
+    // been resolved to its final absolute form and only had its origin
+    // stripped back off (`createPathFilter` in `dist/runtime/utils-pure.js`
+    // does `parseURL(loc).pathname`) — so the string actually being matched
+    // is `/insta360-luna-ultra-desktop/demo/camera`, not `/demo/camera`.
+    // A bare `/demo/**` glob never matches that (confirmed empirically:
+    // with only the bare pattern present, /demo/* URLs still made it into
+    // `sitemap.xml`), so the baseURL-prefixed form is the one doing the
+    // actual work; the bare form is kept too in case a future zero-runtime
+    // or non-prerendered code path in this module ever filters on the
+    // pre-absolute relative path instead.
+    //
+    // The third entry excludes one specific phantom URL rather than a
+    // pattern class — see the long comment below for why this, and not a
+    // broader config change, is the fix.
+    exclude: ["/demo/**", `${baseURL}demo/**`, `${baseURL}${baseURL.slice(1, -1)}`],
+
+    // --- Diagnosis of the doubled-baseURL phantom sitemap entry ---
+    //
+    // `nuxt generate`'s Nitro prerenderer crawls every rendered page for
+    // `href` attributes and queues each discovered one as an additional
+    // route (`nitropack/dist/core/index.mjs`'s `extractLinks`/`generateRoute`
+    // — pushes the raw href straight into the crawl queue, no baseURL
+    // handling). Internal links are rendered by Vue Router with
+    // `app.baseURL` already baked into the `href` (ordinary, correct
+    // behaviour) — but that means the site's own logo/title link back to
+    // "/", present in the header on every page, renders as
+    // `href="/insta360-luna-ultra-desktop/"`. Nitro treats that discovered
+    // string as a *literal, distinct route* to crawl and render, alongside
+    // "/" itself — confirmed by running with `sitemap.debug: true`, whose
+    // "Prerendered routes:" log lists both `{ loc: '/' }` and
+    // `{ loc: '/insta360-luna-ultra-desktop/' }` as separate entries.
+    //
+    // `@nuxtjs/sitemap` records that duplicate route's raw path verbatim as
+    // a sitemap `loc` (its "nuxt:prerender" source, built from whatever
+    // Nitro actually rendered — this is the *only* source most routes have
+    // in a full static generate; Nuxt's static-page-scan source ("nuxt:pages")
+    // defers to it for anything Nitro already rendered, which in `nuxt
+    // generate` is everything, so "nuxt:prerender" cannot be disabled
+    // wholesale without losing "/", "/demo", and "/demo/*" from the sitemap
+    // too — confirmed by testing: doing so dropped every entry except the
+    // ones from `content.config.ts`'s explicit source).
+    //
+    // When building the final absolute URL, the module's own dedup logic
+    // (`resolveSitePath`, in the `site-config-stack` package) is *supposed*
+    // to catch exactly this: it checks whether `loc` already starts with
+    // `app.baseURL` and strips it before prefixing again. But
+    // `preNormalizeEntry` (`@nuxtjs/sitemap/dist/runtime/server/sitemap/
+    // urlset/normalise.js`) strips `loc`'s trailing slash *before* that
+    // check runs. For every other crawled duplicate (e.g. the equally
+    // baseURL-prefixed `/insta360-luna-ultra-desktop/docs/install`, also
+    // visible in the debug log) the base is a strict prefix of a *longer*
+    // string, so trailing-slash-stripping the loc doesn't change whether it
+    // starts with the base, and the dedup still fires correctly. Only for
+    // this one route — the crawled duplicate of the home page, whose loc
+    // *equals* `app.baseURL` and nothing else — does stripping its own
+    // trailing slash make it one character *shorter* than the base, so
+    // `path.startsWith(base)` now fails on that trailing slash alone, the
+    // strip never fires, and the base gets prepended a second time:
+    // `https://ripwords.github.io/insta360-luna-ultra-desktop/insta360-luna-ultra-desktop`.
+    //
+    // This is a real, reproducible interaction bug between two upstream
+    // packages (`nitropack`'s crawler and `site-config-stack`'s URL
+    // resolver), not something reachable from this app's own config —
+    // there's no supported Nitro/Nuxt option to make the crawler recognise
+    // that a discovered link already equals the site's own baseURL. The
+    // closest available "fix the cause, not the symptom" options were
+    // evaluated and rejected:
+    //   - Disabling the whole "nuxt:prerender" source (`excludeAppSources`)
+    //     removes the phantom, but also removes "/", "/demo", and all
+    //     "/demo/*" entries, per the testing above — a worse regression than
+    //     the defect being fixed.
+    //   - Patching `node_modules` isn't durable across installs and isn't
+    //     available as a first-party config surface.
+    // So the fix is a single exact-match `sitemap.exclude` entry for this
+    // one known-bad, fully-determined path (computed from the same
+    // `baseURL` constant this file already defines, not a hardcoded
+    // duplicate literal, so it can't silently drift from it) — the smallest
+    // change that removes exactly the phantom URL and nothing else. Content
+    // pages additionally now have their own explicit, crawl-independent
+    // sitemap source (see `content.config.ts`'s `asSitemapCollection`),
+    // which the brief's "give the module an explicit URL source" option
+    // anticipates — it doesn't fix this specific defect (the phantom
+    // survives even with it in place, since "nuxt:prerender" still runs),
+    // but it does mean the four /docs/* routes no longer *depend solely* on
+    // the crawler that produced this bug.
+  },
+
+  // This config is inert in practice — kept only because the task brief
+  // calls for it and because `defineOgImageComponent()` (the composable that
+  // would actually consume it) still typechecks and auto-imports correctly,
+  // so nothing here signals that it doesn't work.
+  //
+  // `ogImage.defaults` only supplies fallback props for a page that calls
+  // `defineOgImage()`/`defineOgImageComponent()`; it never injects a tag by
+  // itself. Actually calling `defineOgImageComponent("NuxtSeo", {...})` (as
+  // this config anticipates) fails the entire `nuxt generate` outright with
+  // "[400] Invalid island request hash" while satori tries to render the
+  // `NuxtSeo` template through Nuxt's component-islands machinery — this is
+  // a real version incompatibility, not a config mistake: Nuxt 4.5.0 added a
+  // `source` field to the tuple `getIslandHash()` hashes
+  // (`@nuxt/nitro-server/dist/runtime/nuxt/src/app/island-hash.mjs`, tagged
+  // "@since 4.5.0"), but `nuxt-og-image@5.1.13` declares a peer dependency
+  // on `nuxt@^4.2.2` and pre-dates that change, so the island URL it builds
+  // (and hashes) for the OG-image render request no longer matches what
+  // Nuxt's own island endpoint recomputes and expects on arrival — every
+  // request 400s.
+  //
+  // There's no reasonable in-repo fix for a hash-algorithm mismatch between
+  // an installed app framework version and a SEO module that hasn't caught
+  // up to it yet; downgrading Nuxt itself is out of scope for a docs-site
+  // SEO task. So every page instead sets a plain static `ogImage` via
+  // `useSeoMeta()` (see `app/pages/index.vue` and
+  // `app/pages/docs/[...slug].vue`) pointing at `public/og.png` — a real
+  // file that ships in the output, satisfying "every page has a working
+  // og:image" without going through the broken dynamic renderer at all.
+  ogImage: {
+    defaults: {
+      component: "NuxtSeo",
+      props: {
+        title: "Luna Ultra Desktop",
+        description: "A desktop companion for the Insta360 Luna Ultra.",
+      },
+    },
+  },
 
   // Without this, @nuxt/content's build-time database probes for a driver
   // and — since `nuxt dev` runs under a Node subprocess even when launched

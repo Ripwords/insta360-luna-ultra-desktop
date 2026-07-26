@@ -17,6 +17,12 @@ if (!page.value) {
 useSeoMeta({
   title: page.value.title,
   description: page.value.description,
+  // See `pages/index.vue` / `nuxt.config.ts`'s `ogImage` comment: the
+  // dynamic satori/component renderer this brief called for doesn't work in
+  // this install, so every page shares one static image instead. Written
+  // fully-qualified because `nuxt-og-image`'s own relative-URL resolver is
+  // also broken by the same dependency conflict (see `JsonLd.vue`).
+  ogImage: "https://ripwords.github.io/insta360-luna-ultra-desktop/og.png",
 });
 </script>
 
