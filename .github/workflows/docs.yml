@@ -1,0 +1,48 @@
+name: Docs
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "app/**"
+      - "docs/**"
+      - "package.json"
+      - "bun.lock"
+      - "nuxt.config.ts"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+# Allow one concurrent deployment, and let a newer push cancel an in-flight one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Build the docs site
+        run: bun --cwd=docs/site run generate
+        env:
+          NUXT_APP_BASE_URL: /insta360-luna-ultra-desktop/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/site/.output/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -269,6 +269,18 @@ export default defineNuxtConfig({
     baseURL,
   },
 
+  // Nitro is supposed to auto-detect GitHub Actions (via the `GITHUB_ACTIONS`
+  // env var) and apply the `github_pages` preset itself, which is what
+  // actually writes `.nojekyll` into the output — without it, GitHub Pages
+  // silently drops any `_`-prefixed directory, which breaks Nuxt's `_nuxt/`
+  // asset folder and yields a completely unstyled site. That auto-detection
+  // did not fire in this repo's build (confirmed: `.nojekyll` was absent
+  // from `.output/public` after a plain `nuxt generate`), so the preset is
+  // pinned explicitly instead of relying on it.
+  nitro: {
+    preset: "github_pages",
+  },
+
   // Origin only — no path. `@nuxtjs/seo` combines `site.url` with
   // `app.baseURL` itself; including the path in both produces a
   // doubled-up prefix (`https://ripwords.github.io/insta360-luna-ultra-desktop/insta360-luna-ultra-desktop`)
