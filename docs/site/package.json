@@ -5,7 +5,7 @@
   "scripts": {
     "sync:features": "node scripts/sync-features.mjs",
     "dev": "node scripts/sync-features.mjs && nuxt dev",
-    "generate": "node scripts/sync-features.mjs && nuxt generate",
+    "generate": "node scripts/sync-features.mjs && nuxt generate && node scripts/strip-desktop-assets.mjs",
     "preview": "nuxt preview"
   },
   "dependencies": {
