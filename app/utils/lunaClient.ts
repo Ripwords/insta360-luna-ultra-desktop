@@ -202,4 +202,21 @@ export const lunaClient = {
     items.sort((a, b) => b.takenAt - a.takenAt);
     return items;
   },
+
+  /** Replaces the standalone `cameraFetch` export; health reporting included. */
+  fetch: cameraFetch,
+
+  /** Replaces the standalone `probeCamera` export; bypasses health reporting. */
+  probe: probeCamera,
+
+  /**
+   * Subscribe to the Rust side's disconnect event. Returns an unlisten fn.
+   * In a plain browser there is no event source, so this is a no-op — which is
+   * what lets a non-Tauri transport implementation exist at all.
+   */
+  async onDisconnect(handler: () => void): Promise<() => void> {
+    if (!isTauri()) return () => {};
+    const { listen } = await import("@tauri-apps/api/event");
+    return await listen("luna://disconnected", () => handler());
+  },
 };
