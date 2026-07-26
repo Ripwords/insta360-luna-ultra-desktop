@@ -1,4 +1,25 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["unicorn", "typescript", "oxc", "vue"]
+  "plugins": ["unicorn", "typescript", "oxc", "vue"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/lunaClient"],
+            "message": "Import the CameraTransport seam from `~/utils/transport` instead of the concrete lunaClient. See app/utils/transport.ts for why."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/utils/transport.ts", "**/tests/transport.test.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }
