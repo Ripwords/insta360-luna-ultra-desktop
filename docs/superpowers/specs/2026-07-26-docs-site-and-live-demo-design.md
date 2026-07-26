@@ -6,7 +6,7 @@ Status: approved, not yet implemented
 ## Goal
 
 Ship an SEO-oriented documentation site at
-`https://ripwords.github.io/luna-ultra-desktop/`, containing a landing page,
+`https://ripwords.github.io/insta360-luna-ultra-desktop/`, containing a landing page,
 four user-facing doc pages, and an **interactive demo built from the app's real
 components** — running in a plain browser against a mock camera, embeddable
 inline in the documentation prose.
@@ -221,7 +221,7 @@ indexing it would pollute results with UI strings instead of prose.
 
 ```
 bun install --frozen-lockfile
-NUXT_APP_BASE_URL=/luna-ultra-desktop/ bun run --cwd docs/site generate
+NUXT_APP_BASE_URL=/insta360-luna-ultra-desktop/ bun run --cwd docs/site generate
 touch docs/site/.output/public/.nojekyll
 actions/upload-pages-artifact → actions/deploy-pages
 ```
