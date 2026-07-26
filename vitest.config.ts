@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
+    // Composable tests need a Nuxt runtime; they run under vitest.nuxt.config.ts
+    exclude: ["tests/nuxt/**"],
     environment: "node",
   },
 });

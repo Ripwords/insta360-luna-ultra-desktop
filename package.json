@@ -10,6 +10,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "git config core.hooksPath .githooks || true && nuxt prepare",
+    "test": "vitest run && vitest run -c vitest.nuxt.config.ts",
     "lint": "oxlint --deny-warnings",
     "lint:fix": "oxlint --fix --deny-warnings",
     "fmt": "oxfmt",
@@ -31,9 +32,12 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@nuxt/test-utils": "^4.0.3",
     "@tauri-apps/cli": "^2.11.4",
     "@types/three": "^0.185.1",
+    "@vue/test-utils": "^2.4.11",
     "changelogen": "^0.6.2",
+    "happy-dom": "^20.11.1",
     "lint-staged": "^17.2.0",
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",

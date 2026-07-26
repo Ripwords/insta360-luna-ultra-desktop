@@ -19,7 +19,7 @@ jobs:
       # (a failing step would otherwise abort every step after it).
       - name: Unit tests
         if: ${{ !cancelled() }}
-        run: bun x vitest run
+        run: bun run test
       - name: Typecheck
         if: ${{ !cancelled() }}
         run: bun run typecheck
