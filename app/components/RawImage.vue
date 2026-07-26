@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { cameraFetch } from "~/utils/lunaClient";
+import { useCameraTransport } from "~/utils/transport";
 import { extractDngPreview } from "~/utils/dng";
 import { parseRawImageMeta, decodeRawPreview } from "~/utils/rawPreview";
 import { formatBytes } from "~/utils/media";
@@ -124,7 +124,7 @@ async function fetchPreview(priority: number): Promise<Blob | string> {
   const download = () =>
     withCameraSlot(async () => {
       const init: RequestInit = maxBytes ? { headers: { Range: `bytes=0-${maxBytes - 1}` } } : {};
-      const response = await cameraFetch(src, init);
+      const response = await useCameraTransport().fetch(src, init);
       if (!response.ok) throw new Error(String(response.status));
       // If we asked for a byte range (grid thumbnail) but the camera ignored it
       // and would send the whole multi-MB file, skip rather than download it.

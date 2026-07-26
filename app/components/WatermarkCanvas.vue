@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { drawWatermark } from "~/utils/watermark";
 import { placeholderDataUrl } from "~/utils/placeholder";
-import { cameraFetch } from "~/utils/lunaClient";
+import { useCameraTransport } from "~/utils/transport";
 
 /** A real camera photo URL to preview the watermark on. */
 const props = defineProps<{ src?: string }>();
@@ -56,7 +56,7 @@ async function loadFromCamera() {
     return;
   }
   try {
-    const response = await cameraFetch(props.src);
+    const response = await useCameraTransport().fetch(props.src);
     if (!response.ok) throw new Error(String(response.status));
     const blob = await response.blob();
     objectUrl = URL.createObjectURL(blob);

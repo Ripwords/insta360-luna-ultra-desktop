@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { cameraFetch } from "~/utils/lunaClient";
+import { useCameraTransport } from "~/utils/transport";
 import { imageMimeFor } from "~/utils/media";
 import { withCameraSlot, CAMERA_PRIORITY, viewportPriority } from "~/utils/cameraQueue";
 import { cachedMedia } from "~/utils/mediaCache";
@@ -54,7 +54,7 @@ async function load() {
     // behind live camera traffic.
     const blob = await cachedMedia(`img:${src}`, () =>
       withCameraSlot(async () => {
-        const response = await cameraFetch(src);
+        const response = await useCameraTransport().fetch(src);
         if (!response.ok) throw new Error(String(response.status));
         const raw = await response.blob();
         // The camera may serve images as octet-stream; force the right MIME so

@@ -58,7 +58,7 @@ async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): 
  * where the health counter is fed: a completed response of any status means
  * the camera answered, a thrown request means it did not.
  */
-export async function cameraFetch(url: string, init?: RequestInit): Promise<Response> {
+async function cameraFetch(url: string, init?: RequestInit): Promise<Response> {
   try {
     const response = await rawCameraFetch(url, init);
     reportCameraSuccess();
@@ -84,7 +84,7 @@ async function rawCameraFetch(url: string, init?: RequestInit): Promise<Response
  * camera answered. Deliberately bypasses `cameraFetch` so the probe cannot
  * feed the very counter that triggered it.
  */
-export async function probeCamera(host: string): Promise<boolean> {
+async function probeCamera(host: string): Promise<boolean> {
   const root = STORAGE_ROOTS[0]!;
   try {
     await rawCameraFetch(baseUrl(host, root.path), { headers: { "Cache-Control": "no-cache" } });

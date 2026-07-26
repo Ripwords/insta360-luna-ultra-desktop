@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import "pannellum/build/pannellum.css";
-import { cameraFetch } from "~/utils/lunaClient";
+import { useCameraTransport } from "~/utils/transport";
 import { imageMimeFor } from "~/utils/media";
 import { withCameraSlot, CAMERA_PRIORITY } from "~/utils/cameraQueue";
 
@@ -22,7 +22,7 @@ onMounted(async () => {
   if (!container.value) return;
   try {
     const blob = await withCameraSlot(async () => {
-      const response = await cameraFetch(props.src);
+      const response = await useCameraTransport().fetch(props.src);
       if (!response.ok) throw new Error(String(response.status));
       const raw = await response.blob();
       const mime = imageMimeFor(props.src);
