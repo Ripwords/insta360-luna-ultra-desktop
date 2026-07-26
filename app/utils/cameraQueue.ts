@@ -100,6 +100,27 @@ export function withCameraSlot<T>(
 }
 
 /**
+ * Scores are cached per frame. `drain` deliberately re-scores every runnable
+ * task on each pick (that is what makes loading follow the scroll), so without
+ * this a queue of n tiles costs n forced layout reads per pick — worst exactly
+ * when the user is scrolling and the layout is already dirty. Nothing can move
+ * without a frame boundary, so a score stays valid until the next one; the
+ * queue's semantics are untouched.
+ */
+let frameGeneration = 0;
+let frameScheduled = false;
+const scoreCache = new WeakMap<HTMLElement, { generation: number; score: number }>();
+
+function expireScoresNextFrame(): void {
+  if (frameScheduled || typeof requestAnimationFrame === "undefined") return;
+  frameScheduled = true;
+  requestAnimationFrame(() => {
+    frameScheduled = false;
+    frameGeneration++;
+  });
+}
+
+/**
  * Priority for a grid thumbnail from how close it sits to the viewport centre
  * right now: 0 at the centre, sliding negative with distance, so the closest
  * un-loaded tile is always picked next. Stays below LISTING/PREVIEW, and below
@@ -107,7 +128,15 @@ export function withCameraSlot<T>(
  */
 export function viewportPriority(el: HTMLElement | null): number {
   if (!el || typeof window === "undefined") return CAMERA_PRIORITY.THUMBNAIL;
+
+  const cached = scoreCache.get(el);
+  if (cached && cached.generation === frameGeneration) return cached.score;
+
   const rect = el.getBoundingClientRect();
   const tileCenter = rect.top + rect.height / 2;
-  return -Math.abs(tileCenter - window.innerHeight / 2) / 10000;
+  const score = -Math.abs(tileCenter - window.innerHeight / 2) / 10000;
+
+  scoreCache.set(el, { generation: frameGeneration, score });
+  expireScoresNextFrame();
+  return score;
 }

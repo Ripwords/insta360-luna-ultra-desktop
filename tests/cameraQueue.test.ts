@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   withCameraSlot,
   CAMERA_PRIORITY,
   CAMERA_CONCURRENCY,
   setCameraQueuePaused,
+  viewportPriority,
 } from "~/utils/cameraQueue";
 
 function deferred<T>() {
@@ -101,5 +102,94 @@ describe("withCameraSlot", () => {
     setCameraQueuePaused(false);
     await thumb; // resumes once unpaused
     expect(order).toEqual(["preview", "thumb"]);
+  });
+});
+
+/**
+ * The queue re-scores every runnable task each time it picks one, which for a
+ * grid thumbnail means reading its position. Left unguarded that is a layout
+ * read per queued tile per pick, precisely while the user is scrolling. Layout
+ * cannot change without a frame boundary, so the read is cached until one.
+ */
+describe("viewportPriority", () => {
+  let frameCallbacks: FrameRequestCallback[] = [];
+
+  /** A stand-in tile that records how often its geometry is read. */
+  function fakeTile(top: number) {
+    const element = {
+      reads: 0,
+      getBoundingClientRect() {
+        this.reads++;
+        return { top, height: 100 } as DOMRect;
+      },
+    };
+    return element as unknown as HTMLElement & { reads: number };
+  }
+
+  /** Run whatever the module scheduled, standing in for the browser's frame. */
+  function advanceFrame() {
+    const due = frameCallbacks;
+    frameCallbacks = [];
+    for (const callback of due) callback(0);
+  }
+
+  beforeEach(() => {
+    // Deliberately not cleared: the module only schedules one frame at a time,
+    // so dropping a pending callback would leave it believing a frame is still
+    // due and stop it ever expiring its cache again.
+    vi.stubGlobal("window", { innerHeight: 1000 });
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frameCallbacks.push(callback);
+      return frameCallbacks.length;
+    });
+    // Flush anything the previous test left pending, then land on a fresh
+    // generation so no cached score leaks in.
+    advanceFrame();
+    viewportPriority(fakeTile(0));
+    advanceFrame();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("scores by distance from the viewport centre, below every fixed priority", () => {
+    const centred = viewportPriority(fakeTile(450)); // centre 500 == viewport centre
+    const distant = viewportPriority(fakeTile(4000));
+    expect(centred).toBeCloseTo(0);
+    expect(distant).toBeLessThan(centred);
+    expect(centred).toBeLessThanOrEqual(CAMERA_PRIORITY.THUMBNAIL);
+  });
+
+  it("reads geometry once per element per frame, however often it is scored", () => {
+    const tile = fakeTile(300);
+    const scores = Array.from({ length: 50 }, () => viewportPriority(tile));
+    expect(tile.reads).toBe(1);
+    // Every caller still gets the real score, not a placeholder.
+    expect(new Set(scores).size).toBe(1);
+    expect(scores[0]).toBeCloseTo(-Math.abs(350 - 500) / 10000);
+  });
+
+  it("re-reads after a frame, so scrolling still changes the order", () => {
+    const tile = fakeTile(300);
+    viewportPriority(tile);
+    viewportPriority(tile);
+    expect(tile.reads).toBe(1);
+
+    advanceFrame();
+    viewportPriority(tile);
+    expect(tile.reads).toBe(2);
+  });
+
+  it("caches per element rather than sharing one score", () => {
+    const near = fakeTile(450);
+    const far = fakeTile(5000);
+    expect(viewportPriority(near)).toBeGreaterThan(viewportPriority(far));
+    expect(near.reads).toBe(1);
+    expect(far.reads).toBe(1);
+  });
+
+  it("falls back to the base thumbnail priority without an element", () => {
+    expect(viewportPriority(null)).toBe(CAMERA_PRIORITY.THUMBNAIL);
   });
 });
