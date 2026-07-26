@@ -16,18 +16,18 @@ finds a lever has moved to a field it does not watch.
 
 Before starting: **Color Mode = Standard, resolution 4K30 or lower, normal Video
 mode.** Filters are unavailable above 4K60, and a greyed-out picker records the
-*previous* value again rather than the one being asked for.
+_previous_ value again rather than the one being asked for.
 
 ## Why re-calibration is not optional
 
 The vendored extraction (`scripts/luna-protocol-schema.json`) describes a
 2020-era camera. Every picture-profile field checked so far disagrees with it:
 
-| Field | Extraction says | Camera actually does |
-|---|---|---|
-| `color_mode` | NORMAL=0, LOG=1, VIVID=2, HDR=3 | 1, 2, 5 — and no VIVID |
-| `gamma_mode` | a gamma curve, values 0–13 | the **Filter** picker, values 0/15/16/24/26/34–38 |
-| `filter_intensity` | does not exist | field 104, option type 104 |
+| Field              | Extraction says                 | Camera actually does                              |
+| ------------------ | ------------------------------- | ------------------------------------------------- |
+| `color_mode`       | NORMAL=0, LOG=1, VIVID=2, HDR=3 | 1, 2, 5 — and no VIVID                            |
+| `gamma_mode`       | a gamma curve, values 0–13      | the **Filter** picker, values 0/15/16/24/26/34–38 |
+| `filter_intensity` | does not exist                  | field 104, option type 104                        |
 
 The failure mode when these drift is silent and nasty: the camera **accepts**
 the write, **echoes** the option type as successful, and **reads back** a value
@@ -41,28 +41,28 @@ sitting in Standard.
 
 ### Colour mode — `color_mode`, field 35, option type `COLOR_MODE`
 
-| Camera UI | Value |
-|---|---|
-| Standard | 1 |
-| I-Log | 2 |
-| Dolby Vision | 5 |
+| Camera UI    | Value |
+| ------------ | ----- |
+| Standard     | 1     |
+| I-Log        | 2     |
+| Dolby Vision | 5     |
 
 0, 3 and 4 were never observed and are deliberately left unnamed.
 
 ### Filter — `gamma_mode`, field 18, option type `VIDEO_GAMMA_MODE`
 
-| Camera UI | Value | Strength? |
-|---|---|---|
-| Original | 0 | — |
-| Leica Natural | 15 | — |
-| Leica Vivid | 16 | — |
-| Leica Chrome | 36 | — |
-| NC Film | 24 | ✓ |
-| CC Film | 26 | ✓ |
-| Pos Film | 34 | ✓ |
-| Neg Film | 35 | ✓ |
-| Cinematic | 37 | ✓ |
-| Fresh | 38 | ✓ |
+| Camera UI     | Value | Strength? |
+| ------------- | ----- | --------- |
+| Original      | 0     | —         |
+| Leica Natural | 15    | —         |
+| Leica Vivid   | 16    | —         |
+| Leica Chrome  | 36    | —         |
+| NC Film       | 24    | ✓         |
+| CC Film       | 26    | ✓         |
+| Pos Film      | 34    | ✓         |
+| Neg Film      | 35    | ✓         |
+| Cinematic     | 37    | ✓         |
+| Fresh         | 38    | ✓         |
 
 The numbering is genuinely non-contiguous, and Leica Chrome genuinely sits at 36
 among the film filters rather than beside its siblings at 15/16. Both were
@@ -71,10 +71,10 @@ re-measured because they looked like errors. They are not.
 ### Filter strength — `filter_intensity`, field 104, option type `FILTER_INTENSITY`
 
 | Camera UI | Value |
-|---|---|
-| Low | 1 |
-| Medium | 2 |
-| High | 3 |
+| --------- | ----- |
+| Low       | 1     |
+| Medium    | 2     |
+| High      | 3     |
 
 Only the six cinematic filters expose this; the three Leica profiles have no
 strength. The setting is **global** — it persists across filter changes, so it
@@ -90,7 +90,7 @@ holds its last value even while a Leica profile is selected.
   `color_mode` or `gamma_mode` for `FUNCTION_MODE_NORMAL_VIDEO` changes it for
   `HDR_VIDEO`, `NORMAL_IMAGE` and `HDR_IMAGE` too, so one write covers everything.
 - **`$supported` cannot gate the UI.** The camera lists an option type as
-  supported wherever it will *parse* it, which includes modes whose own UI has no
+  supported wherever it will _parse_ it, which includes modes whose own UI has no
   such picker. Availability rules come from the manual, in
   `app/utils/cameraCapabilities.ts`.
 - **proto3 defaults are invisible.** A field at its zero value is omitted from
@@ -109,7 +109,7 @@ traffic never needs sniffing.
    while you change the setting, snapshots again, diffs. One connection.
 2. `series <label>...` — same, for a list of values, and prints a matrix of
    everything that varied. This is what produced the filter table.
-3. `scan --max 200` — walks option-type *numbers* past the end of the vendored
+3. `scan --max 200` — walks option-type _numbers_ past the end of the vendored
    enum to find types this firmware answers to. Needed when a setting has no
    field in the schema at all, which is how filter strength was found.
 4. `snapshot` / `diff` — the manual two-step, for snapshots taken minutes or
@@ -139,7 +139,7 @@ traffic never needs sniffing.
 
 **Dolby Vision has no filters.** The manual's filters page lists Dolby Vision
 among the filter-supporting modes. On the camera it is not: there is no filter
-picker in Dolby Vision, and passing *through* Dolby Vision clears whatever filter
+picker in Dolby Vision, and passing _through_ Dolby Vision clears whatever filter
 was set — it does not come back on returning to Standard or i-Log.
 
 Standard and i-Log both do allow filters. All three modes were checked
@@ -156,8 +156,8 @@ aspect rides on **field 98 / option type 98**: `1` = 360, `4` = 2:1.
 
 Separating that from its co-travellers needed a negative control. Switching the
 Pano aspect moved four fields at once — `pano_aspect`, `photo_resolution`,
-`remaining_time` and field 99. Changing the photo resolution in *ordinary Photo
-mode* then moved `photo_resolution` and `remaining_time` while field 98 stayed
+`remaining_time` and field 99. Changing the photo resolution in _ordinary Photo
+mode_ then moved `photo_resolution` and `remaining_time` while field 98 stayed
 at 1, which is what proves 98 tracks the aspect rather than the shot size.
 Field 99 decodes to `{remaining_time, 3}` — derived, not a lever.
 
@@ -174,11 +174,11 @@ mode detection needs it. UltraPhoto's value is still unmeasured.
 ### Video sub-modes (confirmed unchanged from the extraction)
 
 | Camera UI | `video_sub_mode` |
-|---|---|
-| Video | 0 |
-| PureVideo | 11 |
-| Slow-mo | 9 |
-| Timelapse | 2 |
+| --------- | ---------------- |
+| Video     | 0                |
+| PureVideo | 11               |
+| Slow-mo   | 9                |
+| Timelapse | 2                |
 
 **Changing colour mode rewrites other settings.** `sharpness` was measured moving
 1 → 2 → 1 across an i-Log → Standard → i-Log round trip. Any write that changes
@@ -187,14 +187,14 @@ leaves the rest of the panel showing values the camera has already discarded.
 
 ## Mode / colour-mode rules (confirmed on-device)
 
-| Capture mode | Colour modes | Filters | Reset on entry |
-|---|---|---|---|
-| Video | Standard, i-Log, Dolby Vision | yes (not in DV) | no |
-| PureVideo | Standard only | yes | **yes** |
-| Slow-mo | Standard only | yes | **yes** |
-| Timelapse | Standard only | yes | **yes** |
-| Photo | no picker | yes | no |
-| Pano | no picker | — | **yes** |
+| Capture mode | Colour modes                  | Filters         | Reset on entry |
+| ------------ | ----------------------------- | --------------- | -------------- |
+| Video        | Standard, i-Log, Dolby Vision | yes (not in DV) | no             |
+| PureVideo    | Standard only                 | yes             | **yes**        |
+| Slow-mo      | Standard only                 | yes             | **yes**        |
+| Timelapse    | Standard only                 | yes             | **yes**        |
+| Photo        | no picker                     | yes             | no             |
+| Pano         | no picker                     | —               | **yes**        |
 
 **The camera does not reset for you.** Switching into a Standard-only mode from
 i-Log or Dolby Vision leaves `color_mode` where it was, so the app would show
@@ -207,13 +207,13 @@ on entering any of those modes rather than assuming.
 Five features were driven successfully. Five were chased and abandoned. The
 split is not luck — it is the shape of what this protocol exposes.
 
-| Reachable (a stored option) | Not reachable (live or interactive) |
-|---|---|
-| Colour modes | Colour Recovery |
-| Filters + strength | Deep Track (status only, not settable) |
-| Pano aspect | Tap to focus |
-| Capture modes | Gimbal control |
-| Zoom (`zoom_scale`) | Gimbal attitude |
+| Reachable (a stored option) | Not reachable (live or interactive)    |
+| --------------------------- | -------------------------------------- |
+| Colour modes                | Colour Recovery                        |
+| Filters + strength          | Deep Track (status only, not settable) |
+| Pano aspect                 | Tap to focus                           |
+| Capture modes               | Gimbal control                         |
+| Zoom (`zoom_scale`)         | Gimbal attitude                        |
 
 Everything in the left column is a value the camera stores and reports. Nothing
 in the right column is. Before spending a day on the next feature, ask which
@@ -246,13 +246,13 @@ shows a colour-corrected preview of log footage and disables filters while on.
 It visibly changes the preview, so the setting is real. It is not observable
 anywhere on the control protocol. Exhausted, all read-only:
 
-| Probed | Result |
-|---|---|
-| Photography option types 1–400 | nothing returns a value above 104 |
-| Device option types 1–400 | 12 unnamed types found; none move with the toggle |
-| The 11 named `PHONE_COMMAND_GET_*` commands | unchanged |
-| `GET_SUBMODE_OPTIONS` (43), 16 request shapes | every one empty |
-| Unsolicited notifications (`listen`) | nothing correlates with any setting |
+| Probed                                        | Result                                            |
+| --------------------------------------------- | ------------------------------------------------- |
+| Photography option types 1–400                | nothing returns a value above 104                 |
+| Device option types 1–400                     | 12 unnamed types found; none move with the toggle |
+| The 11 named `PHONE_COMMAND_GET_*` commands   | unchanged                                         |
+| `GET_SUBMODE_OPTIONS` (43), 16 request shapes | every one empty                                   |
+| Unsolicited notifications (`listen`)          | nothing correlates with any setting               |
 
 **A camera that echoes anything.** Asked for photography option types 1–400 it
 echoed back 399 of them, including hundreds that cannot exist. The echo in

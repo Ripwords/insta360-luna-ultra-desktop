@@ -20,15 +20,15 @@ fields, so `PhotographyOptions` and `Options` are structurally accurate for
 Every one of these was acknowledged in both `FUNCTION_MODE_NORMAL_VIDEO` and
 `FUNCTION_MODE_NORMAL_IMAGE`:
 
-| Area | Option types |
-| --- | --- |
-| Exposure | `EXPOSURE_MODE`, `EXPOSURE_PROG`, `EXPOSURE_MANUAL`, `EXPOSURE_BIAS`, `EV_INDEX`, `LONG_EXPOSURE_MANUAL`, `STILL_EXPOSURE_OPTIONS`, `VIDEO_EXPOSURE_OPTIONS`, `VIDEO_ISO_TOP_LIMIT` |
-| Metering | `AE_METER_MODE`, `AE_MANUAL_METER_WEIGHT`, `METERING_ENABLE` |
-| Colour | `WHITE_BALANCE`, `WHITE_BALANCE_VALUE`, `VIDEO_GAMMA_MODE`, `COLOR_MODE`, `BRIGHTNESS`, `CONTRAST`, `SATURATION`, `HUE`, `SHARPNESS`, `FLICKER` |
-| **Zoom** | **`ZOOM_SCALE`**, `FOCAL_LENGTH_VALUE`, `FOV_TYPE` |
-| Format | `RECORD_RESOLUTION`, `PHOTO_RESOLUTION`, `PHOTO_SIZE_ID`, `PHOTO_GRAPHY_BITRATE`, `RES_REC_LIMIT`, `RAW_CAPTURE_TYPE` |
-| Capture | `PHOTOGRAPHY_SELF_TIMER`, `AEB_CAPTURE_NUM`, `BURST_CAPTURE_NUM`, `BURST_CAPTURE_TIME`, `CACHE_CAPTURE_NUM`, `CACHE_CAPTURE_ENABLE`, `RECORD_DURAION`, `REMAINING_TIME` |
-| Stabilisation | `FLOWSTATE_BASE_TYPE`, `FLOWSTATE_LEVEL`, `DARK_EIS_ENABLE`, `PREVIEW_MCTF_ENABLE`, `PREVIEW_SPORT_MODE_ENABLE`, `PREVIEW_SPORT_LEVEL` |
+| Area          | Option types                                                                                                                                                                        |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exposure      | `EXPOSURE_MODE`, `EXPOSURE_PROG`, `EXPOSURE_MANUAL`, `EXPOSURE_BIAS`, `EV_INDEX`, `LONG_EXPOSURE_MANUAL`, `STILL_EXPOSURE_OPTIONS`, `VIDEO_EXPOSURE_OPTIONS`, `VIDEO_ISO_TOP_LIMIT` |
+| Metering      | `AE_METER_MODE`, `AE_MANUAL_METER_WEIGHT`, `METERING_ENABLE`                                                                                                                        |
+| Colour        | `WHITE_BALANCE`, `WHITE_BALANCE_VALUE`, `VIDEO_GAMMA_MODE`, `COLOR_MODE`, `BRIGHTNESS`, `CONTRAST`, `SATURATION`, `HUE`, `SHARPNESS`, `FLICKER`                                     |
+| **Zoom**      | **`ZOOM_SCALE`**, `FOCAL_LENGTH_VALUE`, `FOV_TYPE`                                                                                                                                  |
+| Format        | `RECORD_RESOLUTION`, `PHOTO_RESOLUTION`, `PHOTO_SIZE_ID`, `PHOTO_GRAPHY_BITRATE`, `RES_REC_LIMIT`, `RAW_CAPTURE_TYPE`                                                               |
+| Capture       | `PHOTOGRAPHY_SELF_TIMER`, `AEB_CAPTURE_NUM`, `BURST_CAPTURE_NUM`, `BURST_CAPTURE_TIME`, `CACHE_CAPTURE_NUM`, `CACHE_CAPTURE_ENABLE`, `RECORD_DURAION`, `REMAINING_TIME`             |
+| Stabilisation | `FLOWSTATE_BASE_TYPE`, `FLOWSTATE_LEVEL`, `DARK_EIS_ENABLE`, `PREVIEW_MCTF_ENABLE`, `PREVIEW_SPORT_MODE_ENABLE`, `PREVIEW_SPORT_LEVEL`                                              |
 
 Device state from `GET_OPTIONS`: `battery_status` (83%, type THICK),
 `storage_state` (95.9 GB free of 128 GB), `firmwareRevision` v1.0.47,
@@ -70,17 +70,17 @@ src_width, src_height, dst_width, dst_height, crop_offset_x, crop_offset_y
 All zero while idle. That is exactly the shape a digital reframing window
 would take. Worth re-running the probe **while Deep Track is actively
 following a subject** — if these populate, tracking state is observable
-through the options API even if the command to *start* tracking is not.
+through the options API even if the command to _start_ tracking is not.
 
 ## New enum values to fill in
 
 The structure is right but a few values postdate the schema:
 
-| Field | Value | Note |
-| --- | --- | --- |
-| `photo_sub_mode` | 8 | `PhotoSubMode` stops at 7 (`PHOTO_STARLAPSE`) |
-| `photo_resolution` | 9 | not in `PhotoSize` |
-| `storage_state.location` | 3 | not in `CardLocation` |
+| Field                    | Value | Note                                          |
+| ------------------------ | ----- | --------------------------------------------- |
+| `photo_sub_mode`         | 8     | `PhotoSubMode` stops at 7 (`PHOTO_STARLAPSE`) |
+| `photo_resolution`       | 9     | not in `PhotoSize`                            |
+| `storage_state.location` | 3     | not in `CardLocation`                         |
 
 ## Caveat when reading results
 
@@ -90,14 +90,14 @@ as unsupported — `iso = 0` and `exposure_mode = AUTO` simply do not serialise.
 
 ## Revised confidence
 
-| Feature | Before | After |
-| --- | --- | --- |
-| Exposure / ISO / shutter / WB / EV | ~85% | **confirmed** |
-| Colour, gamma, Leica looks | ~85% | **confirmed** |
-| Zoom | ~50% | **confirmed** (`ZOOM_SCALE`) |
-| Resolution / bitrate / FOV / format | ~85% | **confirmed** |
-| Capture modes, self-timer, burst, AEB | ~70% | **confirmed** (a few new enum values) |
-| Battery / storage / device state | ~85% | **confirmed** |
-| Record start/stop | ~85% | untested — needs a write command |
-| Gimbal pan/tilt | ~15% | **blocked** on packet capture |
-| Deep Track subject select | ~10% | **blocked**, but `WINDOW_CROP_INFO` is a lead |
+| Feature                               | Before | After                                         |
+| ------------------------------------- | ------ | --------------------------------------------- |
+| Exposure / ISO / shutter / WB / EV    | ~85%   | **confirmed**                                 |
+| Colour, gamma, Leica looks            | ~85%   | **confirmed**                                 |
+| Zoom                                  | ~50%   | **confirmed** (`ZOOM_SCALE`)                  |
+| Resolution / bitrate / FOV / format   | ~85%   | **confirmed**                                 |
+| Capture modes, self-timer, burst, AEB | ~70%   | **confirmed** (a few new enum values)         |
+| Battery / storage / device state      | ~85%   | **confirmed**                                 |
+| Record start/stop                     | ~85%   | untested — needs a write command              |
+| Gimbal pan/tilt                       | ~15%   | **blocked** on packet capture                 |
+| Deep Track subject select             | ~10%   | **blocked**, but `WINDOW_CROP_INFO` is a lead |

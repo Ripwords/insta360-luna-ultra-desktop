@@ -14,7 +14,7 @@ import { ZOOM_MARKS, ZOOM_MAX, ZOOM_MIN, zoomFraction, zoomLabel } from "~/utils
  */
 const { zoom, fraction, busy, active, wake, hold, nudgeBy, jumpTo, commit } = useCameraZoom();
 
-const track = ref<HTMLElement | null>(null);
+const track = useTemplateRef("track");
 const dragging = ref(false);
 let lastY = 0;
 

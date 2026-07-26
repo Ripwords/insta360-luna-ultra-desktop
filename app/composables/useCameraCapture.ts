@@ -79,11 +79,10 @@ export function useCameraCapture() {
       // reading back, or the panel would show the one value it can offer while
       // the camera shot something else entirely.
       if (resetsToStandard(target.id)) {
-        await writePhotographyOptions(
-          target.functionMode,
-          ["COLOR_MODE", "VIDEO_GAMMA_MODE"],
-          { color_mode: "COLOR_MODE_NORMAL", gamma_mode: "FILTER_NONE" },
-        );
+        await writePhotographyOptions(target.functionMode, ["COLOR_MODE", "VIDEO_GAMMA_MODE"], {
+          color_mode: "COLOR_MODE_NORMAL",
+          gamma_mode: "FILTER_NONE",
+        });
       }
 
       await load();

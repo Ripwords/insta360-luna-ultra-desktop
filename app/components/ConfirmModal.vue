@@ -1,13 +1,10 @@
 <script setup lang="ts">
-withDefaults(
-  defineProps<{
-    title: string;
-    description?: string;
-    confirmLabel?: string;
-    confirmColor?: "error" | "primary";
-  }>(),
-  { confirmLabel: "Confirm", confirmColor: "error" },
-);
+const { confirmLabel = "Confirm", confirmColor = "error" } = defineProps<{
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  confirmColor?: "error" | "primary";
+}>();
 
 const emit = defineEmits<{ close: [confirmed: boolean] }>();
 </script>
@@ -15,8 +12,8 @@ const emit = defineEmits<{ close: [confirmed: boolean] }>();
 <template>
   <UModal
     :close="{ onClick: () => emit('close', false) }"
-    :title="title"
-    :description="description"
+    :title
+    :description
     :ui="{ footer: 'justify-end' }"
   >
     <template #footer>

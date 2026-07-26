@@ -8,13 +8,20 @@ const meta = computed(() => {
     case "connected":
       return { label: "Connected", icon: "i-lucide-wifi", color: "success" as const };
     case "connecting":
-      return { label: "Pairing", icon: "i-lucide-loader-circle", color: "neutral" as const, spin: true };
+      return {
+        label: "Pairing",
+        icon: "i-lucide-loader-circle",
+        color: "neutral" as const,
+        spin: true,
+      };
     default:
       return { label: "Offline", icon: "i-lucide-wifi-off", color: "neutral" as const };
   }
 });
 
-const tooltip = computed(() => (info.value ? (info.value.ssid ?? info.value.host) : "Camera not connected"));
+const tooltip = computed(() =>
+  info.value ? (info.value.ssid ?? info.value.host) : "Camera not connected",
+);
 </script>
 
 <template>
@@ -25,8 +32,17 @@ const tooltip = computed(() => (info.value ? (info.value.ssid ?? info.value.host
       :class="collapsed ? '' : 'w-full'"
       :aria-label="`Camera ${meta.label.toLowerCase()}. Open settings`"
     >
-      <UBadge :color="meta.color" variant="subtle" size="md" :class="collapsed ? 'px-1.5' : 'w-full justify-start'">
-        <UIcon :name="meta.icon" class="size-3.5 shrink-0" :class="meta.spin ? 'animate-spin' : ''" />
+      <UBadge
+        :color="meta.color"
+        variant="subtle"
+        size="md"
+        :class="collapsed ? 'px-1.5' : 'w-full justify-start'"
+      >
+        <UIcon
+          :name="meta.icon"
+          class="size-3.5 shrink-0"
+          :class="meta.spin ? 'animate-spin' : ''"
+        />
         <span v-if="!collapsed">{{ meta.label }}</span>
       </UBadge>
     </NuxtLink>

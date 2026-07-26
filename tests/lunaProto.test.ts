@@ -252,9 +252,9 @@ describe("filter_intensity, a field the extraction never had", () => {
   });
 
   it("encodes it back to field 104", () => {
-    expect(
-      encodeMessage(MSG.PhotographyOptions, { filter_intensity: "INTENSITY_LOW" }),
-    ).toEqual(hex("c00601"));
+    expect(encodeMessage(MSG.PhotographyOptions, { filter_intensity: "INTENSITY_LOW" })).toEqual(
+      hex("c00601"),
+    );
   });
 
   it("exposes FILTER_INTENSITY as an option type, so a write can name it", () => {

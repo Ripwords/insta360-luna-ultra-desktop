@@ -11,7 +11,19 @@
  */
 
 const TYPE_SIZE: Record<number, number> = {
-  1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8, 13: 4,
+  1: 1,
+  2: 1,
+  3: 2,
+  4: 4,
+  5: 8,
+  6: 1,
+  7: 1,
+  8: 2,
+  9: 4,
+  10: 8,
+  11: 4,
+  12: 8,
+  13: 4,
 };
 
 export interface RawImageMeta {
@@ -84,7 +96,14 @@ export function parseRawImageMeta(buffer: ArrayBuffer): RawImageMeta | null {
   let found: RawImageMeta | null = null;
 
   const walk = (ifdOffset: number, depth: number): void => {
-    if (found || depth > 4 || ifdOffset <= 0 || ifdOffset + 2 > view.byteLength || visited.has(ifdOffset)) return;
+    if (
+      found ||
+      depth > 4 ||
+      ifdOffset <= 0 ||
+      ifdOffset + 2 > view.byteLength ||
+      visited.has(ifdOffset)
+    )
+      return;
     visited.add(ifdOffset);
     const count = reader.u16(ifdOffset);
 
@@ -108,7 +127,12 @@ export function parseRawImageMeta(buffer: ArrayBuffer): RawImageMeta | null {
     const cfa = tag[0x828e]; // CFAPattern
 
     // Uncompressed CFA image stored as a single strip is what we can render.
-    const isCfaRaw = compression === 1 && photometric === 32803 && !!cfa && strips.length === 1 && counts.length === 1;
+    const isCfaRaw =
+      compression === 1 &&
+      photometric === 32803 &&
+      !!cfa &&
+      strips.length === 1 &&
+      counts.length === 1;
     if (isCfaRaw && width > 0 && height > 0) {
       const black = tag[0xc61a]?.[0] ?? 0;
       const white = tag[0xc61d]?.[0] ?? (1 << (tag[0x0102]?.[0] ?? 16)) - 1;

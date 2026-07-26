@@ -49,9 +49,11 @@ describe("withCameraSlot", () => {
   });
 
   it("propagates errors and still frees the slot", async () => {
-    await expect(withCameraSlot(async () => {
-      throw new Error("boom");
-    })).rejects.toThrow("boom");
+    await expect(
+      withCameraSlot(async () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
     // A subsequent task still runs (slot was released).
     await expect(withCameraSlot(async () => 42)).resolves.toBe(42);
   });
@@ -64,12 +66,18 @@ describe("withCameraSlot", () => {
     // Two thumbnails whose priority is a live function; "near" reports closer to
     // the viewport (higher score) only after it's queued, mimicking a scroll.
     let nearScore = -100;
-    const far = withCameraSlot(async () => {
-      order.push("far");
-    }, () => -50);
-    const near = withCameraSlot(async () => {
-      order.push("near");
-    }, () => nearScore);
+    const far = withCameraSlot(
+      async () => {
+        order.push("far");
+      },
+      () => -50,
+    );
+    const near = withCameraSlot(
+      async () => {
+        order.push("near");
+      },
+      () => nearScore,
+    );
 
     nearScore = -1; // "near" scrolls into view before the slots free
     for (const b of blockers) b.resolve();

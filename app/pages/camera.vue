@@ -104,7 +104,7 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="ghost"
-            :loading="loading"
+            :loading
             :disabled="!isConnected"
             aria-label="Reload settings"
             @click="() => load()"
@@ -123,7 +123,10 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
     </template>
 
     <template #body>
-      <div v-if="!isConnected" class="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+      <div
+        v-if="!isConnected"
+        class="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
+      >
         <UIcon name="i-lucide-video-off" class="size-8 text-dimmed" />
         <div class="space-y-1">
           <p class="font-medium text-highlighted">No camera connected</p>
@@ -136,10 +139,7 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
 
       <div v-else class="flex min-h-0 flex-1 flex-col gap-3">
         <!-- Viewfinder: the hero. Everything else floats over it. -->
-        <div
-          class="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black"
-          @wheel="onWheel"
-        >
+        <div class="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black" @wheel="onWheel">
           <LiveView class="absolute inset-0" />
 
           <!-- Starting / stopped state, centred over the black stage -->
@@ -180,7 +180,9 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
           <div
             class="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 via-black/30 to-transparent pb-8"
           >
-            <div class="flex items-start justify-between gap-4 p-4 pr-12 font-mono text-[11px] text-white/70">
+            <div
+              class="flex items-start justify-between gap-4 p-4 pr-12 font-mono text-[11px] text-white/70"
+            >
               <div class="flex items-center gap-3">
                 <!--
                   Red appears exactly once in this interface, and it means
@@ -196,7 +198,9 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
               </div>
 
               <div class="flex items-center gap-3 text-right">
-                <span v-if="activeFilter" class="tracking-wider text-white">{{ activeFilter }}</span>
+                <span v-if="activeFilter" class="tracking-wider text-white">{{
+                  activeFilter
+                }}</span>
                 <span v-if="colorMode" class="tracking-wider">{{ colorMode }}</span>
                 <span v-if="resolution" class="tracking-wider">{{ resolution }}</span>
                 <span
@@ -252,7 +256,9 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
 
           <details v-if="diagnostics.length > 0" class="mt-8 text-sm">
             <summary class="cursor-pointer text-muted">Live view diagnostics</summary>
-            <pre class="mt-2 overflow-x-auto rounded bg-elevated p-3 text-xs">{{ diagnostics.join("\n") }}</pre>
+            <pre class="mt-2 overflow-x-auto rounded bg-elevated p-3 text-xs">{{
+              diagnostics.join("\n")
+            }}</pre>
           </details>
         </template>
       </USlideover>

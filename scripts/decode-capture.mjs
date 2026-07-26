@@ -53,12 +53,18 @@ function streamsFromCapture(capturePath) {
     output = execFileSync(
       "tshark",
       [
-        "-r", capturePath,
-        "-Y", `tcp.port==${PORT} && tcp.len>0`,
-        "-T", "fields",
-        "-e", "ip.src",
-        "-e", "ip.dst",
-        "-e", "tcp.payload",
+        "-r",
+        capturePath,
+        "-Y",
+        `tcp.port==${PORT} && tcp.len>0`,
+        "-T",
+        "fields",
+        "-e",
+        "ip.src",
+        "-e",
+        "ip.dst",
+        "-e",
+        "tcp.payload",
       ],
       { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 },
     );
@@ -127,6 +133,8 @@ for (const stream of streams) {
 console.log(`\n${"=".repeat(72)}\nCODES SEEN\n${"=".repeat(72)}`);
 for (const [code, count] of [...seen].sort((a, b) => a[0] - b[0])) {
   const name = CODES[String(code)];
-  console.log(`  ${String(code).padStart(6)}  x${String(count).padEnd(4)} ${name ?? "<< NOT IN SCHEMA >> — this is the interesting kind"}`);
+  console.log(
+    `  ${String(code).padStart(6)}  x${String(count).padEnd(4)} ${name ?? "<< NOT IN SCHEMA >> — this is the interesting kind"}`,
+  );
 }
 if (seen.size === 0) console.log("  none — no UCD2 frames found in this capture");

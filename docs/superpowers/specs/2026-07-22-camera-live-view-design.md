@@ -13,14 +13,14 @@ same TCP control protocol the mobile app uses.
 The desktop app already speaks the protocol that carries live video. Three of
 the four required pieces exist today.
 
-| Piece | Where | Status |
-| --- | --- | --- |
-| UCD2 control session on TCP 6666 | `src-tauri/src/luna.rs` | exists |
-| Command framing + Insta360 CRC | `build_file_command` | exists |
-| Protobuf body encoding | `wire_field_varint` | exists |
-| `START_LIVE_STREAM` command + body | — | derived, see below |
-| Video de-framing | `drain_frames` | **discards stream frames** |
-| Decode and paint | — | not built |
+| Piece                              | Where                   | Status                     |
+| ---------------------------------- | ----------------------- | -------------------------- |
+| UCD2 control session on TCP 6666   | `src-tauri/src/luna.rs` | exists                     |
+| Command framing + Insta360 CRC     | `build_file_command`    | exists                     |
+| Protobuf body encoding             | `wire_field_varint`     | exists                     |
+| `START_LIVE_STREAM` command + body | —                       | derived, see below         |
+| Video de-framing                   | `drain_frames`          | **discards stream frames** |
+| Decode and paint                   | —                       | not built                  |
 
 ### Evidence
 

@@ -9,9 +9,9 @@
     "ui:dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
+    "postinstall": "git config core.hooksPath .githooks || true && nuxt prepare",
+    "lint": "oxlint --deny-warnings",
+    "lint:fix": "oxlint --fix --deny-warnings",
     "fmt": "oxfmt",
     "typecheck": "nuxt typecheck",
     "changelog": "changelogen",
@@ -34,10 +34,17 @@
     "@tauri-apps/cli": "^2.11.4",
     "@types/three": "^0.185.1",
     "changelogen": "^0.6.2",
+    "lint-staged": "^17.2.0",
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.8"
+  },
+  "lint-staged": {
+    "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,vue}": [
+      "oxfmt",
+      "oxlint --fix --deny-warnings"
+    ]
   }
 }

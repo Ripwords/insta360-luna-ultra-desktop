@@ -117,8 +117,7 @@ replacing any previous one. `disarmCameraHealth` clears both.
 Only **transport failures**: a thrown fetch. Connection refused, DNS failure,
 socket timeout, Wi-Fi disappearing.
 
-Any completed HTTP response resets the counter to zero, including a 404 or a
-500. A camera that answers is a camera that is alive, so a genuinely missing
+Any completed HTTP response resets the counter to zero, including a 404 or a 500. A camera that answers is a camera that is alive, so a genuinely missing
 file must never kill the session. This is the single most important rule in the
 detector and the reason the counter lives in the fetch layer rather than in the
 image components.

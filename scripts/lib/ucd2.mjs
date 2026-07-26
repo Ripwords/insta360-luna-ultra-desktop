@@ -45,7 +45,7 @@ export function insta360Checksum(data) {
   for (const byte of data) {
     checksum = (checksum ^ byte) >>> 0;
     for (let round = 0; round < 4; round++) {
-      checksum = ((((checksum << 8) >>> 0) ^ CRC_TABLE[checksum >>> 24]) >>> 0);
+      checksum = (((checksum << 8) >>> 0) ^ CRC_TABLE[checksum >>> 24]) >>> 0;
     }
   }
   return checksum >>> 0;
@@ -62,8 +62,7 @@ export function varint(value) {
 }
 
 /** proto3 varint field — covers bool, uint32, int32 and enum. */
-export const fieldVarint = (number, value) =>
-  Buffer.concat([varint(number << 3), varint(value)]);
+export const fieldVarint = (number, value) => Buffer.concat([varint(number << 3), varint(value)]);
 
 export function buildUcd2(type, seq, payload) {
   const header = Buffer.alloc(8);

@@ -62,7 +62,7 @@ function insta360Checksum(data) {
   for (const byte of data) {
     checksum = (checksum ^ byte) >>> 0;
     for (let round = 0; round < 4; round++) {
-      checksum = ((((checksum << 8) >>> 0) ^ CRC_TABLE[checksum >>> 24]) >>> 0);
+      checksum = (((checksum << 8) >>> 0) ^ CRC_TABLE[checksum >>> 24]) >>> 0;
     }
   }
   return checksum >>> 0;
@@ -159,7 +159,9 @@ async function probeOsc() {
         signal: AbortSignal.timeout(4000),
       });
       const type = response.headers.get("content-type") ?? "(none)";
-      say(`${attempt.label}\n  -> ${response.status} ${response.statusText}  content-type: ${type}`);
+      say(
+        `${attempt.label}\n  -> ${response.status} ${response.statusText}  content-type: ${type}`,
+      );
 
       if (attempt.previewOnly) {
         // A live preview never ends; read a slice and look for JPEG SOI markers.
@@ -175,7 +177,8 @@ async function probeOsc() {
         const jpegStarts = countMarker(collected, Buffer.from([0xff, 0xd8, 0xff]));
         say(`  -> read ${collected.length} bytes in ~3s, ${jpegStarts} JPEG SOI markers`);
         if (jpegStarts > 1) say("  -> LOOKS LIKE MJPEG. This is the easy path.");
-        else if (collected.length > 0) say(`  -> first 64 bytes: ${collected.subarray(0, 64).toString("hex")}`);
+        else if (collected.length > 0)
+          say(`  -> first 64 bytes: ${collected.subarray(0, 64).toString("hex")}`);
       } else {
         const text = await response.text();
         say(`  -> ${text.slice(0, 400)}`);
@@ -216,7 +219,9 @@ function probeTcp() {
 
       socket.write(buildStreamHello(nextSeq()));
       socket.write(buildFileCommand(nextSeq(), CODE_GET_OPTIONS, 1, smallOptionsBody()));
-      socket.write(buildFileCommand(nextSeq(), CODE_GET_CURRENT_CAPTURE_STATUS, 2, Buffer.alloc(0)));
+      socket.write(
+        buildFileCommand(nextSeq(), CODE_GET_CURRENT_CAPTURE_STATUS, 2, Buffer.alloc(0)),
+      );
       say("sent hello + device-info probes; waiting 2s for the session to settle");
 
       await new Promise((done) => setTimeout(done, 2000));
@@ -224,7 +229,9 @@ function probeTcp() {
       started = true;
 
       const body = startLiveStreamBody();
-      say(`sending START_LIVE_STREAM (code ${CODE_START_LIVE_STREAM}) body: ${body.toString("hex")}`);
+      say(
+        `sending START_LIVE_STREAM (code ${CODE_START_LIVE_STREAM}) body: ${body.toString("hex")}`,
+      );
       socket.write(buildFileCommand(nextSeq(), CODE_START_LIVE_STREAM, 20, body));
 
       // Keep the session alive while the stream (hopefully) flows.
@@ -252,10 +259,14 @@ function probeTcp() {
       const afterStart = dump.length - bytesBeforeStart;
       if (!started) say("never reached the START_LIVE_STREAM step");
       else if (afterStart < 5000) {
-        say(`only ${afterStart} bytes arrived after START_LIVE_STREAM — the camera likely rejected it.`);
+        say(
+          `only ${afterStart} bytes arrived after START_LIVE_STREAM — the camera likely rejected it.`,
+        );
         say("Check report for any FILE response with code 1; its body may carry an error.");
       } else {
-        say(`${afterStart} bytes arrived after START_LIVE_STREAM (~${Math.round(afterStart / SECONDS / 1024)} KiB/s).`);
+        say(
+          `${afterStart} bytes arrived after START_LIVE_STREAM (~${Math.round(afterStart / SECONDS / 1024)} KiB/s).`,
+        );
         say("That is a video-rate flow. Live view is viable over this socket.");
       }
 
@@ -305,13 +316,17 @@ function analyze(dump) {
     const name = type === UCD2_FILE ? "FILE" : type === UCD2_STREAM ? "STREAM" : "UNKNOWN";
     const gaps = [...entry.gaps].sort((a, b) => a - b);
     say(`\ntype 0x${type.toString(16).padStart(2, "0")} (${name}): ${entry.count} frames`);
-    say(`  distinct sizes: ${gaps.length > 8 ? `${gaps.length} values, ${gaps[0]}..${gaps.at(-1)}` : gaps.join(", ")}`);
+    say(
+      `  distinct sizes: ${gaps.length > 8 ? `${gaps.length} values, ${gaps[0]}..${gaps.at(-1)}` : gaps.join(", ")}`,
+    );
 
     if (type === UCD2_STREAM) {
       const onlyHello = gaps.length === 1 && gaps[0] === 16;
-      say(onlyHello
-        ? "  all 16 bytes — these are just keepalive echoes, no video rode this type."
-        : "  NOT all 16 bytes. luna.rs's hardcoded 16 is wrong here; video is carried on STREAM frames.");
+      say(
+        onlyHello
+          ? "  all 16 bytes — these are just keepalive echoes, no video rode this type."
+          : "  NOT all 16 bytes. luna.rs's hardcoded 16 is wrong here; video is carried on STREAM frames.",
+      );
     }
     for (const sample of entry.samples) {
       const matches = sample.gap === 12 + sample.declared + 4 ? "  (gap == 12+len+4)" : "";
@@ -326,7 +341,9 @@ function analyze(dump) {
   say(`JPEG SOI (ffd8ff): ${countMarker(dump, Buffer.from([0xff, 0xd8, 0xff]))}`);
   if (annexB > 10) {
     say("Annex-B present -> raw H.264/H.265 elementary stream.");
-    say("Try: ffplay probe-out/tcp-dump.bin   (expect garbage frames from interleaved headers, but motion visible)");
+    say(
+      "Try: ffplay probe-out/tcp-dump.bin   (expect garbage frames from interleaved headers, but motion visible)",
+    );
   }
 }
 

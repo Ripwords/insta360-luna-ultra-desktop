@@ -51,7 +51,12 @@ export const CONTROL_SECTIONS: ControlSection[] = [
         option: "AE_METER_MODE",
         values: `${PO}.AEMeterMode`,
       },
-      { kind: "toggle", label: "Metering enabled", field: "metering_enable", option: "METERING_ENABLE" },
+      {
+        kind: "toggle",
+        label: "Metering enabled",
+        field: "metering_enable",
+        option: "METERING_ENABLE",
+      },
       {
         kind: "steps",
         label: "ISO ceiling",
@@ -76,7 +81,10 @@ export const CONTROL_SECTIONS: ControlSection[] = [
         label: "Colour temperature",
         field: "white_balance_value",
         option: "WHITE_BALANCE_VALUE",
-        steps: [{ value: 0, label: "Auto" }, ...numbered([2700, 3200, 4000, 5000, 5600, 6500, 7500], "K")],
+        steps: [
+          { value: 0, label: "Auto" },
+          ...numbered([2700, 3200, 4000, 5000, 5600, 6500, 7500], "K"),
+        ],
         hint: "Applies when white balance is not automatic",
       },
       {
@@ -117,7 +125,13 @@ export const CONTROL_SECTIONS: ControlSection[] = [
         option: "BRIGHTNESS",
         steps: numbered([-2, -1, 0, 1, 2]),
       },
-      { kind: "steps", label: "Contrast", field: "contrast", option: "CONTRAST", steps: numbered([0, 1, 2, 3, 4]) },
+      {
+        kind: "steps",
+        label: "Contrast",
+        field: "contrast",
+        option: "CONTRAST",
+        steps: numbered([0, 1, 2, 3, 4]),
+      },
       {
         kind: "steps",
         label: "Saturation",
@@ -125,7 +139,13 @@ export const CONTROL_SECTIONS: ControlSection[] = [
         option: "SATURATION",
         steps: numbered([0, 1, 2, 3, 4]),
       },
-      { kind: "steps", label: "Hue", field: "hue", option: "HUE", steps: numbered([-2, -1, 0, 1, 2]) },
+      {
+        kind: "steps",
+        label: "Hue",
+        field: "hue",
+        option: "HUE",
+        steps: numbered([-2, -1, 0, 1, 2]),
+      },
       {
         kind: "steps",
         label: "Sharpness",
@@ -224,15 +244,30 @@ export const CONTROL_SECTIONS: ControlSection[] = [
   {
     title: "Stabilisation",
     controls: [
-      { kind: "toggle", label: "FlowState", field: "flowstate_base_enable", option: "FLOWSTATE_BASE_TYPE" },
-      { kind: "toggle", label: "Low-light EIS", field: "dark_eis_enable", option: "DARK_EIS_ENABLE" },
+      {
+        kind: "toggle",
+        label: "FlowState",
+        field: "flowstate_base_enable",
+        option: "FLOWSTATE_BASE_TYPE",
+      },
+      {
+        kind: "toggle",
+        label: "Low-light EIS",
+        field: "dark_eis_enable",
+        option: "DARK_EIS_ENABLE",
+      },
       {
         kind: "toggle",
         label: "Sport mode preview",
         field: "preview_sport_mode_enable",
         option: "PREVIEW_SPORT_MODE_ENABLE",
       },
-      { kind: "toggle", label: "Preview noise reduction", field: "preview_mctf_enable", option: "PREVIEW_MCTF_ENABLE" },
+      {
+        kind: "toggle",
+        label: "Preview noise reduction",
+        field: "preview_mctf_enable",
+        option: "PREVIEW_MCTF_ENABLE",
+      },
     ],
   },
   {

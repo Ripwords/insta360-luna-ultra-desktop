@@ -37,7 +37,10 @@ interface RawDeviceInfo {
 }
 
 function normalizeHost(host: string): string {
-  return host.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  return host
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "");
 }
 
 function baseUrl(host: string, path: string): string {
@@ -181,7 +184,9 @@ export const lunaClient = {
     let start = 0;
     let total = Infinity;
     while (start < total) {
-      const fields = decodeRaw(await this.command(CODE_GET_FILE_LIST, fileListBody(MEDIA_VIDEO_AND_PHOTO, start, limit)));
+      const fields = decodeRaw(
+        await this.command(CODE_GET_FILE_LIST, fileListBody(MEDIA_VIDEO_AND_PHOTO, start, limit)),
+      );
       const page = fields
         .filter((f) => f.field === 1 && f.value instanceof Uint8Array)
         .map((f) => decoder.decode(f.value as Uint8Array));

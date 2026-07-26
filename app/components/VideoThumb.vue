@@ -14,20 +14,22 @@ import { withCameraSlot, CAMERA_PRIORITY, viewportPriority } from "~/utils/camer
  * metadata + first frame, releasing it on first-frame/error/stall. Tries the
  * low-res LRV proxy first, then the full file.
  */
-const props = withDefaults(
-  defineProps<{
-    /** Full-resolution source (the file that also plays back) */
-    src: string;
-    /** Optional low-res proxy to try first */
-    lrv?: string;
-    imgClass?: string;
-    eager?: boolean;
-  }>(),
-  { imgClass: "", eager: false },
-);
+const {
+  src,
+  lrv,
+  imgClass = "",
+  eager = false,
+} = defineProps<{
+  /** Full-resolution source (the file that also plays back) */
+  src: string;
+  /** Optional low-res proxy to try first */
+  lrv?: string;
+  imgClass?: string;
+  eager?: boolean;
+}>();
 
-const el = ref<HTMLElement | null>(null);
-const video = ref<HTMLVideoElement | null>(null);
+const el = useTemplateRef("el");
+const video = useTemplateRef<HTMLVideoElement>("video");
 const activeSrc = ref<string | null>(null);
 const state = ref<"idle" | "loading" | "loaded" | "error">("idle");
 
@@ -39,8 +41,8 @@ let attempt = 0;
 
 const sources = computed(() => {
   const list: string[] = [];
-  if (props.lrv && props.lrv !== props.src) list.push(props.lrv);
-  list.push(props.src);
+  if (lrv && lrv !== src) list.push(lrv);
+  list.push(src);
   return list;
 });
 
@@ -83,7 +85,7 @@ function queueAttempt() {
           if (state.value !== "loaded") onError();
         }, 15_000);
       }),
-    props.eager ? CAMERA_PRIORITY.PREVIEW : () => viewportPriority(el.value),
+    eager ? CAMERA_PRIORITY.PREVIEW : () => viewportPriority(el.value),
   );
 }
 
@@ -116,10 +118,8 @@ function onError() {
   queueAttempt();
 }
 
-onMounted(async () => {
-  // .client components bind their template ref a tick late
-  await nextTick();
-  if (props.eager || !("IntersectionObserver" in window) || !el.value) {
+onMounted(() => {
+  if (eager || !("IntersectionObserver" in window) || !el.value) {
     begin();
     return;
   }
@@ -158,7 +158,10 @@ onBeforeUnmount(() => {
       @loadeddata="onReady"
       @error="onError"
     />
-    <div v-if="state !== 'loaded'" class="absolute inset-0 flex items-center justify-center bg-elevated">
+    <div
+      v-if="state !== 'loaded'"
+      class="absolute inset-0 flex items-center justify-center bg-elevated"
+    >
       <UIcon v-if="state === 'error'" name="i-lucide-film" class="size-5 text-dimmed" />
       <UIcon v-else name="i-lucide-loader-circle" class="size-5 animate-spin text-dimmed" />
     </div>

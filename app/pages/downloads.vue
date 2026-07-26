@@ -5,7 +5,9 @@ useHead({ title: "Downloads" });
 
 const { queue, active, completed, retry, clearFinished } = useDownloads();
 
-const hasFinished = computed(() => queue.value.some((entry) => entry.status === "done" || entry.status === "error"));
+const hasFinished = computed(() =>
+  queue.value.some((entry) => entry.status === "done" || entry.status === "error"),
+);
 </script>
 
 <template>
@@ -29,13 +31,18 @@ const hasFinished = computed(() => queue.value.some((entry) => entry.status === 
     </template>
 
     <template #body>
-      <div v-if="queue.length === 0" class="flex h-full flex-col items-center justify-center gap-4 text-center">
+      <div
+        v-if="queue.length === 0"
+        class="flex h-full flex-col items-center justify-center gap-4 text-center"
+      >
         <span class="flex size-14 items-center justify-center rounded-2xl bg-muted">
           <UIcon name="i-lucide-arrow-down-to-line" class="size-7 text-dimmed" />
         </span>
         <div class="space-y-1">
           <p class="font-medium text-highlighted">No transfers yet</p>
-          <p class="max-w-xs text-sm text-muted">Select files in the gallery and download them to see them here.</p>
+          <p class="max-w-xs text-sm text-muted">
+            Select files in the gallery and download them to see them here.
+          </p>
         </div>
         <UButton label="Open gallery" icon="i-lucide-images" to="/gallery" />
       </div>
@@ -68,7 +75,12 @@ const hasFinished = computed(() => queue.value.some((entry) => entry.status === 
           <div class="min-w-0 flex-1 space-y-1">
             <div class="flex items-center gap-2">
               <p class="truncate font-mono text-sm text-highlighted">{{ entry.item.name }}</p>
-              <UBadge v-if="entry.watermarked && entry.item.type === 'photo'" variant="subtle" size="sm" icon="i-lucide-stamp">
+              <UBadge
+                v-if="entry.watermarked && entry.item.type === 'photo'"
+                variant="subtle"
+                size="sm"
+                icon="i-lucide-stamp"
+              >
                 Watermarked
               </UBadge>
             </div>
@@ -83,7 +95,11 @@ const hasFinished = computed(() => queue.value.some((entry) => entry.status === 
           </div>
 
           <div class="shrink-0">
-            <UIcon v-if="entry.status === 'done'" name="i-lucide-circle-check" class="size-5 text-success" />
+            <UIcon
+              v-if="entry.status === 'done'"
+              name="i-lucide-circle-check"
+              class="size-5 text-success"
+            />
             <UButton
               v-else-if="entry.status === 'error'"
               label="Retry"
@@ -93,7 +109,9 @@ const hasFinished = computed(() => queue.value.some((entry) => entry.status === 
               icon="i-lucide-rotate-cw"
               @click="retry(entry.id)"
             />
-            <span v-else class="font-mono text-xs text-muted tabular-nums">{{ entry.progress }}%</span>
+            <span v-else class="font-mono text-xs text-muted tabular-nums"
+              >{{ entry.progress }}%</span
+            >
           </div>
         </div>
       </div>

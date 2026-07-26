@@ -1,6 +1,5 @@
 # Changelog
 
-
 ## v0.2.4...master
 
 [compare changes](https://github.com/Ripwords/luna-ultra-desktop/compare/v0.2.4...master)
@@ -300,4 +299,3 @@
 ### ❤️ Contributors
 
 - JJ <teohjjteoh@gmail.com>
-

@@ -11,7 +11,7 @@ import { withCameraSlot, CAMERA_PRIORITY } from "~/utils/cameraQueue";
  */
 const props = defineProps<{ src: string }>();
 
-const container = ref<HTMLElement | null>(null);
+const container = useTemplateRef("container");
 const state = ref<"loading" | "ready" | "error">("loading");
 
 let viewer: PannellumViewer | null = null;
@@ -73,11 +73,17 @@ onBeforeUnmount(() => {
   <div class="pano-root relative size-full">
     <div ref="container" class="size-full" />
 
-    <div v-if="state === 'loading'" class="pointer-events-none absolute inset-0 flex items-center justify-center">
+    <div
+      v-if="state === 'loading'"
+      class="pointer-events-none absolute inset-0 flex items-center justify-center"
+    >
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-dimmed" />
     </div>
 
-    <div v-else-if="state === 'error'" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-muted">
+    <div
+      v-else-if="state === 'error'"
+      class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-muted"
+    >
       <UIcon name="i-lucide-globe" class="size-8 text-dimmed" />
       <p class="text-sm">Couldn't open this panorama. Download it to view in another app.</p>
     </div>

@@ -46,11 +46,11 @@ published API, and its failure mode is silent: it **accepts** a write,
 under the wrong name. Nothing errors. So a feature only ships here once it has
 been set from the app and confirmed on the camera's own screen.
 
-| | |
-| --- | --- |
-| 🧪 **Built, gated off** | The full settings panel — stabilisation, format, capture timers, metering, bitrate, RAW (~30 controls), plus live-view diagnostics. Written and rendering, waiting on on-device verification. |
-| ○ **Known gaps** | UltraPhoto capture mode, video watermarking, white-balance read-back, macOS notarization / Windows signing. |
-| ⏸ **On hold** | Gimbal pan/tilt, gimbal attitude/gyro, Colour Recovery, Deep Track, tap to focus. Heavily probed, nothing readable found yet — parked pending further experimentation, most likely by capturing the phone app's traffic. |
+|                         |                                                                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🧪 **Built, gated off** | The full settings panel — stabilisation, format, capture timers, metering, bitrate, RAW (~30 controls), plus live-view diagnostics. Written and rendering, waiting on on-device verification.                            |
+| ○ **Known gaps**        | UltraPhoto capture mode, video watermarking, white-balance read-back, macOS notarization / Windows signing.                                                                                                              |
+| ⏸ **On hold**           | Gimbal pan/tilt, gimbal attitude/gyro, Colour Recovery, Deep Track, tap to focus. Heavily probed, nothing readable found yet — parked pending further experimentation, most likely by capturing the phone app's traffic. |
 
 **[→ Full feature map](docs/FEATURES.md)** — the same picture area by area, with
 the measured field numbers, the per-mode availability rules, what was already
@@ -60,16 +60,16 @@ ship.
 <details>
 <summary><strong>More screenshots</strong></summary>
 
-| Connect & 3D showpiece | Multi-select |
-| --- | --- |
+| Connect & 3D showpiece                              | Multi-select                               |
+| --------------------------------------------------- | ------------------------------------------ |
 | ![Connect and 3D model](screenshots/01-connect.png) | ![Selection](screenshots/03-selection.png) |
 
-| Download + watermark | Full-screen preview |
-| --- | --- |
+| Download + watermark                               | Full-screen preview                    |
+| -------------------------------------------------- | -------------------------------------- |
 | ![Download](screenshots/04-download-watermark.png) | ![Preview](screenshots/05-preview.png) |
 
-| Downloads queue | Light theme (Arctic) |
-| --- | --- |
+| Downloads queue                            | Light theme (Arctic)                             |
+| ------------------------------------------ | ------------------------------------------------ |
 | ![Downloads](screenshots/06-downloads.png) | ![Light theme](screenshots/07-gallery-light.png) |
 
 </details>

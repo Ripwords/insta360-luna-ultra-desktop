@@ -22,17 +22,17 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `app/utils/annexB.ts` (create) | Pure byte-level parsing: split NAL units, detect H.264 vs H.265, derive the WebCodecs codec string, group NALs into access units. No I/O, no Vue. |
-| `tests/annexB.test.ts` (create) | Unit tests for the above. |
-| `src-tauri/src/luna.rs` (modify) | Return STREAM payloads instead of dropping them; expose the session to `liveview.rs`. |
-| `src-tauri/src/liveview.rs` (create) | `START_LIVE_STREAM` / `STOP_LIVE_STREAM`, the localhost stream server, and diagnostics counters. |
-| `src-tauri/src/lib.rs` (modify) | Register the new module, state and commands. |
-| `app/utils/lunaClient.ts` (modify) | Thin typed wrappers for the new Tauri commands. |
-| `app/composables/useLiveView.ts` (create) | Start/stop lifecycle, transport selection, OSC probe, reactive state. |
-| `app/components/LiveView.client.vue` (create) | Canvas + `VideoDecoder`, or `<img>` for MJPEG. Renders the diagnostics panel. |
-| `app/pages/index.vue` (modify) | Mount the live view once connected. |
+| File                                          | Responsibility                                                                                                                                    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/utils/annexB.ts` (create)                | Pure byte-level parsing: split NAL units, detect H.264 vs H.265, derive the WebCodecs codec string, group NALs into access units. No I/O, no Vue. |
+| `tests/annexB.test.ts` (create)               | Unit tests for the above.                                                                                                                         |
+| `src-tauri/src/luna.rs` (modify)              | Return STREAM payloads instead of dropping them; expose the session to `liveview.rs`.                                                             |
+| `src-tauri/src/liveview.rs` (create)          | `START_LIVE_STREAM` / `STOP_LIVE_STREAM`, the localhost stream server, and diagnostics counters.                                                  |
+| `src-tauri/src/lib.rs` (modify)               | Register the new module, state and commands.                                                                                                      |
+| `app/utils/lunaClient.ts` (modify)            | Thin typed wrappers for the new Tauri commands.                                                                                                   |
+| `app/composables/useLiveView.ts` (create)     | Start/stop lifecycle, transport selection, OSC probe, reactive state.                                                                             |
+| `app/components/LiveView.client.vue` (create) | Canvas + `VideoDecoder`, or `<img>` for MJPEG. Renders the diagnostics panel.                                                                     |
+| `app/pages/index.vue` (modify)                | Mount the live view once connected.                                                                                                               |
 
 **Note on a deliberate spec deviation:** the design doc has `luna_liveview_start` return a `codec` field. It does not. The codec string is derived from the SPS in `annexB.ts`, frontend-side, because that is where the parsing lives — returning it from Rust would mean duplicating the SPS parser. The OSC probe likewise runs frontend-side, reusing `cameraFetch` (which already bypasses CORS via the Tauri HTTP plugin) instead of hand-rolling an HTTP client in Rust.
 
@@ -43,10 +43,12 @@
 Pure functions, no hardware, no I/O. This is the piece most likely to need iteration after the first real run, so it is isolated and fully tested.
 
 **Files:**
+
 - Create: `app/utils/annexB.ts`
 - Test: `tests/annexB.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `type NalCodec = "h264" | "h265"`
@@ -85,11 +87,20 @@ function annexB(...payloads: number[][]): Uint8Array {
  * level byte). These values are the canonical Main profile / level 3.1.
  */
 const H265_SPS = [
-  0x42, 0x01, // NAL header, type 33 (SPS)
+  0x42,
+  0x01, // NAL header, type 33 (SPS)
   0x01, // vps_id 0, max_sub_layers_minus1 0, nesting 1
   0x01, // profile_space 0, tier 0, profile_idc 1 (Main)
-  0x60, 0x00, 0x00, 0x00, // general_profile_compatibility_flags
-  0xb0, 0x00, 0x00, 0x00, 0x00, 0x00, // constraint flags
+  0x60,
+  0x00,
+  0x00,
+  0x00, // general_profile_compatibility_flags
+  0xb0,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00, // constraint flags
   0x5d, // general_level_idc 93 -> level 3.1
 ];
 const H265_VPS = [0x40, 0x01, 0x0c];
@@ -105,10 +116,7 @@ const H264_NONIDR = [0x41, 0x88]; // type 1, first_mb_in_slice == 0
 describe("splitNalUnits", () => {
   it("splits on 4-byte and 3-byte start codes and drops them", () => {
     const stream = new Uint8Array([0, 0, 0, 1, 0xaa, 0xbb, 0, 0, 1, 0xcc]);
-    expect(splitNalUnits(stream)).toEqual([
-      new Uint8Array([0xaa, 0xbb]),
-      new Uint8Array([0xcc]),
-    ]);
+    expect(splitNalUnits(stream)).toEqual([new Uint8Array([0xaa, 0xbb]), new Uint8Array([0xcc])]);
   });
 
   it("ignores leading bytes before the first start code", () => {
@@ -168,8 +176,8 @@ describe("buildCodecString", () => {
   it("strips emulation prevention bytes before parsing", () => {
     // 0x00 0x00 0x03 in the payload encodes a literal 0x00 0x00
     const spsWithEmulation = [
-      0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00,
-      0xb0, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x5d,
+      0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0xb0, 0x00, 0x00, 0x03, 0x00, 0x00,
+      0x00, 0x5d,
     ];
     const units = splitNalUnits(annexB(spsWithEmulation));
     expect(buildCodecString(units, "h265")).toBe("hvc1.1.6.L93.B0");
@@ -355,8 +363,7 @@ export function buildCodecString(units: Uint8Array[], codec: NalCodec): string |
   const tierFlag = (profileByte >> 5) & 0x01;
   const profileIdc = profileByte & 0x1f;
 
-  const compatibility =
-    ((sps[4]! << 24) | (sps[5]! << 16) | (sps[6]! << 8) | sps[7]!) >>> 0;
+  const compatibility = ((sps[4]! << 24) | (sps[5]! << 16) | (sps[6]! << 8) | sps[7]!) >>> 0;
 
   const constraints: string[] = [];
   for (let i = 8; i < 14; i++) constraints.push(hex(sps[i]!));
@@ -457,12 +464,14 @@ git commit -m "feat: annex-b parsing utilities for live view"
 
 The camera's video rides frames this code currently throws away. `drain_frames` hardcodes STREAM frames to 16 bytes, which is only correct for the keepalive hello.
 
-The fix is smaller than it looks. A FILE frame is `12 + declared_length + 4`. The keepalive hello is 16 bytes and declares length zero — which is *exactly* `12 + 0 + 4`. So both frame types share one length formula, and the hello falls out as the degenerate case. No guessing required about which type carries video.
+The fix is smaller than it looks. A FILE frame is `12 + declared_length + 4`. The keepalive hello is 16 bytes and declares length zero — which is _exactly_ `12 + 0 + 4`. So both frame types share one length formula, and the hello falls out as the degenerate case. No guessing required about which type carries video.
 
 **Files:**
+
 - Modify: `src-tauri/src/luna.rs` (the `drain_frames` function around line 150, the `Session` struct around line 246, and `open_session` around line 300)
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces, for Task 3:
   - `pub(crate) const CODE_START_LIVE_STREAM: u16 = 1;`
@@ -706,10 +715,12 @@ now fan out over a bounded broadcast channel instead of being discarded."
 ### Task 3: Live view transport in Rust
 
 **Files:**
+
 - Create: `src-tauri/src/liveview.rs`
 - Modify: `src-tauri/src/lib.rs`
 
 **Interfaces:**
+
 - Consumes from Task 2: `luna::Session::send_command`, `luna::Session::subscribe_stream`, `luna::LunaState::session`, `luna::wire_field_varint`, `luna::CODE_START_LIVE_STREAM`, `luna::CODE_STOP_LIVE_STREAM`.
 - Produces, for Task 4, three Tauri commands:
   - `luna_liveview_start() -> LiveViewInfo { url: String, port: u16 }`
@@ -1008,10 +1019,12 @@ git commit -m "feat: live view transport over a localhost stream server"
 The OSC probe lives here rather than in Rust because `cameraFetch` already bypasses CORS through the Tauri HTTP plugin — reusing it avoids hand-rolling an HTTP client natively.
 
 **Files:**
+
 - Modify: `app/utils/lunaClient.ts`
 - Create: `app/composables/useLiveView.ts`
 
 **Interfaces:**
+
 - Consumes from Task 3: `luna_liveview_start`, `luna_liveview_stop`, `luna_liveview_stats`.
 - Consumes from Task 1: `detectCodec`, `buildCodecString`, `groupAccessUnits`, `splitNalUnits`.
 - Produces, for Task 5: `useLiveView()` returning `{ active, transport, streamUrl, error, diagnostics, start, stop }` where `transport` is `Ref<"mjpeg" | "annexb" | null>` and `diagnostics` is `Ref<string[]>`.
@@ -1156,7 +1169,18 @@ export function useLiveView() {
     return lunaClient.liveViewStats().catch(() => null);
   }
 
-  return { active, starting, transport, streamUrl, error, diagnostics, note, start, stop, refreshStats };
+  return {
+    active,
+    starting,
+    transport,
+    streamUrl,
+    error,
+    diagnostics,
+    note,
+    start,
+    stop,
+    refreshStats,
+  };
 }
 ```
 
@@ -1177,10 +1201,12 @@ git commit -m "feat: live view client wrappers and composable"
 ### Task 5: The live view component and page wiring
 
 **Files:**
+
 - Create: `app/components/LiveView.client.vue`
 - Modify: `app/pages/index.vue`
 
 **Interfaces:**
+
 - Consumes from Task 4: `useLiveView()`.
 - Consumes from Task 1: `splitNalUnits`, `detectCodec`, `buildCodecString`, `groupAccessUnits`.
 
@@ -1193,7 +1219,8 @@ Create `app/components/LiveView.client.vue`:
 import { buildCodecString, detectCodec, groupAccessUnits, splitNalUnits } from "~/utils/annexB";
 import type { NalCodec } from "~/utils/annexB";
 
-const { active, starting, transport, streamUrl, error, diagnostics, note, start, stop } = useLiveView();
+const { active, starting, transport, streamUrl, error, diagnostics, note, start, stop } =
+  useLiveView();
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 let decoder: VideoDecoder | null = null;
@@ -1331,9 +1358,7 @@ onBeforeUnmount(() => {
         color="primary"
         @click="active ? stop() : start()"
       />
-      <span v-if="transport" class="text-sm text-muted">
-        transport: {{ transport }}
-      </span>
+      <span v-if="transport" class="text-sm text-muted"> transport: {{ transport }} </span>
     </div>
 
     <UAlert
@@ -1345,16 +1370,16 @@ onBeforeUnmount(() => {
     />
 
     <div class="overflow-hidden rounded-lg bg-elevated">
-      <img v-if="active && transport === 'mjpeg' && streamUrl" :src="streamUrl" class="w-full" >
+      <img v-if="active && transport === 'mjpeg' && streamUrl" :src="streamUrl" class="w-full" />
       <canvas v-show="active && transport === 'annexb'" ref="canvas" class="w-full" />
-      <p v-if="!active" class="p-8 text-center text-sm text-muted">
-        Live view is stopped.
-      </p>
+      <p v-if="!active" class="p-8 text-center text-sm text-muted">Live view is stopped.</p>
     </div>
 
     <details v-if="diagnostics.length > 0" class="text-sm">
       <summary class="cursor-pointer text-muted">Diagnostics</summary>
-      <pre class="mt-2 overflow-x-auto rounded bg-elevated p-3 text-xs">{{ diagnostics.join("\n") }}</pre>
+      <pre class="mt-2 overflow-x-auto rounded bg-elevated p-3 text-xs">{{
+        diagnostics.join("\n")
+      }}</pre>
     </details>
   </div>
 </template>
@@ -1365,7 +1390,7 @@ onBeforeUnmount(() => {
 In `app/pages/index.vue`, inside the `<template #body>` grid, add this as the first child of the `lg:order-1` column, immediately after the opening `<div class="order-2 flex flex-col ...">` tag:
 
 ```vue
-          <LiveView v-if="isConnected" />
+<LiveView v-if="isConnected" />
 ```
 
 - [ ] **Step 3: Typecheck and lint**
@@ -1396,13 +1421,13 @@ This is the only step that needs hardware, and it is expected to need iteration.
 
 Possible outcomes and what each means:
 
-| Observation | Meaning | Next move |
-| --- | --- | --- |
-| Video appears | Done. | Consider 360 reprojection as a follow-on. |
-| "OSC MJPEG preview available" then video | The easy path existed. | The Annex-B path stays as fallback. |
-| "camera rejected START_LIVE_STREAM" | Luna Ultra renumbered the command. | Capture the mobile app's traffic; the correct code goes in `liveview.rs`. |
-| Accepted, but 0 bytes | Video does not ride STREAM frames. | Run `node scripts/probe-liveview.mjs` and read the frame-type histogram. |
-| Bytes arrive, decoder errors | Codec string is wrong. | The diagnostics print the exact string and codec; fix `annexB.ts`. |
+| Observation                              | Meaning                            | Next move                                                                 |
+| ---------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------- |
+| Video appears                            | Done.                              | Consider 360 reprojection as a follow-on.                                 |
+| "OSC MJPEG preview available" then video | The easy path existed.             | The Annex-B path stays as fallback.                                       |
+| "camera rejected START_LIVE_STREAM"      | Luna Ultra renumbered the command. | Capture the mobile app's traffic; the correct code goes in `liveview.rs`. |
+| Accepted, but 0 bytes                    | Video does not ride STREAM frames. | Run `node scripts/probe-liveview.mjs` and read the frame-type histogram.  |
+| Bytes arrive, decoder errors             | Codec string is wrong.             | The diagnostics print the exact string and codec; fix `annexB.ts`.        |
 
 Do not mark this step complete until video renders or the failure is recorded with its diagnostics.
 
@@ -1412,24 +1437,24 @@ Do not mark this step complete until video renders or the failure is recorded wi
 
 **Spec coverage:**
 
-| Spec requirement | Task |
-| --- | --- |
-| OSC probe first, 1.5s budget | Task 4, `probeOscPreview` (no explicit timer; the Tauri HTTP plugin's default applies and a failure falls through) |
-| `START_LIVE_STREAM` over existing session | Task 3 |
-| Read length field, fall back to 16 on zero | Task 2 — unified as `12 + declared + 4`, which yields 16 for the hello |
-| H.264 vs H.265 sniffing from SPS | Task 1 |
-| `luna.rs` untouched shipping paths | Task 2, Step 7 asserts the mock-server test still passes |
-| New `liveview.rs` module | Task 3 |
-| `annexB.ts` written test-first | Task 1 |
-| `useLiveView.ts` shaped like `useCamera.ts` | Task 4 |
-| `LiveView.client.vue` with img/canvas split | Task 5 |
-| Localhost stream rather than IPC | Task 3 |
-| Diagnostics contract | Tasks 4 and 5; every table row in Task 5 Step 6 maps to a diagnostic line |
-| Bounded buffer with drop policy | Task 2 (`broadcast::channel(512)`), Task 3 (`RecvError::Lagged` → continue) |
-| Rust tests for frame parsing | Task 2 |
-| Vitest for `annexB.ts` | Task 1 |
-| Flat dual-fisheye v1 | Task 5 — canvas painted directly, no reprojection |
-| No new dependencies | Hand-rolled server in Task 3; OSC probe reuses `cameraFetch` |
+| Spec requirement                            | Task                                                                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| OSC probe first, 1.5s budget                | Task 4, `probeOscPreview` (no explicit timer; the Tauri HTTP plugin's default applies and a failure falls through) |
+| `START_LIVE_STREAM` over existing session   | Task 3                                                                                                             |
+| Read length field, fall back to 16 on zero  | Task 2 — unified as `12 + declared + 4`, which yields 16 for the hello                                             |
+| H.264 vs H.265 sniffing from SPS            | Task 1                                                                                                             |
+| `luna.rs` untouched shipping paths          | Task 2, Step 7 asserts the mock-server test still passes                                                           |
+| New `liveview.rs` module                    | Task 3                                                                                                             |
+| `annexB.ts` written test-first              | Task 1                                                                                                             |
+| `useLiveView.ts` shaped like `useCamera.ts` | Task 4                                                                                                             |
+| `LiveView.client.vue` with img/canvas split | Task 5                                                                                                             |
+| Localhost stream rather than IPC            | Task 3                                                                                                             |
+| Diagnostics contract                        | Tasks 4 and 5; every table row in Task 5 Step 6 maps to a diagnostic line                                          |
+| Bounded buffer with drop policy             | Task 2 (`broadcast::channel(512)`), Task 3 (`RecvError::Lagged` → continue)                                        |
+| Rust tests for frame parsing                | Task 2                                                                                                             |
+| Vitest for `annexB.ts`                      | Task 1                                                                                                             |
+| Flat dual-fisheye v1                        | Task 5 — canvas painted directly, no reprojection                                                                  |
+| No new dependencies                         | Hand-rolled server in Task 3; OSC probe reuses `cameraFetch`                                                       |
 
 Two deliberate deviations from the spec, both noted in the File Structure section: `luna_liveview_start` does not return `codec`, and the OSC probe runs frontend-side. Both avoid duplicating logic.
 

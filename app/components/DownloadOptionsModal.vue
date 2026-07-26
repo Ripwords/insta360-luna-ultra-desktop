@@ -11,8 +11,10 @@ const previewSrc = computed(() => photos.value[0]?.srcUrl);
 
 const summary = computed(() => {
   const parts: string[] = [];
-  if (photos.value.length > 0) parts.push(`${photos.value.length} ${photos.value.length === 1 ? "photo" : "photos"}`);
-  if (videos.value.length > 0) parts.push(`${videos.value.length} ${videos.value.length === 1 ? "video" : "videos"}`);
+  if (photos.value.length > 0)
+    parts.push(`${photos.value.length} ${photos.value.length === 1 ? "photo" : "photos"}`);
+  if (videos.value.length > 0)
+    parts.push(`${videos.value.length} ${videos.value.length === 1 ? "video" : "videos"}`);
   return parts.join(" and ");
 });
 </script>

@@ -76,7 +76,10 @@ async function query(session, { code, body, respMessage, label }) {
   };
 }
 
-async function probeGroup(session, { title, code, respMessage, enumName, types, extra = Buffer.alloc(0) }) {
+async function probeGroup(
+  session,
+  { title, code, respMessage, enumName, types, extra = Buffer.alloc(0) },
+) {
   say(`\n${"=".repeat(72)}\n${title}\n${"=".repeat(72)}`);
 
   const supported = new Set();
@@ -103,14 +106,22 @@ async function probeGroup(session, { title, code, respMessage, enumName, types, 
   }
 
   const asked = types.length;
-  say(`\nasked for ${asked} option types in ${Math.ceil(asked / BATCH)} batches` +
-      (failures ? `, ${failures} batch(es) failed` : ", all batches answered"));
+  say(
+    `\nasked for ${asked} option types in ${Math.ceil(asked / BATCH)} batches` +
+      (failures ? `, ${failures} batch(es) failed` : ", all batches answered"),
+  );
   say(`camera acknowledged ${supported.size} of them\n`);
 
   const unsupported = types.filter((t) => !supported.has(t));
   if (supported.size > 0) {
     say("SUPPORTED:");
-    say("  " + [...supported].sort((a, b) => a - b).map((t) => nameOf(enumName, t)).join("\n  "));
+    say(
+      "  " +
+        [...supported]
+          .sort((a, b) => a - b)
+          .map((t) => nameOf(enumName, t))
+          .join("\n  "),
+    );
   }
   if (unsupported.length > 0) {
     say("\nNOT ACKNOWLEDGED:");
@@ -126,7 +137,9 @@ async function probeGroup(session, { title, code, respMessage, enumName, types, 
 
 async function main() {
   say(`settings probe against ${HOST}`);
-  say(`schema: ${Object.keys(schema.messages).length} messages, ${Object.keys(schema.enums).length} enums`);
+  say(
+    `schema: ${Object.keys(schema.messages).length} messages, ${Object.keys(schema.enums).length} enums`,
+  );
   say("read-only: only GET_OPTIONS and GET_PHOTOGRAPHY_OPTIONS are sent\n");
 
   const session = new LunaSession(HOST, PORT);
@@ -166,8 +179,16 @@ async function main() {
   // The gimbal is the whole reason this camera is interesting, and PTZ_CTRL
   // is an option type the 2020 Options message has no field for. Ask for the
   // gimbal-adjacent types one at a time so nothing hides behind a bad batch.
-  say(`\n${"=".repeat(72)}\n3. GIMBAL / PTZ  —  individually, unknown fields are the point\n${"=".repeat(72)}`);
-  const spotlight = ["PTZ_CTRL", "CAMERA_POSTURE", "CALIBRATION_ORIENTATION", "OFFSET_STATES", "WINDOW_CROP_INFO"];
+  say(
+    `\n${"=".repeat(72)}\n3. GIMBAL / PTZ  —  individually, unknown fields are the point\n${"=".repeat(72)}`,
+  );
+  const spotlight = [
+    "PTZ_CTRL",
+    "CAMERA_POSTURE",
+    "CALIBRATION_ORIENTATION",
+    "OFFSET_STATES",
+    "WINDOW_CROP_INFO",
+  ];
   const ptz = {};
   for (const name of spotlight) {
     const type = valueOf(OPTION_TYPE, name);
@@ -194,7 +215,9 @@ async function main() {
   say(`\n${"=".repeat(72)}\nSUMMARY\n${"=".repeat(72)}`);
   for (const [key, value] of Object.entries(results)) {
     if (!value?.supported) continue;
-    say(`  ${key}: ${value.supported.size} option types acknowledged, ${value.settings.size} values read`);
+    say(
+      `  ${key}: ${value.supported.size} option types acknowledged, ${value.settings.size} values read`,
+    );
   }
   say("\nAnything marked 'unknown, wire N' above is a field this camera has and");
   say("the 2020-era schema does not — those are the Luna-Ultra-specific ones.");
@@ -207,24 +230,29 @@ async function main() {
     path.join(OUT_DIR, "settings-raw.json"),
     JSON.stringify(
       Object.fromEntries(
-        Object.entries(results).filter(([, v]) => v?.supported).map(([k, v]) => [
-          k,
-          {
-            supported: [...v.supported].sort((a, b) => a - b),
-            values: [...v.settings.values()].map((r) => ({
-              field: r.field,
-              name: r.name,
-              value: String(r.value),
-              note: r.note,
-            })),
-          },
-        ]),
+        Object.entries(results)
+          .filter(([, v]) => v?.supported)
+          .map(([k, v]) => [
+            k,
+            {
+              supported: [...v.supported].sort((a, b) => a - b),
+              values: [...v.settings.values()].map((r) => ({
+                field: r.field,
+                name: r.name,
+                value: String(r.value),
+                note: r.note,
+              })),
+            },
+          ]),
       ),
       null,
       2,
     ),
   );
-  fs.writeFileSync(path.join(OUT_DIR, "settings-ptz-raw.json"), JSON.stringify(results.ptzRaw ?? {}, null, 2));
+  fs.writeFileSync(
+    path.join(OUT_DIR, "settings-ptz-raw.json"),
+    JSON.stringify(results.ptzRaw ?? {}, null, 2),
+  );
   say(`\nwrote ${path.join(OUT_DIR, "settings-report.txt")}`);
 }
 

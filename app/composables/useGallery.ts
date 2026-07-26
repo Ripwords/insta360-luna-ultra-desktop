@@ -31,7 +31,9 @@ export function useGallery() {
     groupByDay(filtered.value).map((group) => ({ ...group, label: dayLabel(group.key) })),
   );
 
-  const orderedIds = computed(() => groups.value.flatMap((group) => group.items.map((item) => item.id)));
+  const orderedIds = computed(() =>
+    groups.value.flatMap((group) => group.items.map((item) => item.id)),
+  );
 
   const selectedItems = computed(() => {
     const set = selected.value;

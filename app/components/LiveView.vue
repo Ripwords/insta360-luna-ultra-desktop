@@ -6,7 +6,7 @@ import type { NalCodec } from "~/utils/annexB";
 // decoding surface for whatever the live-view composable is currently serving.
 const { active, transport, streamUrl, error, note, stop } = useLiveView();
 
-const canvas = ref<HTMLCanvasElement | null>(null);
+const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 let decoder: VideoDecoder | null = null;
 let abort: AbortController | null = null;
 
@@ -168,7 +168,11 @@ onBeforeUnmount(() => {
       v-if="active && transport === 'mjpeg' && streamUrl"
       :src="streamUrl"
       class="size-full object-contain"
-    >
-    <canvas v-show="active && transport === 'annexb'" ref="canvas" class="size-full object-contain" />
+    />
+    <canvas
+      v-show="active && transport === 'annexb'"
+      ref="canvas"
+      class="size-full object-contain"
+    />
   </div>
 </template>

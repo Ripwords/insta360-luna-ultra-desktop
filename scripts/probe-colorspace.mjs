@@ -175,7 +175,12 @@ const commandProbes = (videoMode) => [
  * places a "picture profile" could plausibly live on this firmware.
  */
 const PHOTOGRAPHY_WATCH = [
-  { type: 35, field: 35, label: "color_mode", enum: "insta360.messages.PhotographyOptions.COLOR_MODE" },
+  {
+    type: 35,
+    field: 35,
+    label: "color_mode",
+    enum: "insta360.messages.PhotographyOptions.COLOR_MODE",
+  },
   { type: 18, field: 18, label: "gamma_mode", enum: "insta360.messages.GammaMode" },
   { type: 31, field: 31, label: "record_resolution", enum: "insta360.messages.VideoResolution" },
   { type: 32, field: 32, label: "video_bitrate", enum: null },
@@ -187,7 +192,12 @@ const PHOTOGRAPHY_WATCH = [
 const DEVICE_WATCH = [
   { type: 41, field: 41, label: "video_sub_mode", enum: "insta360.messages.VideoSubMode" },
   { type: 40, field: 40, label: "photo_sub_mode", enum: "insta360.messages.PhotoSubMode" },
-  { type: 66, field: 66, label: "video_encode_type", enum: "insta360.messages.Options.VideoEncodeType" },
+  {
+    type: 66,
+    field: 66,
+    label: "video_encode_type",
+    enum: "insta360.messages.Options.VideoEncodeType",
+  },
   // Not in the camera's acknowledged list, but ask anyway — an unacknowledged
   // type that still answers would be the most interesting result of the run.
   { type: 28, field: 28, label: "gamma_mode(device)", enum: "insta360.messages.GammaMode" },
@@ -351,20 +361,18 @@ async function sweep(session, { code, extra, max }) {
   const readings = {};
   const record = (fields) => {
     for (const [field, value] of fields) {
-      const spec = schema.messages[
-        code === CODE.GET_OPTIONS
-          ? "insta360.messages.Options"
-          : "insta360.messages.PhotographyOptions"
-      ]?.[String(field)];
+      const spec =
+        schema.messages[
+          code === CODE.GET_OPTIONS
+            ? "insta360.messages.Options"
+            : "insta360.messages.PhotographyOptions"
+        ]?.[String(field)];
       readings[`${field}:${spec?.name ?? "UNNAMED"}`] = { raw: value, enum: spec?.ref ?? null };
     }
   };
 
   const ask = async (batch) => {
-    const body = Buffer.concat([
-      ...batch.map((t) => fieldVarint(1, t)),
-      extra ?? Buffer.alloc(0),
-    ]);
+    const body = Buffer.concat([...batch.map((t) => fieldVarint(1, t)), extra ?? Buffer.alloc(0)]);
     const frame = await session.send(code, body);
     return frame?.body?.length ? frame.body : null;
   };
@@ -395,7 +403,11 @@ async function collect(session, { all = false, max = 200 } = {}) {
     const mode = valueOf("insta360.messages.FunctionMode", modeName);
     if (mode < 0) continue;
     snapshot.photography[modeName] = all
-      ? await sweep(session, { code: CODE.GET_PHOTOGRAPHY_OPTIONS, extra: fieldVarint(2, mode), max })
+      ? await sweep(session, {
+          code: CODE.GET_PHOTOGRAPHY_OPTIONS,
+          extra: fieldVarint(2, mode),
+          max,
+        })
       : await readGroup(session, {
           code: CODE.GET_PHOTOGRAPHY_OPTIONS,
           extra: fieldVarint(2, mode),
@@ -820,7 +832,13 @@ const CALIBRATION = [
  */
 function selectGroups(only, skip) {
   const known = CALIBRATION.map((group) => group.key);
-  const parse = (value) => (value ? value.split(",").map((s) => s.trim()).filter(Boolean) : []);
+  const parse = (value) =>
+    value
+      ? value
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
   const wanted = parse(only);
   const unwanted = parse(skip);
 
@@ -832,8 +850,7 @@ function selectGroups(only, skip) {
   }
 
   return CALIBRATION.filter(
-    (group) =>
-      (wanted.length === 0 || wanted.includes(group.key)) && !unwanted.includes(group.key),
+    (group) => (wanted.length === 0 || wanted.includes(group.key)) && !unwanted.includes(group.key),
   );
 }
 
@@ -955,7 +972,9 @@ async function shapesCommand(code) {
         continue;
       }
       answered += 1;
-      console.log(`  ${shape.label.padEnd(30)} ${frame.body.length}B  ${frame.body.toString("hex")}`);
+      console.log(
+        `  ${shape.label.padEnd(30)} ${frame.body.length}B  ${frame.body.toString("hex")}`,
+      );
       for (const record of decodeRaw(frame.body)) {
         const value =
           record.value instanceof Buffer ? `0x${record.value.toString("hex")}` : record.value;
@@ -1036,9 +1055,10 @@ async function monitorCommand(max, intervalMs) {
     const videoMode = valueOf("insta360.messages.FunctionMode", "FUNCTION_MODE_NORMAL_VIDEO");
     const sample = async () => ({
       ...Object.fromEntries(
-        Object.entries(
-          await sweep(session, { code: CODE.GET_OPTIONS, max }),
-        ).map(([k, v]) => [`device.${k}`, v.raw]),
+        Object.entries(await sweep(session, { code: CODE.GET_OPTIONS, max })).map(([k, v]) => [
+          `device.${k}`,
+          v.raw,
+        ]),
       ),
       ...Object.fromEntries(
         Object.entries(
@@ -1162,7 +1182,9 @@ async function gimbalCommand(intervalMs, count) {
         const samples = blob ? decodeGyro(blob) : [];
         const last = samples.at(-1);
         if (!last) {
-          console.log(`posture ${posture}  |  ${frame.body.length}B, no whole sample: ${frame.body.toString("hex").slice(0, 80)}`);
+          console.log(
+            `posture ${posture}  |  ${frame.body.length}B, no whole sample: ${frame.body.toString("hex").slice(0, 80)}`,
+          );
         } else {
           const n = (value) => value.toFixed(3).padStart(9);
           console.log(
@@ -1203,7 +1225,9 @@ async function calibrateCommand(max, only, skip) {
         // that miss into a confident reading of 0.
         const prefix = group.scope === "device" ? "device." : "FUNCTION_MODE_NORMAL_VIDEO.";
         const entry = Object.entries(flatten(snapshot)).find(
-          ([key]) => key.startsWith(prefix) && key.slice(prefix.length).split(":")[0] === String(group.field),
+          ([key]) =>
+            key.startsWith(prefix) &&
+            key.slice(prefix.length).split(":")[0] === String(group.field),
         );
         const raw = entry?.[1];
         // A field sitting at its proto3 default is omitted rather than sent, and
@@ -1215,12 +1239,11 @@ async function calibrateCommand(max, only, skip) {
       results[group.enumName] = observed;
     }
 
-    fs.writeFileSync(
-      path.join(OUT_DIR, "calibration.json"),
-      JSON.stringify(results, null, 2),
-    );
+    fs.writeFileSync(path.join(OUT_DIR, "calibration.json"), JSON.stringify(results, null, 2));
 
-    console.log(`\n${"=".repeat(72)}\nPASTE INTO ENUM_OVERRIDES IN scripts/build-schema.mjs\n${"=".repeat(72)}\n`);
+    console.log(
+      `\n${"=".repeat(72)}\nPASTE INTO ENUM_OVERRIDES IN scripts/build-schema.mjs\n${"=".repeat(72)}\n`,
+    );
     for (const [enumName, observed] of Object.entries(results)) {
       const byNumber = Object.entries(observed)
         .map(([name, value]) => [Number(value), name])
@@ -1234,7 +1257,8 @@ async function calibrateCommand(max, only, skip) {
       const seen = new Map();
       const clashes = [];
       for (const [name, value] of Object.entries(observed)) {
-        if (seen.has(value)) clashes.push(`${enumName}: ${seen.get(value)} and ${name} both = ${value}`);
+        if (seen.has(value))
+          clashes.push(`${enumName}: ${seen.get(value)} and ${name} both = ${value}`);
         seen.set(value, name);
       }
       return clashes;
@@ -1314,6 +1338,8 @@ if (command === "diff") {
   }
   await snapshotCommand(label, ALL, MAX);
 } else {
-  console.error(`unknown command "${command}" — expected calibrate, gimbal, monitor, pair, series, snapshot, diff, watch, scan, listen or shapes`);
+  console.error(
+    `unknown command "${command}" — expected calibrate, gimbal, monitor, pair, series, snapshot, diff, watch, scan, listen or shapes`,
+  );
   process.exit(1);
 }

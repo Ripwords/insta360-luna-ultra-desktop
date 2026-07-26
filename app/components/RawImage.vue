@@ -17,20 +17,23 @@ import { cachedMedia } from "~/utils/mediaCache";
  * skips both the multi-MB download and the CPU-bound Bayer decode. Only that
  * small preview is cached — never the source buffer.
  */
-const props = withDefaults(
-  defineProps<{
-    src: string;
-    ext: string;
-    imgClass?: string;
-    eager?: boolean;
-    prefer?: "largest" | "smallest";
-    /** Range-limit the download; the preview must fall within these bytes */
-    maxBytes?: number;
-  }>(),
-  { imgClass: "", eager: false, prefer: "largest" },
-);
+const {
+  src,
+  imgClass = "",
+  eager = false,
+  prefer = "largest",
+  maxBytes,
+} = defineProps<{
+  src: string;
+  ext: string;
+  imgClass?: string;
+  eager?: boolean;
+  prefer?: "largest" | "smallest";
+  /** Range-limit the download; the preview must fall within these bytes */
+  maxBytes?: number;
+}>();
 
-const el = ref<HTMLElement | null>(null);
+const el = useTemplateRef("el");
 const imgSrc = ref<string | null>(null);
 const state = ref<"idle" | "loading" | "loaded" | "nopreview" | "error">("idle");
 const phase = ref<"downloading" | "decoding">("downloading");
@@ -40,8 +43,10 @@ const total = ref(0);
 const reason = ref<"network" | "range-skipped" | "no-preview" | "decode-failed" | null>(null);
 
 /** Whether this instance shows the full file (full-screen), not a grid thumb. */
-const fullFile = computed(() => !props.maxBytes);
-const percent = computed(() => (total.value ? Math.round((downloaded.value / total.value) * 100) : 0));
+const fullFile = computed(() => !maxBytes);
+const percent = computed(() =>
+  total.value ? Math.round((downloaded.value / total.value) * 100) : 0,
+);
 
 let observer: IntersectionObserver | null = null;
 
@@ -118,14 +123,14 @@ const NO_PREVIEW = "nopreview:";
 async function fetchPreview(priority: number): Promise<Blob | string> {
   const download = () =>
     withCameraSlot(async () => {
-      const init: RequestInit = props.maxBytes ? { headers: { Range: `bytes=0-${props.maxBytes - 1}` } } : {};
-      const response = await cameraFetch(props.src, init);
+      const init: RequestInit = maxBytes ? { headers: { Range: `bytes=0-${maxBytes - 1}` } } : {};
+      const response = await cameraFetch(src, init);
       if (!response.ok) throw new Error(String(response.status));
       // If we asked for a byte range (grid thumbnail) but the camera ignored it
       // and would send the whole multi-MB file, skip rather than download it.
-      if (props.maxBytes && response.status !== 206) {
+      if (maxBytes && response.status !== 206) {
         const len = Number(response.headers.get("content-length") ?? 0);
-        if (len === 0 || len > props.maxBytes * 2) return null;
+        if (len === 0 || len > maxBytes * 2) return null;
       }
       return await downloadBuffer(response);
     }, priority);
@@ -150,7 +155,7 @@ async function fetchPreview(priority: number): Promise<Blob | string> {
   if (buffer === null) return `${NO_PREVIEW}range-skipped`;
 
   // Fast path: an embedded preview JPEG (many RAW formats carry one).
-  const embedded = extractDngPreview(buffer, props.prefer);
+  const embedded = extractDngPreview(buffer, prefer);
   if (embedded) return embedded;
 
   // No embedded JPEG: if we hold the whole file (full-screen view, not a grid
@@ -169,15 +174,17 @@ async function load() {
   state.value = "loading";
   phase.value = "downloading";
   // Full-screen preview outranks grid thumbnails for the shared camera slots.
-  const priority = props.maxBytes ? CAMERA_PRIORITY.THUMBNAIL : CAMERA_PRIORITY.PREVIEW;
+  const priority = maxBytes ? CAMERA_PRIORITY.THUMBNAIL : CAMERA_PRIORITY.PREVIEW;
   // Key on everything that changes the derived output: a range-limited grid
   // thumbnail and a full-file preview of one file are different artifacts.
-  const key = `raw:${props.src}:${props.maxBytes ?? "full"}:${props.prefer}`;
+  const key = `raw:${src}:${maxBytes ?? "full"}:${prefer}`;
   try {
     const result = await cachedMedia(key, () => fetchPreview(priority));
 
     if (!result || (typeof result === "string" && result.startsWith(NO_PREVIEW))) {
-      reason.value = result ? (result.slice(NO_PREVIEW.length) as typeof reason.value) : "no-preview";
+      reason.value = result
+        ? (result.slice(NO_PREVIEW.length) as typeof reason.value)
+        : "no-preview";
       state.value = "nopreview";
       return;
     }
@@ -192,7 +199,7 @@ async function load() {
 
 onMounted(async () => {
   await nextTick();
-  if (props.eager || !("IntersectionObserver" in window) || !el.value) {
+  if (eager || !("IntersectionObserver" in window) || !el.value) {
     void load();
     return;
   }
@@ -219,16 +226,27 @@ onBeforeUnmount(() => {
   <!-- Centered so a photo whose aspect ratio differs from the container sits in
        the middle instead of hugging the left edge. -->
   <div ref="el" class="relative flex size-full items-center justify-center">
-    <img v-if="state === 'loaded' && imgSrc" :src="imgSrc" alt="" draggable="false" :class="imgClass" />
+    <img
+      v-if="state === 'loaded' && imgSrc"
+      :src="imgSrc"
+      alt=""
+      draggable="false"
+      :class="imgClass"
+    />
 
-    <slot v-else-if="state === 'nopreview' || state === 'error'" name="fallback" :ext="ext" :reason="reason">
-      <div class="flex size-full flex-col items-center justify-center gap-1.5 bg-elevated text-dimmed">
+    <slot v-else-if="state === 'nopreview' || state === 'error'" name="fallback" :ext :reason>
+      <div
+        class="flex size-full flex-col items-center justify-center gap-1.5 bg-elevated text-dimmed"
+      >
         <UIcon name="i-lucide-aperture" class="size-6" />
         <span class="font-mono text-[10px] uppercase tracking-wide">{{ ext }}</span>
       </div>
     </slot>
 
-    <div v-else class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-elevated text-dimmed">
+    <div
+      v-else
+      class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-elevated text-dimmed"
+    >
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" />
       <p v-if="fullFile" class="text-center text-xs">
         <template v-if="phase === 'downloading'">

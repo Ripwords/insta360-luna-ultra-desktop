@@ -18,7 +18,7 @@ const emit = defineEmits<{
   loaded: [dimensions: { width: number; height: number }];
 }>();
 
-const videoEl = ref<HTMLVideoElement | null>(null);
+const videoEl = useTemplateRef<HTMLVideoElement>("videoEl");
 
 /**
  * Space toggles video play/pause. Captured on window because the modal's focus
@@ -89,7 +89,13 @@ defineShortcuts({
 </script>
 
 <template>
-  <UModal v-model:open="open" fullscreen :ui="{ content: 'bg-default', body: 'p-0 sm:p-0' }" :title="item?.name ?? 'Preview'" :description="takenLabel">
+  <UModal
+    v-model:open="open"
+    fullscreen
+    :ui="{ content: 'bg-default', body: 'p-0 sm:p-0' }"
+    :title="item?.name ?? 'Preview'"
+    :description="takenLabel"
+  >
     <template #content>
       <div v-if="item" class="flex h-full flex-col">
         <div class="flex items-center justify-between gap-4 border-b border-default px-4 py-2.5">
@@ -98,16 +104,38 @@ defineShortcuts({
             <p class="text-xs text-muted">{{ takenLabel }}</p>
           </div>
           <div class="flex items-center gap-1.5">
-            <UButton icon="i-lucide-arrow-down-to-line" label="Download" size="sm" color="neutral" variant="outline" @click="emit('download')" />
+            <UButton
+              icon="i-lucide-arrow-down-to-line"
+              label="Download"
+              size="sm"
+              color="neutral"
+              variant="outline"
+              @click="emit('download')"
+            />
             <UDropdownMenu v-model:open="moreOpen" :items="moreItems">
-              <UButton icon="i-lucide-ellipsis" size="sm" color="neutral" variant="ghost" aria-label="More actions" />
+              <UButton
+                icon="i-lucide-ellipsis"
+                size="sm"
+                color="neutral"
+                variant="ghost"
+                aria-label="More actions"
+              />
             </UDropdownMenu>
             <span class="mx-1 h-5 w-px bg-default" aria-hidden="true" />
-            <UButton icon="i-lucide-x" size="sm" color="neutral" variant="ghost" aria-label="Close preview" @click="open = false" />
+            <UButton
+              icon="i-lucide-x"
+              size="sm"
+              color="neutral"
+              variant="ghost"
+              aria-label="Close preview"
+              @click="open = false"
+            />
           </div>
         </div>
 
-        <div class="relative flex min-h-0 flex-1 items-center justify-center bg-black/95 px-16 dark:bg-black">
+        <div
+          class="relative flex min-h-0 flex-1 items-center justify-center bg-black/95 px-16 dark:bg-black"
+        >
           <!-- Play the low-res LRV proxy when available; the full-res file can
                be hundreds of MB and is meant for download, not preview. -->
           <video
@@ -149,12 +177,27 @@ defineShortcuts({
                 <div class="space-y-1">
                   <p class="font-mono text-sm uppercase text-highlighted">{{ item.ext }} file</p>
                   <p class="max-w-xs text-sm">
-                    <template v-if="reason === 'network'">The download from the camera failed or was interrupted. Try again or download the file.</template>
-                    <template v-else-if="reason === 'decode-failed'">Downloaded, but rendering this RAW file's preview failed. Download it to open in your photo editor.</template>
-                    <template v-else>No embedded preview in this RAW file. Download it to open in your photo editor.</template>
+                    <template v-if="reason === 'network'"
+                      >The download from the camera failed or was interrupted. Try again or download
+                      the file.</template
+                    >
+                    <template v-else-if="reason === 'decode-failed'"
+                      >Downloaded, but rendering this RAW file's preview failed. Download it to open
+                      in your photo editor.</template
+                    >
+                    <template v-else
+                      >No embedded preview in this RAW file. Download it to open in your photo
+                      editor.</template
+                    >
                   </p>
                 </div>
-                <UButton label="Download" icon="i-lucide-arrow-down-to-line" color="neutral" variant="outline" @click="emit('download')" />
+                <UButton
+                  label="Download"
+                  icon="i-lucide-arrow-down-to-line"
+                  color="neutral"
+                  variant="outline"
+                  @click="emit('download')"
+                />
               </div>
             </template>
           </RawImage>
@@ -181,7 +224,9 @@ defineShortcuts({
           />
         </div>
 
-        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-default px-4 py-2.5 font-mono text-xs text-muted">
+        <div
+          class="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-default px-4 py-2.5 font-mono text-xs text-muted"
+        >
           <span v-if="item.width && item.height">{{ item.width }} × {{ item.height }}</span>
           <span v-if="item.size > 0">{{ formatBytes(item.size) }}</span>
           <span class="uppercase">{{ item.type }}</span>

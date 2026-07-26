@@ -160,9 +160,7 @@ const currentRes = computed(() => {
   return { size, aspect, fps: fpsFor(modeId.value, size, aspect)[0]! };
 });
 
-const sizeSteps = computed(() =>
-  sizesFor(modeId.value).map((value) => ({ value, label: value })),
-);
+const sizeSteps = computed(() => sizesFor(modeId.value).map((value) => ({ value, label: value })));
 const aspectRatioSteps = computed(() =>
   currentRes.value
     ? aspectsFor(modeId.value, currentRes.value.size).map((value) => ({ value, label: value }))
@@ -231,96 +229,98 @@ const strengthAvailable = computed(
   () => filtersAvailable.value && filterHasIntensity(currentFilter.value),
 );
 
-const chips = computed(() => [
-  {
-    id: "iso" as const,
-    group: "exposure",
-    label: "ISO",
-    value: isoAuto.value ? "Auto" : isoLabel(manualIso.value),
-  },
-  {
-    id: "shutter" as const,
-    group: "exposure",
-    label: "SHUTTER",
-    value: shutterAuto.value ? "Auto" : shutterLabel(manualShutter.value),
-  },
-  {
-    id: "ev" as const,
-    group: "exposure",
-    label: "EV",
-    value: evLabel(Number(settings.value.exposure_bias ?? 0)),
-  },
-  {
-    id: "colour" as const,
-    group: "look",
-    label: "COLOR",
-    value: settings.value.color_mode ? optionLabel(String(settings.value.color_mode)) : "—",
-  },
-  {
-    id: "filter" as const,
-    group: "look",
-    label: "FILTER",
-    value: optionLabel(currentFilter.value ?? "FILTER_NONE"),
-  },
-  {
-    id: "strength" as const,
-    group: "look",
-    label: "STRENGTH",
-    value: settings.value.filter_intensity
-      ? optionLabel(String(settings.value.filter_intensity))
-      : "—",
-  },
-  {
-    id: "aspect" as const,
-    group: "look",
-    label: "ASPECT",
-    value: settings.value.pano_aspect ? optionLabel(String(settings.value.pano_aspect)) : "—",
-  },
-  {
-    // Three axes rather than one list of every combination: 37 entries in a
-    // strip is a scroll-hunt, and you end up passing 8K to reach 1080p60.
-    id: "res" as const,
-    group: "format",
-    label: "RES",
-    value: currentRes.value?.size ?? "—",
-  },
-  {
-    id: "fps" as const,
-    group: "format",
-    label: "FPS",
-    value: currentRes.value ? String(currentRes.value.fps) : "—",
-  },
-  {
-    id: "ratio" as const,
-    group: "format",
-    label: "RATIO",
-    value: currentRes.value?.aspect ?? "—",
-  },
-  {
-    id: "wb" as const,
-    group: "image",
-    label: "WB",
-    value: wbIsAuto.value ? "Auto" : `${wbKelvin.value / 1000}K`,
-  },
-  {
-    id: "sharpness" as const,
-    group: "image",
-    label: "SHARP",
-    value: sharpnessSteps[Number(settings.value.sharpness ?? 0)]?.label ?? "—",
-  },
-].filter((chip) => {
-  if (chip.id === "colour") return FEATURES.colorMode && supportsColorMode(modeId.value);
-  if (chip.id === "filter") return filtersAvailable.value;
-  if (chip.id === "strength") return strengthAvailable.value;
-  if (chip.id === "aspect") return supportsPanoAspect(modeId.value);
-  // No measured resolutions for this mode means no picker, rather than one
-  // offering numbers the camera may not take
-  if (chip.id === "res") return sizeSteps.value.length > 0;
-  if (chip.id === "fps") return fpsSteps.value.length > 1;
-  // Only worth a chip where the size actually has more than one aspect
-  if (chip.id === "ratio") return aspectRatioSteps.value.length > 1;
-  return true;
-}));
+const chips = computed(() =>
+  [
+    {
+      id: "iso" as const,
+      group: "exposure",
+      label: "ISO",
+      value: isoAuto.value ? "Auto" : isoLabel(manualIso.value),
+    },
+    {
+      id: "shutter" as const,
+      group: "exposure",
+      label: "SHUTTER",
+      value: shutterAuto.value ? "Auto" : shutterLabel(manualShutter.value),
+    },
+    {
+      id: "ev" as const,
+      group: "exposure",
+      label: "EV",
+      value: evLabel(Number(settings.value.exposure_bias ?? 0)),
+    },
+    {
+      id: "colour" as const,
+      group: "look",
+      label: "COLOR",
+      value: settings.value.color_mode ? optionLabel(String(settings.value.color_mode)) : "—",
+    },
+    {
+      id: "filter" as const,
+      group: "look",
+      label: "FILTER",
+      value: optionLabel(currentFilter.value ?? "FILTER_NONE"),
+    },
+    {
+      id: "strength" as const,
+      group: "look",
+      label: "STRENGTH",
+      value: settings.value.filter_intensity
+        ? optionLabel(String(settings.value.filter_intensity))
+        : "—",
+    },
+    {
+      id: "aspect" as const,
+      group: "look",
+      label: "ASPECT",
+      value: settings.value.pano_aspect ? optionLabel(String(settings.value.pano_aspect)) : "—",
+    },
+    {
+      // Three axes rather than one list of every combination: 37 entries in a
+      // strip is a scroll-hunt, and you end up passing 8K to reach 1080p60.
+      id: "res" as const,
+      group: "format",
+      label: "RES",
+      value: currentRes.value?.size ?? "—",
+    },
+    {
+      id: "fps" as const,
+      group: "format",
+      label: "FPS",
+      value: currentRes.value ? String(currentRes.value.fps) : "—",
+    },
+    {
+      id: "ratio" as const,
+      group: "format",
+      label: "RATIO",
+      value: currentRes.value?.aspect ?? "—",
+    },
+    {
+      id: "wb" as const,
+      group: "image",
+      label: "WB",
+      value: wbIsAuto.value ? "Auto" : `${wbKelvin.value / 1000}K`,
+    },
+    {
+      id: "sharpness" as const,
+      group: "image",
+      label: "SHARP",
+      value: sharpnessSteps[Number(settings.value.sharpness ?? 0)]?.label ?? "—",
+    },
+  ].filter((chip) => {
+    if (chip.id === "colour") return FEATURES.colorMode && supportsColorMode(modeId.value);
+    if (chip.id === "filter") return filtersAvailable.value;
+    if (chip.id === "strength") return strengthAvailable.value;
+    if (chip.id === "aspect") return supportsPanoAspect(modeId.value);
+    // No measured resolutions for this mode means no picker, rather than one
+    // offering numbers the camera may not take
+    if (chip.id === "res") return sizeSteps.value.length > 0;
+    if (chip.id === "fps") return fpsSteps.value.length > 1;
+    // Only worth a chip where the size actually has more than one aspect
+    if (chip.id === "ratio") return aspectRatioSteps.value.length > 1;
+    return true;
+  }),
+);
 
 /** What each chip's list holds, and where the current value sits in it. */
 const PICKERS: Record<ChipId, { steps: () => WheelStep[]; value: () => string | undefined }> = {
@@ -355,18 +355,30 @@ const PICKERS: Record<ChipId, { steps: () => WheelStep[]; value: () => string | 
 function choose(id: ChipId, value: string) {
   open.value = null;
   switch (id) {
-    case "iso": return void setExposure({ iso: Number(value) });
-    case "shutter": return void setExposure({ shutter_speed: value });
-    case "ev": return void update("EXPOSURE_BIAS", "exposure_bias", Number(value));
-    case "colour": return void setColorMode(value);
-    case "filter": return void setFilter(value);
-    case "strength": return void setFilterIntensity(value);
-    case "aspect": return void update("PANO_ASPECT", "pano_aspect", value);
-    case "res": return chooseResolution({ size: value });
-    case "fps": return chooseResolution({ fps: Number(value) });
-    case "ratio": return chooseResolution({ aspect: value });
-    case "wb": return selectWb(Number(value));
-    case "sharpness": return void update("SHARPNESS", "sharpness", Number(value));
+    case "iso":
+      return void setExposure({ iso: Number(value) });
+    case "shutter":
+      return void setExposure({ shutter_speed: value });
+    case "ev":
+      return void update("EXPOSURE_BIAS", "exposure_bias", Number(value));
+    case "colour":
+      return void setColorMode(value);
+    case "filter":
+      return void setFilter(value);
+    case "strength":
+      return void setFilterIntensity(value);
+    case "aspect":
+      return void update("PANO_ASPECT", "pano_aspect", value);
+    case "res":
+      return chooseResolution({ size: value });
+    case "fps":
+      return chooseResolution({ fps: Number(value) });
+    case "ratio":
+      return chooseResolution({ aspect: value });
+    case "wb":
+      return selectWb(Number(value));
+    case "sharpness":
+      return void update("SHARPNESS", "sharpness", Number(value));
   }
 }
 
@@ -455,7 +467,11 @@ const busy = (id: ChipId) => saving.value === FIELD_OF[id];
         </div>
       </template>
 
-      <span v-if="FEATURES.allSettings" class="my-1.5 w-px shrink-0 bg-white/15" aria-hidden="true" />
+      <span
+        v-if="FEATURES.allSettings"
+        class="my-1.5 w-px shrink-0 bg-white/15"
+        aria-hidden="true"
+      />
 
       <button
         v-if="FEATURES.allSettings"

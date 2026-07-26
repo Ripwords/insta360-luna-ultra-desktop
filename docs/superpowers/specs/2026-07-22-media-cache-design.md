@@ -55,13 +55,13 @@ export function cachedMedia<T extends Blob | string>(
 
 Behaviour:
 
-| Case | Result |
-| --- | --- |
-| Hit | Resolve immediately with the stored value; re-insert the key so it becomes most-recently-used. `load` is never called, so no camera slot is taken. |
-| In flight | Return the *same* pending promise. Deduplicates the common race where a grid tile and a freshly opened full-screen view request one file. |
-| Miss | Await `load()`, store the result, then evict from the LRU end until total bytes ≤ budget. |
-| `load()` resolves `null` | Cache it, sized 0 bytes. `null` means "this source can never produce a preview" (a RAW whose range fetch was skipped), so retrying is pure waste. |
-| `load()` throws | Do **not** cache. Drop the in-flight entry and rethrow. Camera Wi-Fi failures are transient and must stay retryable. |
+| Case                     | Result                                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hit                      | Resolve immediately with the stored value; re-insert the key so it becomes most-recently-used. `load` is never called, so no camera slot is taken. |
+| In flight                | Return the _same_ pending promise. Deduplicates the common race where a grid tile and a freshly opened full-screen view request one file.          |
+| Miss                     | Await `load()`, store the result, then evict from the LRU end until total bytes ≤ budget.                                                          |
+| `load()` resolves `null` | Cache it, sized 0 bytes. `null` means "this source can never produce a preview" (a RAW whose range fetch was skipped), so retrying is pure waste.  |
+| `load()` throws          | Do **not** cache. Drop the in-flight entry and rethrow. Camera Wi-Fi failures are transient and must stay retryable.                               |
 
 Entry size is `value.size` for a `Blob` and `value.length` for a string (a
 base64 data URL is one byte per character in practice; exactness is not
@@ -81,11 +81,11 @@ pattern and is materially simpler.
 
 ### What is cached
 
-| Consumer | Key | Value | Typical size |
-| --- | --- | --- | --- |
-| `CameraImage` | `img:<src>` | the final MIME-corrected `Blob` | file size |
-| `RawImage` grid thumb | `raw:<src>:<maxBytes>:<prefer>` | embedded preview `Blob`, or `null` when the range fetch was skipped | small |
-| `RawImage` full screen | `raw:<src>:full:<prefer>` | embedded preview `Blob`, or the decoded data URL string | ~1–3 MB |
+| Consumer               | Key                             | Value                                                               | Typical size |
+| ---------------------- | ------------------------------- | ------------------------------------------------------------------- | ------------ |
+| `CameraImage`          | `img:<src>`                     | the final MIME-corrected `Blob`                                     | file size    |
+| `RawImage` grid thumb  | `raw:<src>:<maxBytes>:<prefer>` | embedded preview `Blob`, or `null` when the range fetch was skipped | small        |
+| `RawImage` full screen | `raw:<src>:full:<prefer>`       | embedded preview `Blob`, or the decoded data URL string             | ~1–3 MB      |
 
 The multi-megabyte source `ArrayBuffer` behind a RAW is deliberately **not**
 cached — only the derived preview. Reopening a DNG therefore skips the download

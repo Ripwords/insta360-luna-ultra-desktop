@@ -121,7 +121,9 @@ const apply = (control: Control, value: ProtoValue) => {
  * Before any read we know nothing, so leave everything enabled rather than
  * greying out controls that may well work.
  */
-const supported = computed(() => new Set((settings.value.$supported as string[] | undefined) ?? []));
+const supported = computed(
+  () => new Set((settings.value.$supported as string[] | undefined) ?? []),
+);
 const isSupported = (control: Control) =>
   control.scope === "device" || supported.value.size === 0 || supported.value.has(control.option);
 
@@ -144,7 +146,11 @@ const asNumber = (control: Control): number => {
       </h3>
 
       <div class="grid gap-4 sm:grid-cols-2">
-        <UFormField v-for="control in visibleControls(section)" :key="control.field" :help="control.hint">
+        <UFormField
+          v-for="control in visibleControls(section)"
+          :key="control.field"
+          :help="control.hint"
+        >
           <template #label>
             <span class="flex items-center gap-1.5">
               {{ control.label }}

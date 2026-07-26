@@ -81,7 +81,9 @@ export function useCameraZoom() {
   /** Move by a slice of the dial, positive being further in. */
   function nudgeBy(delta: number) {
     wake();
-    const next = zoomForFraction((pending.value === null ? fraction.value : zoomFraction(pending.value)) + delta);
+    const next = zoomForFraction(
+      (pending.value === null ? fraction.value : zoomFraction(pending.value)) + delta,
+    );
     if (next === pending.value) return;
     pending.value = next;
     pushThrottled(next);

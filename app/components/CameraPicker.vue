@@ -21,7 +21,7 @@ defineProps<{
 
 const emit = defineEmits<{ select: [value: string]; dismiss: [] }>();
 
-const list = ref<HTMLElement | null>(null);
+const list = useTemplateRef("list");
 
 // Long lists (shutter has 49 stops) open scrolled somewhere arbitrary otherwise
 onMounted(async () => {
@@ -48,7 +48,7 @@ const onKey = (event: KeyboardEvent) => event.key === "Escape" && emit("dismiss"
   >
     <div
       ref="list"
-      class="max-h-72 overflow-y-auto overscroll-contain p-1 [scrollbar-width:thin]"
+      class="max-h-72 overflow-y-auto overscroll-contain p-1 scrollbar-thin"
       role="listbox"
       tabindex="-1"
       @keydown="onKey"

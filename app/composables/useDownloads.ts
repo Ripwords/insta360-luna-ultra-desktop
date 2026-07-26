@@ -3,7 +3,11 @@ import { drawWatermark } from "~/utils/watermark";
 import { saveBlob } from "~/utils/saveFile";
 import { cameraFetch } from "~/utils/lunaClient";
 
-async function renderWithWatermark(item: MediaItem, blob: Blob, settings: ReturnType<typeof useWatermarkSettings>["settings"]): Promise<Blob> {
+async function renderWithWatermark(
+  item: MediaItem,
+  blob: Blob,
+  settings: ReturnType<typeof useWatermarkSettings>["settings"],
+): Promise<Blob> {
   const bitmap = await createImageBitmap(blob);
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
@@ -24,7 +28,9 @@ export function useDownloads() {
   const toast = useToast();
   const running = useState<boolean>("download-running", () => false);
 
-  const active = computed(() => queue.value.filter((entry) => entry.status === "queued" || entry.status === "downloading"));
+  const active = computed(() =>
+    queue.value.filter((entry) => entry.status === "queued" || entry.status === "downloading"),
+  );
   const completed = computed(() => queue.value.filter((entry) => entry.status === "done"));
 
   async function processNext(): Promise<void> {
@@ -91,7 +97,9 @@ export function useDownloads() {
   }
 
   function clearFinished() {
-    queue.value = queue.value.filter((entry) => entry.status !== "done" && entry.status !== "error");
+    queue.value = queue.value.filter(
+      (entry) => entry.status !== "done" && entry.status !== "error",
+    );
   }
 
   return { queue, active, completed, enqueue, retry, clearFinished };

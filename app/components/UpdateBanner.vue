@@ -18,7 +18,14 @@ const show = computed(() => ["available", "downloading", "ready", "error"].inclu
   <div v-if="available && show" class="w-full">
     <div v-if="collapsed" class="flex justify-center">
       <UTooltip :text="`Update ${version} available`">
-        <UButton icon="i-lucide-arrow-up-circle" size="sm" color="primary" variant="soft" square @click="install" />
+        <UButton
+          icon="i-lucide-arrow-up-circle"
+          size="sm"
+          color="primary"
+          variant="soft"
+          square
+          @click="install"
+        />
       </UTooltip>
     </div>
 

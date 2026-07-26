@@ -1,5 +1,6 @@
 <script setup lang="ts">
-const { info, library, host, error, isConnected, isBusy, available, connect, disconnect } = useCamera();
+const { info, library, host, error, isConnected, isBusy, available, connect, disconnect } =
+  useCamera();
 const { reset: resetWatermark } = useWatermarkSettings();
 
 useHead({ title: "Settings" });
@@ -48,20 +49,32 @@ useHead({ title: "Settings" });
             </template>
           </UFormField>
 
-          <UAlert v-if="error" icon="i-lucide-triangle-alert" color="error" variant="subtle" :title="error">
+          <UAlert
+            v-if="error"
+            icon="i-lucide-triangle-alert"
+            color="error"
+            variant="subtle"
+            :title="error"
+          >
             <template #description>
               <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs">
                 <li>Make sure your computer is joined to the camera's Wi-Fi network.</li>
-                <li>Confirm the address matches the camera's gateway (default <span class="font-mono">192.168.42.1</span>).</li>
                 <li>
-                  On macOS, allow <span class="font-medium">Luna Ultra Desktop</span> under System Settings &rsaquo;
-                  Privacy &amp; Security &rsaquo; Local Network.
+                  Confirm the address matches the camera's gateway (default
+                  <span class="font-mono">192.168.42.1</span>).
+                </li>
+                <li>
+                  On macOS, allow <span class="font-medium">Luna Ultra Desktop</span> under System
+                  Settings &rsaquo; Privacy &amp; Security &rsaquo; Local Network.
                 </li>
               </ul>
             </template>
           </UAlert>
 
-          <dl v-if="isConnected && info" class="grid grid-cols-2 gap-x-8 gap-y-4 border-t border-default pt-4 text-sm">
+          <dl
+            v-if="isConnected && info"
+            class="grid grid-cols-2 gap-x-8 gap-y-4 border-t border-default pt-4 text-sm"
+          >
             <div>
               <dt class="text-muted">Device</dt>
               <dd class="mt-0.5 text-default">{{ info.deviceName ?? "Luna Ultra" }}</dd>
@@ -107,13 +120,21 @@ useHead({ title: "Settings" });
         <section class="space-y-4">
           <div class="space-y-1">
             <h2 class="text-sm font-semibold text-highlighted">Watermark</h2>
-            <p class="text-sm text-muted">Applied to photos as they download. Videos transfer untouched.</p>
+            <p class="text-sm text-muted">
+              Applied to photos as they download. Videos transfer untouched.
+            </p>
           </div>
 
           <WatermarkSettingsForm />
 
           <div class="flex justify-end border-t border-default pt-4">
-            <UButton label="Reset to default" icon="i-lucide-rotate-ccw" color="neutral" variant="ghost" @click="resetWatermark" />
+            <UButton
+              label="Reset to default"
+              icon="i-lucide-rotate-ccw"
+              color="neutral"
+              variant="ghost"
+              @click="resetWatermark"
+            />
           </div>
         </section>
 

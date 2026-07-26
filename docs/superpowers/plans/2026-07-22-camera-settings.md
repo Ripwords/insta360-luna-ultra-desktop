@@ -28,20 +28,20 @@ Out (each its own follow-up): capture start/stop and shutter, gimbal control, su
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `app/utils/protobuf.ts` (create) | Pure protobuf wire format. No schema, no I/O. |
-| `tests/protobuf.test.ts` (create) | Round-trip and real-capture tests for the above. |
-| `app/assets/luna-protocol-schema.json` (create) | Trimmed schema: 41 messages, 71 enums, ~53 KB. |
-| `scripts/build-schema.mjs` (create) | Regenerates the trimmed asset from the full probe schema. |
-| `app/utils/lunaProto.ts` (create) | Schema-driven encode/decode by message name. |
-| `tests/lunaProto.test.ts` (create) | Decodes real bytes captured from the camera. |
-| `src-tauri/src/luna.rs` (modify) | `luna_command` passthrough with an allowlist. |
-| `src-tauri/src/lib.rs` (modify) | Register the command. |
-| `app/utils/lunaSettings.ts` (create) | Typed get/set for options and photography options. |
-| `app/composables/useCameraSettings.ts` (create) | Reactive settings state, load and save. |
-| `app/components/CameraSettings.client.vue` (create) | The settings UI. |
-| `app/pages/camera.vue` (create) | Hosts live view beside the settings panel. |
+| File                                                | Responsibility                                            |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| `app/utils/protobuf.ts` (create)                    | Pure protobuf wire format. No schema, no I/O.             |
+| `tests/protobuf.test.ts` (create)                   | Round-trip and real-capture tests for the above.          |
+| `app/assets/luna-protocol-schema.json` (create)     | Trimmed schema: 41 messages, 71 enums, ~53 KB.            |
+| `scripts/build-schema.mjs` (create)                 | Regenerates the trimmed asset from the full probe schema. |
+| `app/utils/lunaProto.ts` (create)                   | Schema-driven encode/decode by message name.              |
+| `tests/lunaProto.test.ts` (create)                  | Decodes real bytes captured from the camera.              |
+| `src-tauri/src/luna.rs` (modify)                    | `luna_command` passthrough with an allowlist.             |
+| `src-tauri/src/lib.rs` (modify)                     | Register the command.                                     |
+| `app/utils/lunaSettings.ts` (create)                | Typed get/set for options and photography options.        |
+| `app/composables/useCameraSettings.ts` (create)     | Reactive settings state, load and save.                   |
+| `app/components/CameraSettings.client.vue` (create) | The settings UI.                                          |
+| `app/pages/camera.vue` (create)                     | Hosts live view beside the settings panel.                |
 
 ---
 
@@ -50,10 +50,12 @@ Out (each its own follow-up): capture start/stop and shutter, gimbal control, su
 Pure functions, no schema, no I/O.
 
 **Files:**
+
 - Create: `app/utils/protobuf.ts`
 - Test: `tests/protobuf.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `interface RawField { field: number; wire: number; value: number | Uint8Array }`
@@ -291,12 +293,14 @@ git commit -m "feat: protobuf wire-format codec"
 ### Task 2: Schema asset and schema-driven message codec
 
 **Files:**
+
 - Create: `scripts/build-schema.mjs`
 - Create: `app/assets/luna-protocol-schema.json` (generated)
 - Create: `app/utils/lunaProto.ts`
 - Test: `tests/lunaProto.test.ts`
 
 **Interfaces:**
+
 - Consumes Task 1: `decodeRaw`, `encodeVarint`, `encodeTag`, `encodeLengthDelimited`, `concatBytes`, `zigzagEncode`, `zigzagDecode`, `RawField`.
 - Produces:
   - `type ProtoValue = string | number | boolean | ProtoObject | ProtoValue[]`
@@ -367,7 +371,12 @@ if (missing.length > 0) {
 
 const trimmed = {
   messages: Object.fromEntries([...messages].sort().map((n) => [n, full.messages[n]])),
-  enums: Object.fromEntries([...enums].sort().filter((n) => full.enums[n]).map((n) => [n, full.enums[n]])),
+  enums: Object.fromEntries(
+    [...enums]
+      .sort()
+      .filter((n) => full.enums[n])
+      .map((n) => [n, full.enums[n]]),
+  ),
 };
 
 const out = path.join("app", "assets", "luna-protocol-schema.json");
@@ -465,7 +474,7 @@ describe("encodeMessage", () => {
 
   it("round-trips a double, which zoom and focal length use", () => {
     const bytes = encodeMessage(MSG.PhotographyOptions, { focal_length_value: 17.4 });
-    expect((decodeMessage(MSG.PhotographyOptions, bytes).focal_length_value as number)).toBeCloseTo(
+    expect(decodeMessage(MSG.PhotographyOptions, bytes).focal_length_value as number).toBeCloseTo(
       17.4,
       6,
     );
@@ -634,7 +643,9 @@ function encodeField(number: number, spec: FieldSpec, value: ProtoValue): number
 
 export function encodeMessage(messageName: string, value: ProtoObject): Uint8Array {
   const fields = fieldsOf(messageName);
-  const byName = new Map(Object.entries(fields).map(([number, spec]) => [spec.name, { number, spec }]));
+  const byName = new Map(
+    Object.entries(fields).map(([number, spec]) => [spec.name, { number, spec }]),
+  );
   const parts: number[][] = [];
 
   for (const [key, raw] of Object.entries(value)) {
@@ -743,10 +754,12 @@ git commit -m "feat: schema-driven protobuf message codec"
 ### Task 3: Rust command passthrough
 
 **Files:**
+
 - Modify: `src-tauri/src/luna.rs`
 - Modify: `src-tauri/src/lib.rs`
 
 **Interfaces:**
+
 - Consumes Task 2's callers: nothing at compile time.
 - Produces: Tauri command `luna_command(code: u16, body: Vec<u8>) -> Vec<u8>`.
 
@@ -856,11 +869,13 @@ git commit -m "feat: allowlisted protobuf command passthrough"
 ### Task 4: Settings client and composable
 
 **Files:**
+
 - Create: `app/utils/lunaSettings.ts`
 - Create: `app/composables/useCameraSettings.ts`
 - Modify: `app/utils/lunaClient.ts`
 
 **Interfaces:**
+
 - Consumes Task 2: `MSG`, `encodeMessage`, `decodeMessage`, `enumNames`, `PHOTOGRAPHY_OPTION_TYPE`, `OPTION_TYPE`, `FUNCTION_MODE`, `ProtoObject`.
 - Consumes Task 3: `luna_command`.
 - Produces:
@@ -913,7 +928,7 @@ const CODE_GET_PHOTOGRAPHY_OPTIONS = 10;
  */
 const BATCH = 12;
 
-const chunk = <T,>(items: T[], size: number): T[][] =>
+const chunk = <T>(items: T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
     items.slice(i * size, i * size + size),
   );
@@ -928,7 +943,10 @@ async function readBatched(
   const merged: ProtoObject = {};
   const supported: string[] = [];
 
-  for (const batch of chunk(enumNames(optionTypeEnum).filter((n) => !n.endsWith("_NUM")), BATCH)) {
+  for (const batch of chunk(
+    enumNames(optionTypeEnum).filter((n) => !n.endsWith("_NUM")),
+    BATCH,
+  )) {
     let response: Uint8Array;
     try {
       response = await lunaClient.command(
@@ -1086,10 +1104,12 @@ git commit -m "feat: camera settings client and composable"
 ### Task 5: Settings UI
 
 **Files:**
+
 - Create: `app/components/CameraSettings.client.vue`
 - Create: `app/pages/camera.vue`
 
 **Interfaces:**
+
 - Consumes Task 4: `useCameraSettings()`.
 - Consumes Task 2: `enumNames`.
 
@@ -1124,12 +1144,21 @@ const sliders = [
   { label: "EV bias", field: "exposure_bias", option: "EXPOSURE_BIAS", min: -4, max: 4, step: 1 },
   { label: "Zoom", field: "zoom_scale", option: "ZOOM_SCALE", min: 1, max: 12, step: 1 },
   { label: "Sharpness", field: "sharpness", option: "SHARPNESS", min: 0, max: 4, step: 1 },
-  { label: "ISO ceiling", field: "video_iso_top_limit", option: "VIDEO_ISO_TOP_LIMIT", min: 0, max: 6400, step: 100 },
+  {
+    label: "ISO ceiling",
+    field: "video_iso_top_limit",
+    option: "VIDEO_ISO_TOP_LIMIT",
+    min: 0,
+    max: 6400,
+    step: 100,
+  },
 ];
 
 const options = (name: string) => enumNames(name).map((value) => ({ label: value, value }));
 
-const supported = computed(() => new Set((settings.value.$supported as string[] | undefined) ?? []));
+const supported = computed(
+  () => new Set((settings.value.$supported as string[] | undefined) ?? []),
+);
 const isSupported = (option: string) => supported.value.size === 0 || supported.value.has(option);
 
 const battery = computed(() => {
@@ -1290,20 +1319,20 @@ not a bug, and tells us which option types need a different write shape.
 
 **Spec coverage** — against `2026-07-22-camera-settings-probe-findings.md`:
 
-| Confirmed capability | Task |
-| --- | --- |
-| Exposure mode/prog/manual, EV, ISO ceiling | 4, 5 |
-| Metering | 4 (readable); UI in a follow-up |
-| White balance + Kelvin value | 4, 5 |
-| Gamma, colour mode, brightness/contrast/saturation/hue/sharpness | 4, 5 |
-| Zoom (`ZOOM_SCALE`), focal length, FOV | 4, 5 |
-| Resolution, bitrate, formats | 4 (readable); UI in a follow-up |
-| Capture params (self-timer, burst, AEB) | 4 (readable); UI in a follow-up |
-| Stabilisation | 4 (readable); UI in a follow-up |
-| Battery, storage, firmware | 5 |
-| proto3 default-omission caveat | Task 2 `isDefault`, Task 4 `$supported` |
-| Batching so one bad option cannot spoil a reply | Task 4 `readBatched` |
-| Unknown fields preserved | Task 2 `$unknown` |
+| Confirmed capability                                             | Task                                    |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| Exposure mode/prog/manual, EV, ISO ceiling                       | 4, 5                                    |
+| Metering                                                         | 4 (readable); UI in a follow-up         |
+| White balance + Kelvin value                                     | 4, 5                                    |
+| Gamma, colour mode, brightness/contrast/saturation/hue/sharpness | 4, 5                                    |
+| Zoom (`ZOOM_SCALE`), focal length, FOV                           | 4, 5                                    |
+| Resolution, bitrate, formats                                     | 4 (readable); UI in a follow-up         |
+| Capture params (self-timer, burst, AEB)                          | 4 (readable); UI in a follow-up         |
+| Stabilisation                                                    | 4 (readable); UI in a follow-up         |
+| Battery, storage, firmware                                       | 5                                       |
+| proto3 default-omission caveat                                   | Task 2 `isDefault`, Task 4 `$supported` |
+| Batching so one bad option cannot spoil a reply                  | Task 4 `readBatched`                    |
+| Unknown fields preserved                                         | Task 2 `$unknown`                       |
 
 The raw dump in Task 5 keeps every read field visible even where no control exists yet, so nothing confirmed by the probe is hidden.
 

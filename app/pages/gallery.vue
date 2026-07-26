@@ -69,8 +69,12 @@ const previewId = ref<string | null>(null);
 // the camera's single connection loads the opened photo/video first.
 watch(previewOpen, (open) => setCameraQueuePaused(open));
 onBeforeUnmount(() => setCameraQueuePaused(false));
-const previewItem = computed(() => (previewId.value ? (allById.value.get(previewId.value) ?? null) : null));
-const previewIndex = computed(() => (previewId.value ? orderedIds.value.indexOf(previewId.value) : -1));
+const previewItem = computed(() =>
+  previewId.value ? (allById.value.get(previewId.value) ?? null) : null,
+);
+const previewIndex = computed(() =>
+  previewId.value ? orderedIds.value.indexOf(previewId.value) : -1,
+);
 
 /**
  * Record a photo's real pixel size once it decodes, and promote it to an
@@ -175,13 +179,7 @@ defineShortcuts({
 
       <UDashboardToolbar v-if="isConnected">
         <template #left>
-          <UTabs
-            v-model="filter"
-            :items="filterTabs"
-            :content="false"
-            size="xs"
-            color="neutral"
-          />
+          <UTabs v-model="filter" :items="filterTabs" :content="false" size="xs" color="neutral" />
           <USelect
             v-if="hasSdCard"
             v-model="storage"
@@ -210,13 +208,18 @@ defineShortcuts({
     </template>
 
     <template #body>
-      <div v-if="!isConnected" class="flex h-full flex-col items-center justify-center gap-4 text-center">
+      <div
+        v-if="!isConnected"
+        class="flex h-full flex-col items-center justify-center gap-4 text-center"
+      >
         <span class="flex size-14 items-center justify-center rounded-2xl bg-muted">
           <UIcon name="i-lucide-camera-off" class="size-7 text-dimmed" />
         </span>
         <div class="space-y-1">
           <p class="font-medium text-highlighted">No camera connected</p>
-          <p class="max-w-xs text-sm text-muted">Pair your Luna Ultra over Wi-Fi to browse its media library.</p>
+          <p class="max-w-xs text-sm text-muted">
+            Pair your Luna Ultra over Wi-Fi to browse its media library.
+          </p>
         </div>
         <UButton label="Go to Connect" icon="i-lucide-cable" to="/" />
       </div>
@@ -234,12 +237,19 @@ defineShortcuts({
             class="grid gap-2"
             :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${tileMin}px, 1fr))` }"
           >
-            <div v-for="tile in 12" :key="tile" class="aspect-square animate-pulse rounded-lg bg-elevated" />
+            <div
+              v-for="tile in 12"
+              :key="tile"
+              class="aspect-square animate-pulse rounded-lg bg-elevated"
+            />
           </div>
         </section>
       </div>
 
-      <div v-else-if="groups.length === 0" class="flex h-full flex-col items-center justify-center gap-4 text-center">
+      <div
+        v-else-if="groups.length === 0"
+        class="flex h-full flex-col items-center justify-center gap-4 text-center"
+      >
         <span class="flex size-14 items-center justify-center rounded-2xl bg-muted">
           <UIcon name="i-lucide-image-off" class="size-7 text-dimmed" />
         </span>
@@ -249,7 +259,13 @@ defineShortcuts({
             No {{ filter === "all" ? "media" : `${filter}s` }} on the camera right now.
           </p>
         </div>
-        <UButton v-if="filter !== 'all'" label="Show everything" color="neutral" variant="outline" @click="filter = 'all'" />
+        <UButton
+          v-if="filter !== 'all'"
+          label="Show everything"
+          color="neutral"
+          variant="outline"
+          @click="filter = 'all'"
+        />
       </div>
 
       <div v-else class="space-y-8 pb-24">
@@ -273,7 +289,7 @@ defineShortcuts({
             <MediaTile
               v-for="item in group.items"
               :key="item.id"
-              :item="item"
+              :item
               :selected="selected.has(item.id)"
               :selection-active="selectionActive"
               @open="openPreview(item)"
@@ -286,7 +302,7 @@ defineShortcuts({
 
       <SelectionBar
         :count="selected.size"
-        :deleting="deleting"
+        :deleting
         @download="onDownloadSelection"
         @delete="onDeleteSelection"
         @clear="clearSelection"

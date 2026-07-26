@@ -14,15 +14,16 @@ import { cachedMedia } from "~/utils/mediaCache";
  * transfer. This component still owns its own object URL, created per mount and
  * revoked on unmount; the cache owns only the blob.
  */
-const props = withDefaults(
-  defineProps<{
-    src: string;
-    alt: string;
-    imgClass?: string;
-    eager?: boolean;
-  }>(),
-  { imgClass: "", eager: false },
-);
+const {
+  src,
+  imgClass = "",
+  eager = false,
+} = defineProps<{
+  src: string;
+  alt: string;
+  imgClass?: string;
+  eager?: boolean;
+}>();
 
 const emit = defineEmits<{
   /** Fired once the browser has decoded the image; carries its real pixel size. */
@@ -36,7 +37,7 @@ function onImgLoad(event: Event) {
   }
 }
 
-const el = ref<HTMLElement | null>(null);
+const el = useTemplateRef("el");
 const objectUrl = ref<string | null>(null);
 const state = ref<"idle" | "loading" | "loaded" | "error">("idle");
 
@@ -47,18 +48,18 @@ async function load() {
   state.value = "loading";
   // Full-screen views (eager) outrank grid thumbnails; a thumbnail's priority
   // tracks its live distance to the viewport so loading follows the scroll.
-  const priority = props.eager ? CAMERA_PRIORITY.PREVIEW : () => viewportPriority(el.value);
+  const priority = eager ? CAMERA_PRIORITY.PREVIEW : () => viewportPriority(el.value);
   try {
     // The camera slot is taken inside the loader so a cache hit never queues
     // behind live camera traffic.
-    const blob = await cachedMedia(`img:${props.src}`, () =>
+    const blob = await cachedMedia(`img:${src}`, () =>
       withCameraSlot(async () => {
-        const response = await cameraFetch(props.src);
+        const response = await cameraFetch(src);
         if (!response.ok) throw new Error(String(response.status));
         const raw = await response.blob();
         // The camera may serve images as octet-stream; force the right MIME so
         // the browser renders the blob (fixes .insp and mistyped JPEGs).
-        const mime = imageMimeFor(props.src);
+        const mime = imageMimeFor(src);
         return mime && raw.type !== mime ? new Blob([raw], { type: mime }) : raw;
       }, priority),
     );
@@ -70,10 +71,8 @@ async function load() {
   }
 }
 
-onMounted(async () => {
-  // .client components mount a tick late; wait for the template ref to bind
-  await nextTick();
-  if (props.eager || !("IntersectionObserver" in window) || !el.value) {
+onMounted(() => {
+  if (eager || !("IntersectionObserver" in window) || !el.value) {
     void load();
     return;
   }
@@ -102,7 +101,7 @@ onBeforeUnmount(() => {
     <img
       v-if="state === 'loaded' && objectUrl"
       :src="objectUrl"
-      :alt="alt"
+      :alt
       draggable="false"
       :class="imgClass"
       @load="onImgLoad"
@@ -112,16 +111,8 @@ onBeforeUnmount(() => {
       class="flex size-full items-center justify-center bg-elevated"
       :aria-busy="state === 'loading'"
     >
-      <UIcon
-        v-if="state === 'error'"
-        name="i-lucide-image-off"
-        class="size-5 text-dimmed"
-      />
-      <UIcon
-        v-else
-        name="i-lucide-loader-circle"
-        class="size-5 animate-spin text-dimmed"
-      />
+      <UIcon v-if="state === 'error'" name="i-lucide-image-off" class="size-5 text-dimmed" />
+      <UIcon v-else name="i-lucide-loader-circle" class="size-5 animate-spin text-dimmed" />
     </div>
   </div>
 </template>

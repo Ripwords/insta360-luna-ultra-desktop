@@ -9,26 +9,28 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 /** Official Insta360 Luna Ultra scan dropped into public/ */
 const STL_URL = "/Insta360+LunaUltra.stl";
 
-const props = withDefaults(
-  defineProps<{
-    /** Model colorway; "auto" follows the app color mode */
-    colorway?: "black" | "white" | "auto";
-    autoRotate?: boolean;
-    interactive?: boolean;
-    /** Increment to play a one-shot spin celebration (e.g. on camera connect) */
-    celebrate?: number;
-  }>(),
-  { colorway: "auto", autoRotate: true, interactive: true, celebrate: 0 },
-);
+const {
+  colorway = "auto",
+  autoRotate = true,
+  interactive = true,
+  celebrate = 0,
+} = defineProps<{
+  /** Model colorway; "auto" follows the app color mode */
+  colorway?: "black" | "white" | "auto";
+  autoRotate?: boolean;
+  interactive?: boolean;
+  /** Increment to play a one-shot spin celebration (e.g. on camera connect) */
+  celebrate?: number;
+}>();
 
 const emit = defineEmits<{ ready: [source: "gltf" | "stl" | "fallback"] }>();
 
-const container = ref<HTMLDivElement | null>(null);
+const container = useTemplateRef<HTMLDivElement>("container");
 const loading = ref(true);
 const colorMode = useColorMode();
 
 const resolvedColorway = computed<"black" | "white">(() => {
-  if (props.colorway !== "auto") return props.colorway;
+  if (colorway !== "auto") return colorway;
   return colorMode.value === "dark" ? "black" : "white";
 });
 
@@ -91,8 +93,6 @@ function applyColorway() {
 }
 
 onMounted(async () => {
-  // .client components render after mount; wait a tick for the template ref
-  await nextTick();
   const el = container.value;
   if (!el) return;
 
@@ -152,11 +152,11 @@ onMounted(async () => {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.enablePan = false;
-  controls.enabled = props.interactive;
+  controls.enabled = interactive;
   controls.minDistance = 2;
   controls.maxDistance = 6;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  controls.autoRotate = props.autoRotate && !reducedMotion;
+  controls.autoRotate = autoRotate && !reducedMotion;
   controls.autoRotateSpeed = 1.6;
 
   const host: HTMLDivElement = el;
@@ -181,7 +181,7 @@ onMounted(async () => {
       const t = (performance.now() - spinStart) / 1800;
       if (t >= 1) {
         spinStart = null;
-        controls.autoRotate = props.autoRotate && !reducedMotion;
+        controls.autoRotate = autoRotate && !reducedMotion;
         controls.autoRotateSpeed = baseAutoRotateSpeed;
       } else {
         controls.autoRotate = true;
@@ -208,7 +208,7 @@ onMounted(async () => {
 watch(resolvedColorway, applyColorway);
 
 watch(
-  () => props.celebrate,
+  () => celebrate,
   (next, prev) => {
     if (next > (prev ?? 0) && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       spinStart = performance.now();

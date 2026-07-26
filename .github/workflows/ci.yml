@@ -15,11 +15,16 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
+      # Each check runs independently so one failure doesn't mask the others
+      # (a failing step would otherwise abort every step after it).
       - name: Unit tests
+        if: ${{ !cancelled() }}
         run: bun x vitest run
       - name: Typecheck
+        if: ${{ !cancelled() }}
         run: bun run typecheck
       - name: Lint
+        if: ${{ !cancelled() }}
         run: bun run lint
 
   rust:

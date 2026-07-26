@@ -129,7 +129,8 @@ export function useCamera() {
     if (isConnected.value || isBusy.value) return;
     error.value = null;
     if (!lunaClient.available) {
-      error.value = "Camera control requires the desktop app. Run the packaged Luna Ultra app to connect.";
+      error.value =
+        "Camera control requires the desktop app. Run the packaged Luna Ultra app to connect.";
       return;
     }
     status.value = "connecting";

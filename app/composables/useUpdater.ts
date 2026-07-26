@@ -1,6 +1,13 @@
 import { isTauri } from "~/utils/saveFile";
 
-export type UpdaterPhase = "idle" | "checking" | "available" | "downloading" | "ready" | "error" | "uptodate";
+export type UpdaterPhase =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "ready"
+  | "error"
+  | "uptodate";
 
 /**
  * Wraps the Tauri updater plugin. In a browser (no desktop runtime) every
@@ -16,7 +23,8 @@ export function useUpdater() {
   const available = computed(() => isTauri());
 
   // Hold the pending update between check() and install()
-  let pending: Awaited<ReturnType<typeof import("@tauri-apps/plugin-updater")["check"]>> | null = null;
+  let pending: Awaited<ReturnType<(typeof import("@tauri-apps/plugin-updater"))["check"]>> | null =
+    null;
 
   function messageOf(e: unknown, fallback: string): string {
     // Tauri commands reject with a plain string, not an Error instance.

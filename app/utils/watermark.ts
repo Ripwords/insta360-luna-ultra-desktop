@@ -1,6 +1,11 @@
 import { LUNA_WATERMARK_LAYOUT } from "~/utils/watermarkLayout";
 
-export type WatermarkPosition = "top-left" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right";
+export type WatermarkPosition =
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
 export interface WatermarkSettings {
   enabled: boolean;
@@ -53,7 +58,11 @@ export function nearestAspect(width: number, height: number): string {
  * the watermark's bottom edge and the image's bottom edge as a fraction of
  * image height.
  */
-export function watermarkRect(width: number, height: number, position: WatermarkPosition): WatermarkRect {
+export function watermarkRect(
+  width: number,
+  height: number,
+  position: WatermarkPosition,
+): WatermarkRect {
   const aspect = nearestAspect(width, height);
   const [widthRatio, xRatio, yRatio] = LUNA_WATERMARK_LAYOUT[aspect]![position];
   const rectWidth = widthRatio * width;

@@ -20,12 +20,16 @@ export function rangeSelect(
   const targetIndex = orderedIds.indexOf(targetId);
   if (anchorIndex === -1 || targetIndex === -1) return toggleId(selected, targetId);
   const next = new Set(selected);
-  const [from, to] = anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex];
+  const [from, to] =
+    anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex];
   for (let i = from; i <= to; i++) next.add(orderedIds[i]!);
   return next;
 }
 
-export function toggleGroup(selected: ReadonlySet<string>, groupIds: readonly string[]): Set<string> {
+export function toggleGroup(
+  selected: ReadonlySet<string>,
+  groupIds: readonly string[],
+): Set<string> {
   const next = new Set(selected);
   const allSelected = groupIds.every((id) => next.has(id));
   for (const id of groupIds) {

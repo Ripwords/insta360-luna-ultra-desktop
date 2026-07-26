@@ -14,8 +14,18 @@ const INDEX_RE =
   /<a href="(?<href>[^"]+)">(?<name>[^<]+)<\/a>\s+(?<date>\d{2}-[A-Za-z]{3}-\d{4})\s+(?<time>\d{2}:\d{2})\s+(?<size>\S+)/gi;
 
 const MONTHS: Record<string, number> = {
-  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+  Jan: 0,
+  Feb: 1,
+  Mar: 2,
+  Apr: 3,
+  May: 4,
+  Jun: 5,
+  Jul: 6,
+  Aug: 7,
+  Sep: 8,
+  Oct: 9,
+  Nov: 10,
+  Dec: 11,
 };
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "dng", "insp", "webp"]);
@@ -46,10 +56,19 @@ export function parseIndexSize(text: string): number | null {
 
 /** Capture timestamp encoded in names like IMG_20260718_142012_00_002.jpg */
 export function parseNameTimestamp(name: string): Date | null {
-  const match = name.match(/(?:VID|LRV|IMG|LIV|PIC|PANO)_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/i);
+  const match = name.match(
+    /(?:VID|LRV|IMG|LIV|PIC|PANO)_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/i,
+  );
   if (!match) return null;
   const [, year, month, day, hour, minute, second] = match;
-  return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  return new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
 }
 
 function parseIndexTimestamp(dateText: string, timeText: string): Date | null {
@@ -58,7 +77,14 @@ function parseIndexTimestamp(dateText: string, timeText: string): Date | null {
   if (!dateMatch || !timeMatch) return null;
   const month = MONTHS[dateMatch[2]!];
   if (month === undefined) return null;
-  return new Date(Number(dateMatch[3]), month, Number(dateMatch[1]), Number(timeMatch[1]), Number(timeMatch[2]), 0);
+  return new Date(
+    Number(dateMatch[3]),
+    month,
+    Number(dateMatch[1]),
+    Number(timeMatch[1]),
+    Number(timeMatch[2]),
+    0,
+  );
 }
 
 /** CameraNN subdirectories linked from a storage root index page */
@@ -101,7 +127,10 @@ export interface RawEntry {
  * DNG+JPG siblings, flag 360 panos, drop the standalone proxies, and dedupe.
  * Shared by the HTTP-index parser and the GET_FILE_LIST path.
  */
-export function buildMediaItems(entries: RawEntry[], storage: MediaStorage = "internal"): MediaItem[] {
+export function buildMediaItems(
+  entries: RawEntry[],
+  storage: MediaStorage = "internal",
+): MediaItem[] {
   const lrvByKey = new Map<string, RawEntry>();
   for (const entry of entries) {
     if (entry.extension !== "lrv") continue;
@@ -127,7 +156,9 @@ export function buildMediaItems(entries: RawEntry[], storage: MediaStorage = "in
     const key = proxyKey(entry.name);
     const lrv = key ? lrvByKey.get(key) : undefined;
     const siblingJpg =
-      entry.extension === "dng" ? jpgByBase.get(entry.name.slice(0, entry.name.lastIndexOf("."))) : undefined;
+      entry.extension === "dng"
+        ? jpgByBase.get(entry.name.slice(0, entry.name.lastIndexOf(".")))
+        : undefined;
     // PANO_ shots and Insta360 .insp files are equirectangular 360 photos
     const panoramic = !isVideo && (/^PANO_/i.test(entry.name) || entry.extension === "insp");
     items.push({
@@ -161,7 +192,8 @@ export function entriesFromPaths(paths: string[], urlFor: (path: string) => stri
     const name = path.slice(path.lastIndexOf("/") + 1);
     if (name.toLowerCase().endsWith(".live.mp4")) continue;
     const extension = extensionOf(name);
-    if (!IMAGE_EXTENSIONS.has(extension) && !VIDEO_EXTENSIONS.has(extension) && extension !== "lrv") continue;
+    if (!IMAGE_EXTENSIONS.has(extension) && !VIDEO_EXTENSIONS.has(extension) && extension !== "lrv")
+      continue;
     entries.push({
       name,
       url: urlFor(path),
@@ -174,7 +206,11 @@ export function entriesFromPaths(paths: string[], urlFor: (path: string) => stri
   return entries;
 }
 
-export function parseLunaIndex(html: string, baseUrl: string, storage: MediaStorage = "internal"): MediaItem[] {
+export function parseLunaIndex(
+  html: string,
+  baseUrl: string,
+  storage: MediaStorage = "internal",
+): MediaItem[] {
   const entries: RawEntry[] = [];
   for (const match of html.matchAll(INDEX_RE)) {
     const groups = match.groups;
@@ -184,7 +220,8 @@ export function parseLunaIndex(html: string, baseUrl: string, storage: MediaStor
     if (href === "../" || name === "../" || href.endsWith("/")) continue;
     if (name.toLowerCase().endsWith(".live.mp4")) continue;
     const extension = extensionOf(name);
-    if (!IMAGE_EXTENSIONS.has(extension) && !VIDEO_EXTENSIONS.has(extension) && extension !== "lrv") continue;
+    if (!IMAGE_EXTENSIONS.has(extension) && !VIDEO_EXTENSIONS.has(extension) && extension !== "lrv")
+      continue;
     const url = new URL(href, baseUrl);
     const timestamp = parseNameTimestamp(name) ?? parseIndexTimestamp(groups.date!, groups.time!);
     entries.push({

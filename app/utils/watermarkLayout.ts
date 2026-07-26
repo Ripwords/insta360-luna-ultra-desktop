@@ -7,7 +7,10 @@ import type { WatermarkPosition } from "~/utils/watermark";
  * image width, and the gap below the watermark as a fraction of image height
  * (measured from the bottom edge).
  */
-export const LUNA_WATERMARK_LAYOUT: Record<string, Record<WatermarkPosition, [number, number, number]>> = {
+export const LUNA_WATERMARK_LAYOUT: Record<
+  string,
+  Record<WatermarkPosition, [number, number, number]>
+> = {
   "16:9": {
     "bottom-left": [0.191, 0.033, 0.059],
     "bottom-right": [0.191, 0.776, 0.059],

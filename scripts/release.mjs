@@ -17,7 +17,8 @@ const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 const args = process.argv.slice(2);
 const explicit = args.find((a) => /^\d+\.\d+\.\d+([-+.].+)?$/.test(a));
 
-const setVersion = (file, re, replacement) => writeFileSync(file, readFileSync(file, "utf8").replace(re, replacement));
+const setVersion = (file, re, replacement) =>
+  writeFileSync(file, readFileSync(file, "utf8").replace(re, replacement));
 
 if (explicit) {
   // Deterministic path: WE choose the version, changelogen only writes notes.

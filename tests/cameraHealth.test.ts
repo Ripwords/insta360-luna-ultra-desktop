@@ -122,9 +122,12 @@ describe("cameraHealth", () => {
   it("does not start a second probe while one is in flight", async () => {
     const onDead = vi.fn();
     let release: (alive: boolean) => void = () => {};
-    const probe = vi.fn(() => new Promise<boolean>((resolve) => {
-      release = resolve;
-    }));
+    const probe = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          release = resolve;
+        }),
+    );
     armCameraHealth(onDead, probe);
     for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
     expect(probe).toHaveBeenCalledTimes(1);
@@ -142,9 +145,12 @@ describe("cameraHealth", () => {
   it("does not fire when disarmed while the probe is in flight", async () => {
     const onDead = vi.fn();
     let release: (alive: boolean) => void = () => {};
-    const probe = vi.fn(() => new Promise<boolean>((resolve) => {
-      release = resolve;
-    }));
+    const probe = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          release = resolve;
+        }),
+    );
     armCameraHealth(onDead, probe);
     for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
     disarmCameraHealth();

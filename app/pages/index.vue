@@ -50,7 +50,8 @@ watch(isConnected, (connected) => {
                 Pair your Luna Ultra
               </h1>
               <p class="max-w-md text-muted">
-                Join the camera's Wi-Fi network, then connect to browse, download and manage everything you shot.
+                Join the camera's Wi-Fi network, then connect to browse, download and manage
+                everything you shot.
               </p>
             </div>
 
@@ -73,7 +74,13 @@ watch(isConnected, (connected) => {
               :title="error"
             >
               <template #actions>
-                <UButton label="Open settings" size="xs" color="neutral" variant="outline" to="/settings" />
+                <UButton
+                  label="Open settings"
+                  size="xs"
+                  color="neutral"
+                  variant="outline"
+                  to="/settings"
+                />
               </template>
             </UAlert>
 
@@ -86,13 +93,19 @@ watch(isConnected, (connected) => {
                 :disabled="!available"
                 @click="connect"
               />
-              <UButton size="xl" label="View downloads" color="neutral" variant="ghost" to="/downloads" />
+              <UButton
+                size="xl"
+                label="View downloads"
+                color="neutral"
+                variant="ghost"
+                to="/downloads"
+              />
             </div>
           </template>
         </div>
 
         <div class="order-1 h-72 min-h-0 lg:order-2 lg:h-full">
-          <LunaModel class="size-full" :celebrate="celebrate" />
+          <LunaModel class="size-full" :celebrate />
         </div>
       </div>
     </template>

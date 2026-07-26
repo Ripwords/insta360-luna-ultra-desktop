@@ -125,7 +125,9 @@ export function useCameraSettings() {
         // successful write looks like — call it applied. Only a non-default
         // request that comes back empty is genuinely ambiguous.
         setStatus(field, {
-          outcome: isDefaultValue(MSG.PhotographyOptions, field, patch[field]!) ? "applied" : "assumed",
+          outcome: isDefaultValue(MSG.PhotographyOptions, field, patch[field]!)
+            ? "applied"
+            : "assumed",
         });
         return;
       }
@@ -324,13 +326,14 @@ export function useCameraSettings() {
 
     const isoAuto = !iso;
     const shutterAuto = !shutterSecs;
-    const program = isoAuto && shutterAuto
-      ? "AUTO"
-      : isoAuto
-        ? "SHUTTER_PRIORITY"
-        : shutterAuto
-          ? "ISO_PRIORITY"
-          : "MANUAL";
+    const program =
+      isoAuto && shutterAuto
+        ? "AUTO"
+        : isoAuto
+          ? "SHUTTER_PRIORITY"
+          : shutterAuto
+            ? "ISO_PRIORITY"
+            : "MANUAL";
 
     const exposureMode = program === "MANUAL" ? "EXP_MODE_MANUAL" : "EXP_MODE_AUTO";
     if (settings.value.exposure_mode !== exposureMode) {

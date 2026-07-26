@@ -17,9 +17,7 @@ const { modes, modeId, isPhoto, recording, elapsedLabel, busy, error, selectMode
         type="button"
         class="shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors"
         :class="
-          mode.id === modeId
-            ? 'font-semibold text-primary'
-            : 'text-muted hover:text-highlighted'
+          mode.id === modeId ? 'font-semibold text-primary' : 'text-muted hover:text-highlighted'
         "
         :disabled="busy"
         @click="selectMode(mode.id)"
@@ -29,7 +27,10 @@ const { modes, modeId, isPhoto, recording, elapsedLabel, busy, error, selectMode
     </div>
 
     <div class="flex items-center justify-center gap-6">
-      <span class="w-16 text-right font-mono text-sm" :class="recording ? 'text-error' : 'text-dimmed'">
+      <span
+        class="w-16 text-right font-mono text-sm"
+        :class="recording ? 'text-error' : 'text-dimmed'"
+      >
         {{ recording ? elapsedLabel : "" }}
       </span>
 

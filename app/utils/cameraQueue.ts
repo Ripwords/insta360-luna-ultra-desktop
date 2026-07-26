@@ -84,7 +84,10 @@ function drain(): void {
  * Run `fn` while holding one of the limited camera slots. `fn` must perform the
  * entire transfer (fetch + body read) so the slot covers the whole download.
  */
-export function withCameraSlot<T>(fn: () => Promise<T>, priority: CameraPriority = CAMERA_PRIORITY.THUMBNAIL): Promise<T> {
+export function withCameraSlot<T>(
+  fn: () => Promise<T>,
+  priority: CameraPriority = CAMERA_PRIORITY.THUMBNAIL,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     queue.push({
       priority,

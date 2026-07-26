@@ -28,7 +28,13 @@ const emit = defineEmits<{
       <USeparator orientation="vertical" class="h-6" />
 
       <div class="flex items-center gap-1.5">
-        <UButton icon="i-lucide-arrow-down-to-line" label="Download" size="sm" :disabled="deleting" @click="emit('download')" />
+        <UButton
+          icon="i-lucide-arrow-down-to-line"
+          label="Download"
+          size="sm"
+          :disabled="deleting"
+          @click="emit('download')"
+        />
         <UButton
           icon="i-lucide-trash-2"
           label="Delete"

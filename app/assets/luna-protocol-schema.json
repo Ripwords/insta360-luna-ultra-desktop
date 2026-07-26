@@ -1,1 +1,2290 @@
-{"messages":{"insta360.messages.BatteryStatus":{"1":{"name":"power_type","ref":"insta360.messages.BatteryStatus.PowerType","repeated":false,"type":"enum"},"2":{"name":"battery_level","repeated":false,"type":"uint32"},"3":{"name":"battery_scale","repeated":false,"type":"uint32"},"4":{"name":"battery_type","ref":"insta360.messages.BatteryStatus.BatteryType","repeated":false,"type":"enum"}},"insta360.messages.ButtonFollowOptions":{"1":{"name":"click","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"},"2":{"name":"double_click","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"},"3":{"name":"triple_click","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"},"4":{"name":"long_press","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"},"5":{"name":"shutdown_click","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"},"6":{"name":"shutdown_double_click","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"},"7":{"name":"shutdown_triple_click","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"},"8":{"name":"shutdown_long_press","ref":"insta360.messages.ButtonFollowMode","repeated":false,"type":"enum"}},"insta360.messages.ButtonPressOptions":{"1":{"name":"click","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"2":{"name":"double_click","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"3":{"name":"triple_click","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"4":{"name":"long_press","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"5":{"name":"short_press","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"6":{"name":"shutdown_click","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"7":{"name":"shutdown_double_click","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"8":{"name":"shutdown_triple_click","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"9":{"name":"shutdown_long_press","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"},"10":{"name":"shutdown_short_press","ref":"insta360.messages.ButtonPressMode","repeated":false,"type":"enum"}},"insta360.messages.CameraCaptureStatus":{"1":{"name":"state","ref":"insta360.messages.CameraCaptureState","repeated":false,"type":"enum"},"2":{"name":"capture_time","repeated":false,"type":"uint32"},"3":{"name":"capture_nums","repeated":false,"type":"uint32"},"4":{"name":"keyTimePointDetail","repeated":false,"type":"string"}},"insta360.messages.ChargeboxConnectedStatus":{"1":{"name":"chargebox_connected_state","ref":"insta360.messages.ChargeboxConnectedStatus.ChargeboxConnectedType","repeated":false,"type":"enum"},"2":{"name":"chargingbox_battery_status","ref":"insta360.messages.BatteryStatus","repeated":false,"type":"message"},"3":{"name":"chargebox_onoff_status","ref":"insta360.messages.ChargeboxConnectedStatus.ChargeboxOnOffInfo","repeated":false,"type":"enum"},"4":{"name":"chargebox_usb_connected_state","ref":"insta360.messages.ChargeboxConnectedStatus.ChargeboxUsbBtConnectedType","repeated":false,"type":"enum"},"5":{"name":"chargebox_bt_connected_state","ref":"insta360.messages.ChargeboxConnectedStatus.ChargeboxUsbBtConnectedType","repeated":false,"type":"enum"}},"insta360.messages.DeepTrack":{"1":{"name":"unknown_1","type":"uint32","repeated":false},"2":{"name":"unknown_2","type":"uint32","repeated":false},"3":{"name":"unknown_3","type":"uint32","repeated":false},"4":{"name":"state","type":"uint32","repeated":false}},"insta360.messages.ExposureOptions":{"1":{"name":"program","ref":"insta360.messages.ExposureOptions.Program","repeated":false,"type":"enum"},"2":{"name":"iso","repeated":false,"type":"uint32"},"3":{"name":"shutter_speed","repeated":false,"type":"double"}},"insta360.messages.ExtraMetadata":{"1":{"name":"serial_number","repeated":false,"type":"string"},"2":{"name":"camera_type","repeated":false,"type":"string"},"3":{"name":"fw_version","repeated":false,"type":"string"},"4":{"name":"file_type","repeated":false,"type":"string"},"5":{"name":"offset","repeated":false,"type":"string"},"6":{"name":"ip","repeated":false,"type":"string"},"7":{"name":"creation_time","repeated":false,"type":"uint64"},"8":{"name":"export_time","repeated":false,"type":"uint64"},"9":{"name":"file_size","repeated":false,"type":"uint64"},"10":{"name":"total_time","repeated":false,"type":"uint32"},"11":{"name":"gps","repeated":false,"type":"bytes"},"12":{"name":"orientation","repeated":false,"type":"bytes"},"13":{"name":"user_options","ref":"insta360.messages.ExtraMetadata.ExtraUserOptions","repeated":false,"type":"message"},"14":{"name":"gyro","repeated":false,"type":"bytes"},"15":{"name":"hdr_state","ref":"insta360.messages.ExtraMetadata.HDR_STATE","repeated":false,"type":"enum"},"16":{"name":"hdr_identifier","repeated":false,"type":"string"},"17":{"name":"original_offset","repeated":false,"type":"string"},"18":{"name":"trigger_source","ref":"insta360.messages.ExtraMetadata.TriggerSource","repeated":false,"type":"enum"},"19":{"name":"dimension","ref":"insta360.messages.ExtraMetadata.Vector2","repeated":false,"type":"message"},"20":{"name":"frame_rate","repeated":false,"type":"int32"},"21":{"name":"image_translate","ref":"insta360.messages.ExtraMetadata.Vector2","repeated":false,"type":"message"},"22":{"name":"gamma_mode","repeated":false,"type":"string"},"23":{"name":"thumbnail_gyro_index","ref":"insta360.messages.ExtraMetadata.GyroIndex","repeated":false,"type":"message"},"24":{"name":"first_frame_timestamp","repeated":false,"type":"int64"},"25":{"name":"rolling_shutter_time","repeated":false,"type":"double"},"26":{"name":"file_group_info","ref":"insta360.messages.ExtraMetadata.FileGroupInfo","repeated":false,"type":"message"},"27":{"name":"window_crop_info","ref":"insta360.messages.WindowCropInfo","repeated":false,"type":"message"},"28":{"name":"gyro_timestamp","repeated":false,"type":"double"},"29":{"name":"is_has_gyro_timestamp","repeated":false,"type":"bool"},"30":{"name":"timelapse_interval","repeated":false,"type":"uint32"},"31":{"name":"gyro_calib","repeated":false,"type":"bytes"},"32":{"name":"evo_status_mode","ref":"insta360.messages.ExtraMetadata.EvoStatusMode","repeated":false,"type":"enum"},"33":{"name":"evo_status_id","repeated":false,"type":"string"},"34":{"name":"original_offset_3d","repeated":false,"type":"string"},"35":{"name":"gps_sources","ref":"insta360.messages.ExtraMetadata.GpsSource","repeated":true,"type":"enum"},"36":{"name":"first_gps_timestamp","repeated":false,"type":"int64"},"37":{"name":"orientation_calib","repeated":false,"type":"bytes"},"38":{"name":"is_collected","repeated":false,"type":"bool"},"39":{"name":"recycle_time","repeated":false,"type":"uint64"},"40":{"name":"total_frames","repeated":false,"type":"uint32"},"41":{"name":"is_selfie","repeated":false,"type":"bool"},"42":{"name":"is_flowstate_online","repeated":false,"type":"bool"},"43":{"name":"is_dewarp","repeated":false,"type":"bool"},"44":{"name":"resolution_size","ref":"insta360.messages.ExtraMetadata.Vector2","repeated":false,"type":"message"},"45":{"name":"battery_type","ref":"insta360.messages.ExtraMetadata.Battery_type","repeated":false,"type":"enum"},"46":{"name":"cam_posture","ref":"insta360.messages.ExtraMetadata.Camera_Posture","repeated":false,"type":"enum"},"47":{"name":"fov_type","ref":"insta360.messages.ExtraMetadata.Image_FovType","repeated":false,"type":"enum"},"48":{"name":"distance","repeated":false,"type":"double"},"49":{"name":"fov","repeated":false,"type":"double"},"50":{"name":"gyro_filter_type","ref":"insta360.messages.ExtraMetadata.Gyro_FilterType","repeated":false,"type":"enum"},"51":{"name":"gyro_type","ref":"insta360.messages.ExtraMetadata.GyroType","repeated":false,"type":"enum"},"52":{"name":"media_data_rotate_angel","ref":"insta360.messages.ExtraMetadata.VideoMediaDataRotateAngle","repeated":false,"type":"enum"},"53":{"name":"offset_v2","repeated":false,"type":"string"},"54":{"name":"offset_v3","repeated":false,"type":"string"},"55":{"name":"original_offset_v2","repeated":false,"type":"string"},"56":{"name":"original_offset_v3","repeated":false,"type":"string"},"57":{"name":"focusSensor","ref":"insta360.messages.ExtraMetadata.SensorDevice","repeated":false,"type":"enum"},"58":{"name":"expectOutputType","ref":"insta360.messages.ExtraMetadata.ExpectOutputType","repeated":false,"type":"enum"},"59":{"name":"timelapse_interval_in_millisecond","repeated":false,"type":"bool"},"60":{"name":"photo_rot","repeated":true,"type":"float"},"61":{"name":"audio_mode","ref":"insta360.messages.ExtraMetadata.AudioModeType","repeated":false,"type":"enum"},"62":{"name":"is_raw_gyro","repeated":false,"type":"bool"},"63":{"name":"raw_capture_type","ref":"insta360.messages.ExtraMetadata.RawCaptureType","repeated":false,"type":"enum"},"64":{"name":"pts_type","ref":"insta360.messages.ExtraMetadata.VideoPtsType","repeated":false,"type":"enum"},"65":{"name":"gyro_cfg_info","ref":"insta360.messages.ExtraMetadata.GyroConfigInfo","repeated":false,"type":"message"},"66":{"name":"lens_283M_type1","ref":"insta360.messages.ExtraMetadata.Lens283MType","repeated":false,"type":"enum"},"67":{"name":"lens_283M_type2","ref":"insta360.messages.ExtraMetadata.Lens283MType","repeated":false,"type":"enum"},"68":{"name":"offset_states","ref":"insta360.messages.OffsetState","repeated":false,"type":"enum"},"69":{"name":"q_i_uav","repeated":true,"type":"float"},"70":{"name":"r_uav_i","repeated":true,"type":"float"},"71":{"name":"auto_clip_para","ref":"insta360.messages.ExtraMetadata.AutoClipParam","repeated":false,"type":"message"},"72":{"name":"meta_track_para","ref":"insta360.messages.ExtraMetadata.MetaTrackParam","repeated":false,"type":"message"},"73":{"name":"time_scale","ref":"insta360.messages.ExtraMetadata.TimeScale","repeated":false,"type":"enum"},"74":{"name":"hdr_process_type","ref":"insta360.messages.ExtraMetadata.HdrProcessType","repeated":false,"type":"enum"},"75":{"name":"thumbnail_type","ref":"insta360.messages.ExtraMetadata.ThumbnailType","repeated":false,"type":"enum"},"76":{"name":"pureshot_process_type","ref":"insta360.messages.ExtraMetadata.PureShotProcessType","repeated":false,"type":"enum"},"77":{"name":"pre_rec_time_flag","repeated":false,"type":"bool"},"78":{"name":"frame_rate_av_rational","ref":"insta360.messages.ExtraMetadata.FrameRateAVRational","repeated":false,"type":"message"}},"insta360.messages.ExtraMetadata.AiLibVersion":{"1":{"name":"major","repeated":false,"type":"uint32"},"2":{"name":"minor","repeated":false,"type":"uint32"},"3":{"name":"patch","repeated":false,"type":"uint32"}},"insta360.messages.ExtraMetadata.AutoClipParam":{"1":{"name":"version","ref":"insta360.messages.ExtraMetadata.AutoClipVersion","repeated":false,"type":"message"},"2":{"name":"sample_rate","repeated":false,"type":"float"},"3":{"name":"img_w","repeated":false,"type":"uint32"},"4":{"name":"img_h","repeated":false,"type":"uint32"},"5":{"name":"img_pitch","repeated":false,"type":"uint32"},"6":{"name":"compute_type","ref":"insta360.messages.ExtraMetadata.ComputeType","repeated":false,"type":"enum"},"7":{"name":"fps","repeated":false,"type":"uint32"},"8":{"name":"seq_diff","repeated":false,"type":"uint32"},"9":{"name":"pts_diff","repeated":false,"type":"uint32"},"10":{"name":"total_frame","repeated":false,"type":"uint32"}},"insta360.messages.ExtraMetadata.AutoClipVersion":{"1":{"name":"platform","ref":"insta360.messages.ExtraMetadata.AiPlatform","repeated":false,"type":"enum"},"2":{"name":"algorithm","ref":"insta360.messages.ExtraMetadata.AiAlgorithm","repeated":false,"type":"enum"},"3":{"name":"model_ver","ref":"insta360.messages.ExtraMetadata.AiLibVersion","repeated":false,"type":"message"},"4":{"name":"svc_ver","ref":"insta360.messages.ExtraMetadata.AiLibVersion","repeated":false,"type":"message"}},"insta360.messages.ExtraMetadata.ExtraUserOptions":{"1":{"name":"filter","repeated":false,"type":"string"},"2":{"name":"befilter","repeated":false,"type":"string"},"3":{"name":"euler","repeated":false,"type":"bytes"},"4":{"name":"rm_purple","repeated":false,"type":"bool"},"5":{"name":"gyro_calibrate_mode","repeated":false,"type":"uint32"},"6":{"name":"euler_enable","repeated":false,"type":"bool"},"7":{"name":"logo_type","ref":"insta360.messages.ExtraMetadata.ExtraUserOptions.LogoType","repeated":false,"type":"enum"},"8":{"name":"adjustFilters","repeated":false,"type":"string"},"9":{"name":"lut_filter","repeated":false,"type":"string"},"10":{"name":"offset_convert_states","ref":"insta360.messages.ExtraMetadata.ExtraUserOptions.OffsetConvertState","repeated":true,"type":"enum"},"11":{"name":"play_trim_recommend_timestamp","repeated":false,"type":"double"}},"insta360.messages.ExtraMetadata.FileGroupInfo":{"1":{"name":"type","ref":"insta360.messages.ExtraMetadata.SubMediaType","repeated":false,"type":"enum"},"2":{"name":"index","repeated":false,"type":"uint32"},"3":{"name":"identify","repeated":false,"type":"string"},"4":{"name":"total","repeated":false,"type":"uint32"}},"insta360.messages.ExtraMetadata.FrameRateAVRational":{"1":{"name":"num","repeated":false,"type":"uint32"},"2":{"name":"den","repeated":false,"type":"uint32"}},"insta360.messages.ExtraMetadata.GyroConfigInfo":{"1":{"name":"acc_range","repeated":false,"type":"uint32"},"2":{"name":"gyro_range","repeated":false,"type":"uint32"}},"insta360.messages.ExtraMetadata.GyroIndex":{"1":{"name":"index","repeated":false,"type":"int32"},"2":{"name":"timestamp","repeated":false,"type":"int64"}},"insta360.messages.ExtraMetadata.MetaTrackParam":{"1":{"name":"ImuDataSize","repeated":false,"type":"uint64"},"2":{"name":"AAADataSize","repeated":false,"type":"uint64"},"3":{"name":"Compress","repeated":false,"type":"uint32"}},"insta360.messages.ExtraMetadata.Vector2":{"1":{"name":"x","repeated":false,"type":"int32"},"2":{"name":"y","repeated":false,"type":"int32"}},"insta360.messages.GetCurrentCaptureStatusResp":{"1":{"name":"status","ref":"insta360.messages.CameraCaptureStatus","repeated":false,"type":"message"}},"insta360.messages.GetOptions":{"1":{"name":"option_types","ref":"insta360.messages.OptionType","repeated":true,"type":"enum"}},"insta360.messages.GetOptionsResp":{"1":{"name":"option_types","ref":"insta360.messages.OptionType","repeated":true,"type":"enum"},"2":{"name":"value","ref":"insta360.messages.Options","repeated":false,"type":"message"}},"insta360.messages.GetPhotographyOptions":{"1":{"name":"option_types","ref":"insta360.messages.PhotographyOptionType","repeated":true,"type":"enum"},"2":{"name":"function_mode","ref":"insta360.messages.FunctionMode","repeated":false,"type":"enum"}},"insta360.messages.GetPhotographyOptionsResp":{"1":{"name":"option_types","ref":"insta360.messages.PhotographyOptionType","repeated":true,"type":"enum"},"2":{"name":"value","ref":"insta360.messages.PhotographyOptions","repeated":false,"type":"message"}},"insta360.messages.Options":{"1":{"name":"video_resolution","ref":"insta360.messages.VideoResolution","repeated":false,"type":"enum"},"2":{"name":"photo_size","ref":"insta360.messages.PhotoSize","repeated":false,"type":"enum"},"3":{"name":"video_bitrate","repeated":false,"type":"uint32"},"4":{"name":"audio_bitrate","repeated":false,"type":"uint32"},"5":{"name":"audio_samplerate","repeated":false,"type":"uint32"},"6":{"name":"origin_offset","repeated":false,"type":"string"},"7":{"name":"capture_time_limit","repeated":false,"type":"uint32"},"8":{"name":"gps_timeout","repeated":false,"type":"uint32"},"9":{"name":"remaining_capture_time","repeated":false,"type":"uint32"},"10":{"name":"remaining_pictures","repeated":false,"type":"uint32"},"11":{"name":"battery_status","ref":"insta360.messages.BatteryStatus","repeated":false,"type":"message"},"12":{"name":"local_time","repeated":false,"type":"uint64"},"13":{"name":"time_zone_seconds_from_GMT","repeated":false,"type":"int32"},"14":{"name":"mute","repeated":false,"type":"bool"},"15":{"name":"serial_number","repeated":false,"type":"string"},"16":{"name":"UUID","repeated":false,"type":"string"},"17":{"name":"pressOptions","ref":"insta360.messages.ButtonPressOptions","repeated":false,"type":"message"},"19":{"name":"activate_time","repeated":false,"type":"uint64"},"20":{"name":"storage_state","ref":"insta360.messages.StorageState","repeated":false,"type":"message"},"21":{"name":"lens_index","repeated":false,"type":"uint32"},"22":{"name":"media_offset","repeated":false,"type":"string"},"23":{"name":"self_timer","repeated":false,"type":"uint32"},"24":{"name":"gyro_sample_rate","repeated":false,"type":"uint32"},"25":{"name":"acc_range","ref":"insta360.messages.Options.AccFullScaleRange","repeated":false,"type":"enum"},"26":{"name":"gyro_range","ref":"insta360.messages.Options.GyroFullScaleRange","repeated":false,"type":"enum"},"27":{"name":"take_raw_picture","repeated":false,"type":"bool"},"28":{"name":"gamma_mode","ref":"insta360.messages.GammaMode","repeated":false,"type":"enum"},"29":{"name":"media_time","repeated":false,"type":"int64"},"30":{"name":"firmwareRevision","repeated":false,"type":"string"},"31":{"name":"sys_adoption","ref":"insta360.messages.Options.AdoptionSystem","repeated":false,"type":"enum"},"32":{"name":"cpu_type","repeated":false,"type":"string"},"33":{"name":"gyro_filter_config","ref":"insta360.messages.Options.GyroFilterConfig","repeated":false,"type":"message"},"34":{"name":"mctf_enable","repeated":false,"type":"bool"},"35":{"name":"sport_mode_enable","repeated":false,"type":"bool"},"36":{"name":"wifi_info","ref":"insta360.messages.Options.WifiInfo","repeated":false,"type":"message"},"37":{"name":"wifi_channel_list","ref":"insta360.messages.Options.WifiChannelList","repeated":false,"type":"message"},"38":{"name":"authorization_id","repeated":false,"type":"string"},"39":{"name":"calibration_offset","repeated":false,"type":"string"},"40":{"name":"photo_sub_mode","ref":"insta360.messages.PhotoSubMode","repeated":false,"type":"enum"},"41":{"name":"video_sub_mode","ref":"insta360.messages.VideoSubMode","repeated":false,"type":"enum"},"42":{"name":"second_stream_res","ref":"insta360.messages.VideoResolution","repeated":false,"type":"enum"},"43":{"name":"wifi_status","ref":"insta360.messages.Options.WifiStatus","repeated":false,"type":"enum"},"44":{"name":"evo_status_mode","ref":"insta360.messages.Options.EvoStatusMode","repeated":false,"type":"enum"},"45":{"name":"origin_offset_3d","repeated":false,"type":"string"},"46":{"name":"media_offset_3d","repeated":false,"type":"string"},"47":{"name":"calibration_offset_3d","repeated":false,"type":"string"},"48":{"name":"camera_type","repeated":false,"type":"string"},"49":{"name":"bt_remote_version","repeated":false,"type":"string"},"50":{"name":"bt_remote_type","ref":"insta360.messages.Options.BTRemoteType","repeated":false,"type":"enum"},"51":{"name":"quality_setting","ref":"insta360.messages.Options.QualitySetting","repeated":false,"type":"enum"},"52":{"name":"over_heat_protection","repeated":false,"type":"bool"},"53":{"name":"calibration_orientation","repeated":false,"type":"bytes"},"54":{"name":"standby_duration","repeated":false,"type":"uint32"},"55":{"name":"quick_capture_enable","repeated":false,"type":"bool"},"56":{"name":"bt_mac_addr","repeated":false,"type":"string"},"57":{"name":"television_system","ref":"insta360.messages.Options.TelevisionSystem","repeated":false,"type":"enum"},"58":{"name":"sensor0_serial_vr360","repeated":false,"type":"string"},"59":{"name":"sensor1_serial_vr360","repeated":false,"type":"string"},"60":{"name":"sensor_serial_vr180","repeated":false,"type":"string"},"61":{"name":"mobvoi_license","repeated":false,"type":"string"},"62":{"name":"mobvoi_public_key","repeated":false,"type":"string"},"63":{"name":"gyro_info","ref":"insta360.messages.Options.GyroInfo","repeated":false,"type":"message"},"64":{"name":"sensor_id","repeated":false,"type":"string"},"65":{"name":"enableInternalFlowstate","repeated":false,"type":"bool"},"66":{"name":"video_encode_type","ref":"insta360.messages.Options.VideoEncodeType","repeated":false,"type":"enum"},"67":{"name":"sensor","ref":"insta360.messages.Sensor","repeated":false,"type":"message"},"68":{"name":"is_selfie","repeated":false,"type":"bool"},"69":{"name":"rolling_shutter_time","repeated":false,"type":"double"},"70":{"name":"gyro_timestamp","repeated":false,"type":"double"},"71":{"name":"video_fov","ref":"insta360.messages.Options.FovType","repeated":false,"type":"enum"},"72":{"name":"still_fov","ref":"insta360.messages.Options.FovType","repeated":false,"type":"enum"},"73":{"name":"Gyro_Polyfit_State","repeated":false,"type":"bool"},"74":{"name":"Gyro_Calibrate_State","repeated":false,"type":"bool"},"75":{"name":"mobvoi_license_verity_state","repeated":false,"type":"bool"},"76":{"name":"flicker","ref":"insta360.messages.Flicker","repeated":false,"type":"enum"},"77":{"name":"temp_value","repeated":false,"type":"int32"},"78":{"name":"origin_offset_v2","repeated":false,"type":"string"},"79":{"name":"origin_offset_v3","repeated":false,"type":"string"},"80":{"name":"media_offset_v2","repeated":false,"type":"string"},"81":{"name":"media_offset_v3","repeated":false,"type":"string"},"82":{"name":"focusSensor","ref":"insta360.messages.SensorDevice","repeated":false,"type":"enum"},"83":{"name":"expectOutputType","ref":"insta360.messages.Options.ExpectOutputType","repeated":false,"type":"enum"},"84":{"name":"hw_type","ref":"insta360.messages.Options.HwType","repeated":false,"type":"enum"},"85":{"name":"ChargeboxConnectedStatus","ref":"insta360.messages.ChargeboxConnectedStatus","repeated":false,"type":"message"},"88":{"name":"camera_language","ref":"insta360.messages.Options.LANGUAGE_TYPE","repeated":false,"type":"enum"},"89":{"name":"ble_version","repeated":false,"type":"string"},"93":{"name":"camera_posture","ref":"insta360.messages.Options.CameraPostureType","repeated":false,"type":"enum"},"97":{"name":"bt_wakeup_sw","ref":"insta360.messages.Options.Bt_Wakeup_Sw","repeated":false,"type":"enum"},"103":{"name":"offset_states","ref":"insta360.messages.OffsetState","repeated":false,"type":"enum"},"110":{"name":"ota_pkg_version","repeated":false,"type":"string"},"114":{"name":"box_ota_pkg_version","repeated":false,"type":"string"},"115":{"name":"box_bt_version","repeated":false,"type":"string"},"116":{"name":"box_version","repeated":false,"type":"string"},"117":{"name":"go3_version","repeated":false,"type":"string"},"118":{"name":"wifi_working_status","repeated":false,"type":"bool"},"119":{"name":"followOptions","ref":"insta360.messages.ButtonFollowOptions","repeated":false,"type":"message"},"120":{"name":"led_switch","repeated":false,"type":"bool"},"122":{"name":"camera_posture_when_capture_start","ref":"insta360.messages.Options.CameraPostureType","repeated":false,"type":"enum"},"123":{"name":"chargebox_connected_status_when_capture_start","ref":"insta360.messages.ChargeboxConnectedStatus","repeated":false,"type":"message"},"124":{"name":"window_crop_info","ref":"insta360.messages.WindowCropInfo","repeated":false,"type":"message"}},"insta360.messages.Options.GyroFilterConfig":{"1":{"name":"dlpf_value","repeated":false,"type":"uint32"}},"insta360.messages.Options.GyroInfo":{"1":{"name":"gyro_type","ref":"insta360.messages.Options.GyroInfo.GyroType","repeated":false,"type":"enum"},"2":{"name":"gyro_pos","ref":"insta360.messages.Options.GyroInfo.GyroPos","repeated":false,"type":"enum"}},"insta360.messages.Options.WifiChannelList":{"1":{"name":"country_code","repeated":false,"type":"string"},"2":{"name":"channel_list","repeated":false,"type":"bytes"}},"insta360.messages.Options.WifiInfo":{"1":{"name":"ssid","repeated":false,"type":"string"},"2":{"name":"password","repeated":false,"type":"string"},"3":{"name":"channel","repeated":false,"type":"int32"},"4":{"name":"mode","ref":"insta360.messages.Options.WifiInfo.Mode","repeated":false,"type":"enum"},"5":{"name":"wifi_state","ref":"insta360.messages.Options.WifiInfo.WifiState","repeated":false,"type":"enum"},"6":{"name":"passwd_version","repeated":false,"type":"int32"},"7":{"name":"mac_addr","repeated":false,"type":"string"}},"insta360.messages.PhotographyOptions":{"1":{"name":"channel","repeated":false,"type":"uint32"},"2":{"name":"brightness","repeated":false,"type":"sint32"},"3":{"name":"contrast","repeated":false,"type":"uint32"},"4":{"name":"saturation","repeated":false,"type":"uint32"},"5":{"name":"hue","repeated":false,"type":"sint32"},"6":{"name":"sharpness","repeated":false,"type":"uint32"},"7":{"name":"exposure_bias","repeated":false,"type":"sint32"},"8":{"name":"exposure_mode","ref":"insta360.messages.PhotographyOptions.ExposureMode","repeated":false,"type":"enum"},"9":{"name":"exposure_prog","ref":"insta360.messages.PhotographyOptions.ExposureProg","repeated":false,"type":"message"},"10":{"name":"exposure_manual","ref":"insta360.messages.PhotographyOptions.ExposureManual","repeated":false,"type":"message"},"11":{"name":"meter_mode","ref":"insta360.messages.PhotographyOptions.AEMeterMode","repeated":false,"type":"enum"},"12":{"name":"manual_meter_weights","repeated":true,"type":"uint32"},"13":{"name":"white_balance","ref":"insta360.messages.PhotographyOptions.WhiteBalance","repeated":false,"type":"enum"},"14":{"name":"flicker","ref":"insta360.messages.Flicker","repeated":false,"type":"enum"},"15":{"name":"ev_index","repeated":false,"type":"uint32"},"16":{"name":"auto_mode_video_param","ref":"insta360.messages.PhotographyOptions.ExposureParameter","repeated":false,"type":"message"},"17":{"name":"auto_mode_still_param","ref":"insta360.messages.PhotographyOptions.ExposureParameter","repeated":false,"type":"message"},"18":{"name":"gamma_mode","ref":"insta360.messages.GammaMode","repeated":false,"type":"enum"},"19":{"name":"long_exposure_manual","ref":"insta360.messages.PhotographyOptions.LongExposureManual","repeated":false,"type":"message"},"20":{"name":"still_exposure","ref":"insta360.messages.ExposureOptions","repeated":false,"type":"message"},"21":{"name":"video_exposure","ref":"insta360.messages.ExposureOptions","repeated":false,"type":"message"},"22":{"name":"preview_mctf_enable","repeated":false,"type":"bool"},"23":{"name":"preview_sport_mode_enable","repeated":false,"type":"bool"},"24":{"name":"video_iso_top_limit","repeated":false,"type":"uint32"},"25":{"name":"raw_capture_type","ref":"insta360.messages.RawCaptureType","repeated":false,"type":"enum"},"26":{"name":"photography_self_timer","repeated":false,"type":"uint32"},"27":{"name":"aeb_capture_num","repeated":false,"type":"uint32"},"28":{"name":"preview_sport_level","ref":"insta360.messages.PhotographyOptions.PREVIEW_SPORT_LEVEL","repeated":false,"type":"enum"},"29":{"name":"record_duration","repeated":false,"type":"uint32"},"30":{"name":"photo_size_id","repeated":false,"type":"uint32"},"31":{"name":"record_resolution","ref":"insta360.messages.VideoResolution","repeated":false,"type":"enum"},"32":{"name":"video_bitrate","repeated":false,"type":"uint32"},"33":{"name":"fov_type","ref":"insta360.messages.PhotographyOptions.Fov_Type","repeated":false,"type":"enum"},"34":{"name":"flowstate_base_enable","repeated":false,"type":"bool"},"35":{"name":"color_mode","ref":"insta360.messages.PhotographyOptions.COLOR_MODE","repeated":false,"type":"enum"},"36":{"name":"res_rec_limit","ref":"insta360.messages.PhotographyOptions.ResRecLimit","repeated":true,"type":"message"},"37":{"name":"accelerate_frequency","repeated":false,"type":"uint32"},"38":{"name":"focal_length_value","repeated":false,"type":"double"},"39":{"name":"white_balance_value","repeated":false,"type":"uint32"},"40":{"name":"photo_resolution","ref":"insta360.messages.PhotoSize","repeated":false,"type":"enum"},"41":{"name":"remaining_time","repeated":false,"type":"uint32"},"42":{"name":"dark_eis_enable","repeated":false,"type":"bool"},"43":{"name":"flow_state_level","ref":"insta360.messages.PhotographyOptions.Flow_State_Level","repeated":false,"type":"enum"},"44":{"name":"burst_capture_num","repeated":false,"type":"uint32"},"45":{"name":"cache_capture_num","repeated":false,"type":"uint32"},"46":{"name":"metering_enable","repeated":false,"type":"bool"},"51":{"name":"burst_capture_time","repeated":false,"type":"uint32"},"52":{"name":"cache_capture_enable","repeated":false,"type":"bool"},"53":{"name":"zoom_scale","repeated":false,"type":"double"},"91":{"name":"deep_track","type":"message","repeated":false,"ref":"insta360.messages.DeepTrack"},"98":{"name":"pano_aspect","type":"enum","repeated":false,"ref":"insta360.messages.PanoAspect"},"104":{"name":"filter_intensity","type":"enum","repeated":false,"ref":"insta360.messages.FilterIntensity"}},"insta360.messages.PhotographyOptions.ExposureManual":{"1":{"name":"relate_mode","ref":"insta360.messages.PhotographyOptions.ExposureManual.RelateMode","repeated":false,"type":"enum"},"2":{"name":"iso","repeated":false,"type":"uint32"},"3":{"name":"shutter_speed","ref":"insta360.messages.PhotographyOptions.ShutterSpeed","repeated":false,"type":"enum"},"4":{"name":"video_iso","repeated":false,"type":"uint32"},"5":{"name":"video_shutter_speed","ref":"insta360.messages.PhotographyOptions.ShutterSpeed","repeated":false,"type":"enum"},"6":{"name":"still_iso","repeated":false,"type":"uint32"},"7":{"name":"still_shutter_speed","ref":"insta360.messages.PhotographyOptions.ShutterSpeed","repeated":false,"type":"enum"}},"insta360.messages.PhotographyOptions.ExposureParameter":{"1":{"name":"iso","repeated":false,"type":"uint32"},"2":{"name":"shutter_speed","ref":"insta360.messages.PhotographyOptions.ShutterSpeed","repeated":false,"type":"enum"}},"insta360.messages.PhotographyOptions.ExposureProg":{"1":{"name":"mode","ref":"insta360.messages.PhotographyOptions.ExposureProg.ProgMode","repeated":false,"type":"enum"},"2":{"name":"iso","repeated":false,"type":"uint32"},"3":{"name":"shutter_speed","ref":"insta360.messages.PhotographyOptions.ShutterSpeed","repeated":false,"type":"enum"}},"insta360.messages.PhotographyOptions.LongExposureManual":{"1":{"name":"iso","repeated":false,"type":"uint32"},"2":{"name":"shutter_speed","repeated":false,"type":"uint32"}},"insta360.messages.PhotographyOptions.ResRecLimit":{"1":{"name":"video_res","ref":"insta360.messages.VideoResolution","repeated":false,"type":"enum"},"2":{"name":"limit_time","repeated":false,"type":"uint32"}},"insta360.messages.Sensor":{"1":{"name":"serials","repeated":true,"type":"string"},"2":{"name":"type","ref":"insta360.messages.Sensor.Type","repeated":false,"type":"enum"},"3":{"name":"id","repeated":true,"type":"string"}},"insta360.messages.SetOptions":{"1":{"name":"option_types","ref":"insta360.messages.OptionType","repeated":true,"type":"enum"},"2":{"name":"value","ref":"insta360.messages.Options","repeated":false,"type":"message"}},"insta360.messages.SetOptionsResp":{"1":{"name":"option_types","ref":"insta360.messages.OptionType","repeated":true,"type":"enum"}},"insta360.messages.SetPhotographyOptions":{"1":{"name":"option_types","ref":"insta360.messages.PhotographyOptionType","repeated":true,"type":"enum"},"2":{"name":"value","ref":"insta360.messages.PhotographyOptions","repeated":false,"type":"message"},"3":{"name":"function_mode","ref":"insta360.messages.FunctionMode","repeated":false,"type":"enum"}},"insta360.messages.SetPhotographyOptionsResp":{"1":{"name":"success_types","ref":"insta360.messages.PhotographyOptionType","repeated":true,"type":"enum"}},"insta360.messages.StartCapture":{"1":{"name":"mode","ref":"insta360.messages.CaptureMode","repeated":false,"type":"enum"}},"insta360.messages.StopCapture":{"1":{"name":"extra_metadata","ref":"insta360.messages.ExtraMetadata","repeated":false,"type":"message"},"2":{"name":"mode","ref":"insta360.messages.CaptureMode","repeated":false,"type":"enum"}},"insta360.messages.StorageState":{"1":{"name":"card_state","ref":"insta360.messages.CardState","repeated":false,"type":"enum"},"2":{"name":"free_space","repeated":false,"type":"uint64"},"3":{"name":"total_space","repeated":false,"type":"uint64"},"4":{"name":"location","ref":"insta360.messages.CardLocation","repeated":false,"type":"enum"}},"insta360.messages.TakePicture":{"1":{"name":"mode","ref":"insta360.messages.TakePicture.Mode","repeated":false,"type":"enum"},"2":{"name":"extra_metadata","ref":"insta360.messages.ExtraMetadata","repeated":false,"type":"message"},"3":{"name":"aeb_ev_bias","repeated":true,"type":"sint32"},"4":{"name":"raw_capture_type","ref":"insta360.messages.RawCaptureType","repeated":false,"type":"enum"},"5":{"name":"isInstaPanoEnabled","repeated":false,"type":"bool"},"6":{"name":"focusSensor","ref":"insta360.messages.SensorDevice","repeated":false,"type":"enum"},"7":{"name":"selfTimer","repeated":false,"type":"uint32"}},"insta360.messages.WindowCropInfo":{"1":{"name":"src_width","repeated":false,"type":"uint32"},"2":{"name":"src_height","repeated":false,"type":"uint32"},"3":{"name":"dst_width","repeated":false,"type":"uint32"},"4":{"name":"dst_height","repeated":false,"type":"uint32"},"5":{"name":"crop_offset_x","repeated":false,"type":"int32"},"6":{"name":"crop_offset_y","repeated":false,"type":"int32"}}},"enums":{"insta360.messages.BatteryStatus.BatteryType":{"0":"THICK","1":"THIN","2":"VERTICAL","100":"NONE"},"insta360.messages.BatteryStatus.PowerType":{"0":"BATTERY","1":"ADAPTER"},"insta360.messages.ButtonFollowMode":{"0":"FOLLOW_UNKNOWN","1":"FOLLOW_FULL","2":"FOLLOW_PARM","3":"FOLLOW_MODE","4":"FOLLOW_NONE"},"insta360.messages.ButtonPressMode":{"0":"DO_NOT_CHANGE","1":"DO_NOTHING","2":"SHUT_DOWN","3":"TAKE_PICTURE","4":"CAPTURE","5":"SELFTIMER","6":"TIMELAPSE","7":"HIGH_FRAME_RATE","8":"ACTION_TIMELAPSE_VIDEO","9":"INTERVAL_SHOOTING","10":"ACTION_INTERVAL_VIDEO","11":"TAKE_HDR_IMAGE","12":"ACTION_STATIC_TIMELAPSE","13":"ACTION_CALIBRATE_GYRO","14":"ACTION_HDR_CAPTURE","15":"ACTION_TIMESHIFT","16":"TAKE_BURST_IMAGE","17":"TAKE_AEB_NIGHT_IMAGE","18":"SUPER_CAPTURE","19":"ACTION_LOOPRECORDING","20":"TAKE_STARLAPSE_IMAGE","21":"FPV_RECORDING","22":"MOVIE_RECORDING","23":"SLOW_MOTION_RECORDING","24":"SELFIE_RECORDING","25":"FOLLOW_CHARGEBOX","26":"PURE_VIDEO"},"insta360.messages.CameraCaptureState":{"0":"NOT_CAPTURE","1":"NORMAL_CAPTURE","2":"TIMELAPSE_CAPTURE","3":"INTERVAL_SHOOTING_CAPTURE","4":"SINGLE_SHOOTING","5":"HDR_SHOOTING","6":"SELF_TIMER_SHOOTING","7":"BULLET_TIME_CAPTURE","8":"SETTINGS_NEW_VALUE","9":"HDR_CAPTURE","10":"BURST_SHOOTING","11":"STATIC_TIMELAPSE_SHOOTING","12":"INTERVAL_VIDEO_CAPTURE","13":"TIMESHIFT_CAPTURE","14":"AEB_NIGHT_SHOOTING","15":"SINGLE_POWER_PANO_SHOOTING","16":"HDR_POWER_PANO_SHOOTING","17":"SUPER_NORMAL_CAPTURE","18":"LOOP_RECORDING_CAPTURE","19":"STARLAPSE_SHOOTING","20":"FPV_RECORDING_CAPTURE","21":"MOVIE_RECORDING_CAPTURE","22":"SLOW_MOTION_CAPTURE","23":"SELFIE_RECORDING_CAPTURE","24":"PURE_RECORDING_CAPTURE"},"insta360.messages.CaptureMode":{"0":"Capture_MODE_UNKNOWN","1":"Capture_MODE_NORMAL","2":"Capture_MODE_BULLETTIME","3":"Capture_MODE_HDR","4":"Capture_MODE_TIMESHIFT","5":"Capture_MODE_SUPER_VIDEO","6":"Capture_MODE_LOOPRECORDING","7":"Capture_MODE_FPV","8":"Capture_MODE_MOVIE","9":"Capture_MODE_SLOWMOTION","10":"Capture_MODE_SELFIE","11":"Capture_MODE_PURE_VIDEO"},"insta360.messages.CardLocation":{"0":"STOR_CL_CAMERA","1":"STOR_CL_READER"},"insta360.messages.CardState":{"0":"STOR_CS_PASS","1":"STOR_CS_NOCARD","2":"STOR_CS_NOSPACE","3":"STOR_CS_INVALID_FORMAT","4":"STOR_CS_WPCARD","5":"STOR_CS_OTHER_ERROR"},"insta360.messages.ChargeboxConnectedStatus.ChargeboxConnectedType":{"0":"disconnected","1":"connected"},"insta360.messages.ChargeboxConnectedStatus.ChargeboxOnOffInfo":{"0":"offline","1":"online"},"insta360.messages.ChargeboxConnectedStatus.ChargeboxUsbBtConnectedType":{"0":"usb_bt_status_undefined","1":"usb_bt_status_disconnected","2":"usb_bt_status_connected"},"insta360.messages.ExposureOptions.Program":{"0":"AUTO","1":"ISO_PRIORITY","2":"SHUTTER_PRIORITY","3":"MANUAL","4":"ADAPTIVE"},"insta360.messages.ExtraMetadata.AiAlgorithm":{"0":"EDITOR"},"insta360.messages.ExtraMetadata.AiPlatform":{"0":"CV5","1":"CV22","2":"H22"},"insta360.messages.ExtraMetadata.AudioModeType":{"0":"AUDIO_MODE_UNKNOWN","1":"AUDIO_MODE_FOCUS","2":"AUDIO_MODE_WINDREDUCTION","3":"AUDIO_MODE_360","4":"AUDIO_MODE_STEREO","5":"AUDIO_MODE_EXTMICDEV","6":"AUDIO_MODE_AIRPODDEV","7":"AUDIO_MODE_RESERVE1","8":"AUDIO_MODE_RESERVE2"},"insta360.messages.ExtraMetadata.Battery_type":{"0":"THICK","1":"THIN","2":"VERTICAL"},"insta360.messages.ExtraMetadata.Camera_Posture":{"0":"CAMERA_ROTATE_0","1":"CAMERA_ROTATE_90","2":"CAMERA_ROTATE_180","3":"CAMERA_ROTATE_270"},"insta360.messages.ExtraMetadata.ComputeType":{"0":"COMPUTE_CPU","1":"COMPUTE_VPU","2":"COMPUTE_DSP"},"insta360.messages.ExtraMetadata.EvoStatusMode":{"0":"UNKNOWN_STATUS_MODE","1":"DEGREE180","2":"DEGREE360"},"insta360.messages.ExtraMetadata.ExpectOutputType":{"0":"DEFAULT","1":"INSTA_PANO","2":"MULTI_CAMERA","3":"ONE_TAKE"},"insta360.messages.ExtraMetadata.ExtraUserOptions.LogoType":{"0":"UNKNOWN_LOGO_TYPE","1":"NO_LOGO","2":"INSTA_LOGO"},"insta360.messages.ExtraMetadata.ExtraUserOptions.OffsetConvertState":{"0":"WaterProof","1":"DivingWater","2":"DivingAir","3":"StitchOptimization","4":"Protect","5":"SphereProtect","6":"FpvProtect"},"insta360.messages.ExtraMetadata.GpsSource":{"0":"GSV","1":"DASHBOARD","2":"REMOTE"},"insta360.messages.ExtraMetadata.GyroType":{"0":"INSDEV_IMU_TYPE_20948","1":"INSDEV_IMU_TYPE_40609"},"insta360.messages.ExtraMetadata.Gyro_FilterType":{"0":"GYRO_FILTER_TYPE_UNKNOWN","1":"GYRO_FILTER_TYPE_BRUTE","2":"GYRO_FILTER_TYPE_AKF"},"insta360.messages.ExtraMetadata.HDR_STATE":{"0":"NOT_HDR","1":"WAITING_PROCESS","2":"PROCESSED"},"insta360.messages.ExtraMetadata.HdrProcessType":{"0":"HDR_PROCESS_EXTERNAL","1":"HDR_PROCESS_INNER"},"insta360.messages.ExtraMetadata.Image_FovType":{"0":"FOV_TYPE_UNKNOWN","1":"FOV_TYPE_WIDE","2":"FOV_TYPE_LINEAR","3":"FOV_TYPE_ULTRAWIDE","4":"FOV_TYPE_NARROW","5":"FOV_TYPE_POV","6":"FOV_TYPE_LINEARPLUS","7":"FOV_TYPE_LINEARHORIZON","8":"FOV_TYPE_FPV","9":"FOV_TYPE_SUPER","10":"FOV_TYPE_TINYPLANET","11":"FOV_TYPE_INFINITYWIDE","12":"FOV_TYPE_NUM"},"insta360.messages.ExtraMetadata.Lens283MType":{"0":"LENS_UNKNOW","1":"LENS_LOW_TRANSPARENCY","2":"LENS_HIGH_TRANSPARENCY"},"insta360.messages.ExtraMetadata.PureShotProcessType":{"0":"PURESHOT_PROCESS_EXTERNAL","1":"PURESHOT_PROCESS_INNER"},"insta360.messages.ExtraMetadata.RawCaptureType":{"0":"RAW_CAPTURE_TYPE_OFF","1":"RAW_CAPTURE_TYPE_DNG","2":"RAW_CAPTURE_TYPE_RAW","3":"RAW_CAPTURE_TYPE_PURESHOT","4":"RAW_CAPTURE_TYPE_PURESHOT_RAW"},"insta360.messages.ExtraMetadata.SensorDevice":{"0":"SENSOR_DEVICE_UNKNOWN","1":"SENSOR_DEVICE_FRONT","2":"SENSOR_DEVICE_REAR","3":"SENSOR_DEVICE_ALL"},"insta360.messages.ExtraMetadata.SubMediaType":{"0":"VIDEO_NORMAL","1":"VIDEO_BULLETTIME","2":"VIDEO_TIMELAPSE","3":"PHOTO_NORMAL","4":"PHOTO_HDR","5":"PHOTO_INTERVALSHOOTING","6":"VIDEO_HDR","7":"PHOTO_BURST","8":"VIDEO_STATIC_TIMELAPSE","9":"VIDEO_TIMESHIFT","10":"PHOTO_AEB_NIGHT_MODE","11":"VIDEO_SUPER_NORMAL","12":"VIDEO_LOOPRECORDING","13":"PHOTO_STARLAPSE","14":"PHOTO_PANO_MODE","15":"VIDEO_FPV","16":"VIDEO_MOVIE","17":"VIDEO_SLOWMOTION","18":"VIDEO_SELFIE","19":"PHOTO_PURESHOTPLUS","20":"VIDEO_PURE","21":"VIDEO_STARLAPSE"},"insta360.messages.ExtraMetadata.ThumbnailType":{"0":"THUMBNAIL_TYPE_UNKNOWN","1":"THUMBNAIL_TYPE_YUV","2":"THUMBNAIL_TYPE_JPEG","3":"THUMBNAIL_TYPE_H264"},"insta360.messages.ExtraMetadata.TimeScale":{"0":"TIMESCALE_1X","1":"TIMESCALE_4X","2":"TIMESCALE_8X","3":"TIMESCALE_1_4X","4":"TIMESCALE_1_8X"},"insta360.messages.ExtraMetadata.TriggerSource":{"0":"Unknown","1":"CameraButton","2":"RemoteControl","3":"USB","4":"BtRemote"},"insta360.messages.ExtraMetadata.VideoMediaDataRotateAngle":{"0":"MEDIA_DATA_ROTATE_UNKNOWN","1":"MEDIA_DATA_ROTATE_ANGLE_0","3":"MEDIA_DATA_ROTATE_ANGLE_180","6":"MEDIA_DATA_ROTATE_ANGLE_90","8":"MEDIA_DATA_ROTATE_ANGLE_270"},"insta360.messages.ExtraMetadata.VideoPtsType":{"0":"VIDEO_PTS_UNKNOWN","1":"VIDEO_PTS_MP4","2":"VIDEO_PTS_EXPOSURE_FILE"},"insta360.messages.FilterIntensity":{"1":"INTENSITY_LOW","2":"INTENSITY_MEDIUM","3":"INTENSITY_HIGH"},"insta360.messages.Flicker":{"0":"FLICKER_AUTO","1":"FLICKER_60HZ","2":"FLICKER_50HZ"},"insta360.messages.FunctionMode":{"0":"FUNCTION_MODE_NORMAL","1":"FUNCTION_MODE_LIVE_STREAM","2":"FUNCTION_MODE_MOBILE_TIMELAPSE","3":"FUNCTION_MODE_INTERVAL_SHOOTING","4":"FUNCTION_MODE_HIGH_FRAME_RATE","5":"FUNCTION_MODE_BURST","6":"FUNCTION_MODE_NORMAL_IMAGE","7":"FUNCTION_MODE_NORMAL_VIDEO","8":"FUNCTION_MODE_HDR_IMAGE","9":"FUNCTION_MODE_HDR_VIDEO","10":"FUNCTION_MODE_INTERVAL_VIDEO","11":"FUNCTION_MODE_STATIC_TIMELAPSE","12":"FUNCTION_MODE_TIMESHIFT","13":"FUNCTION_MODE_AEB_NIGHT_IMAGE","14":"FUNCTION_MODE_NORMAL_POWER_PANO_IMAGE","15":"FUNCTION_MODE_HDR_POWER_PANO_IMAGE","16":"FUNCTION_MODE_SUPER_VIDEO","17":"FUNCTION_MODE_LOOP_RECORDING_VIDEO","18":"FUNCTION_MODE_STARLAPSE_IMAGE","19":"FUNCTION_MODE_FPV_VIDEO","20":"FUNCTION_MODE_MOVIE_VIDEO","21":"FUNCTION_MODE_SLOWMOTION_VIDEO","22":"FUNCTION_MODE_SELFIE_VIDEO","23":"FUNCTION_MODE_QC_SINGLE_PRESS","24":"FUNCTION_MODE_QC_DOUBLE_PRESS","25":"FUNCTION_MODE_CAMERA_SINGLE_PRESS","26":"FUNCTION_MODE_CAMERA_DOUBLE_PRESS","27":"FUNCTION_MODE_PURE_VIDEO"},"insta360.messages.GammaMode":{"0":"FILTER_NONE","15":"FILTER_LEICA_NATURAL","16":"FILTER_LEICA_VIVID","24":"FILTER_NC_FILM","26":"FILTER_CC_FILM","34":"FILTER_POS_FILM","35":"FILTER_NEG_FILM","36":"FILTER_LEICA_CHROME","37":"FILTER_CINEMATIC","38":"FILTER_FRESH"},"insta360.messages.OffsetState":{"0":"Common","1":"SphereProtect","2":"DivingWater"},"insta360.messages.OptionType":{"0":"OPTION_UNKNOWN","1":"VIDEO_RESOLUTION","2":"PHOTO_SIZE","3":"VIDEO_BITRATE","4":"AUDIO_BITRATE","5":"AUDIO_SAMPLERATE","6":"ORIGIN_OFFSET","7":"CAPTURE_TIME_LIMIT","8":"GPS_TIMEOUT","9":"REMAINING_CAPTURE_TIME","10":"REMAINING_PICTURES","11":"BATTERY_STATUS","12":"LOCAL_TIME","13":"TIME_ZONE","14":"MUTE","15":"SERIAL_NUMBER","16":"UUID","17":"BUTTON_PRESS_OPTIONS","19":"ACTIVATE_TIME","20":"STORAGE_STATE","21":"LENS_INDEX","22":"MEDIA_OFFSET","23":"SELF_TIMER","24":"GYRO_SAMPLE_RATE","25":"ACC_FULL_SCALE_RANGE","26":"GYRO_FULL_SCALE_RANGE","27":"TAKE_RAW_PICTURE","28":"GAMMA_MODE","29":"MEDIA_TIME","30":"FIRMWAREREVISION","31":"SYS_ADOPTION","32":"CPU_TYPE","33":"GYRO_FILTER","34":"MCTF_ENABLE","35":"SPORT_MODE_ENABLE","36":"WIFI_INFO","37":"WIFI_CHANNEL_LIST","38":"AUTHORIZATION_ID","39":"CALIBRATION_OFFSET","40":"PHOTO_SUB_MODE","41":"VIDEO_SUB_MODE","42":"SECOND_STREAM_RES","43":"WIFI_STATUS","44":"EVO_STATUS_MODE","45":"ORIGIN_OFFSET_3D","46":"MEDIA_OFFSET_3D","47":"CALIBRATION_OFFSET_3D","48":"CAMERA_TYPE","49":"BT_REMOTE_VERSION","50":"BT_REMOTE_TYPE","51":"QUALITY_SETTING","52":"OVERHEAT_PROTECTION","53":"CALIBRATION_ORIENTATION","54":"STANDBY_DURATION","55":"QUICK_CAPTURE_ENABLE","56":"BT_MAC_ADDR","57":"TELEVISION_SYSTEM","58":"SENSOR0_SERIAL_VR360","59":"SENSOR1_SERIAL_VR360","60":"SENSOR_SERIAL_VR180","61":"MOBVOI_LICENSE","62":"MOBVOI_PUBLIC_KEY","63":"GYRO_INFO","64":"SENSOR_ID","65":"INTERNAL_FLOWSTATE","66":"VIDEO_ENCODE_TYPE","67":"SENSOR_INFO","68":"IS_SELFIE","69":"ROLLING_SHUTTER_TIME","70":"GYRO_TIME_STAMP","71":"VIDEO_FOV","72":"STILL_FOV","73":"GYRO_POLYFIT_STATE","74":"GYRO_CALIBRATE_STATE","75":"MOBVOI_LICENSE_VERITY_STATE","76":"FLICKER_GLOBAL","77":"TEMP_VALUE","78":"ORIGIN_OFFSET_V2","79":"ORIGIN_OFFSET_V3","80":"MEDIA_OFFSET_V2","81":"MEDIA_OFFSET_V3","82":"INSTAPANO_FOCUS_SENSOR","83":"EXPECT_OUTPUT_TYPE","84":"HW_TYPE","85":"CHARGEBOX_CONNECTED_STATUS","86":"BT_CAR_TABLE","87":"PTZ_CTRL","88":"CAMERA_LANGUAGE","89":"HW_BLE_VERSION","93":"CAMERA_POSTURE","97":"BT_WAKEUP_SW","103":"OFFSET_STATES","110":"OTA_PKG_VERSION","114":"BOX_OTA_PKG_VERSION","115":"BOX_BT_VERSION","116":"BOX_VERSION","117":"GO3_VERSION","118":"WIFI_WORKING_STATUS","119":"BUTTON_FOLLOW_OPTION","120":"LED_SWITCH","122":"CAMERA_POSTURE_WHEN_CAPTURE_START","123":"CHARGEBOX_CONNECTED_STATUS_WHEN_CAPTURE_START","124":"WINDOW_CROP_INFO","125":"OPTIONS_NUM"},"insta360.messages.Options.AccFullScaleRange":{"0":"RANGE_2G","1":"RANGE_4G","2":"RANGE_8G","3":"RANGE_16G"},"insta360.messages.Options.AdoptionSystem":{"0":"PHONE_IOS","1":"PHONE_ANDROID"},"insta360.messages.Options.BTRemoteType":{"0":"UNKNOWN_BT_REMOTE","1":"BT_REMOTE_WITHOUT_GPS","2":"BT_REMOTE_WITH_GPS"},"insta360.messages.Options.Bt_Wakeup_Sw":{"0":"Bt_Wakeup_Sw_Off","1":"Bt_Wakeup_Sw_On","2":"Bt_Wakeup_Sw_Unknown"},"insta360.messages.Options.CameraPostureType":{"0":"CAMERA_POSTURE_ROTATE_0","1":"CAMERA_POSTURE_ROTATE_90","2":"CAMERA_POSTURE_ROTATE_180","3":"CAMERA_POSTURE_ROTATE_270","4":"CAMERA_POSTURE_UP","5":"CAMERA_POSTURE_DOWN"},"insta360.messages.Options.EvoStatusMode":{"0":"UNKNOWN_STATUS_MODE","1":"DEGREE180","2":"DEGREE360"},"insta360.messages.Options.ExpectOutputType":{"0":"DEFAULT","1":"INSTA_PANO","2":"MULTI_CAMERA","3":"ONE_TAKE"},"insta360.messages.Options.FovType":{"0":"FOV_WIDE","1":"FOV_LINEAR","2":"FOV_ULTRAWIDE","3":"FOV_NARROW"},"insta360.messages.Options.GyroFullScaleRange":{"0":"RANGE_250DPS","1":"RANGE_500DPS","2":"RANGE_1000DPS","3":"RANGE_2000DPS"},"insta360.messages.Options.GyroInfo.GyroPos":{"0":"INSDEV_IMU_POS_VIN0","1":"INSDEV_IMU_POS_VIN1","2":"INSDEV_IMU_POS_UNKNOWN"},"insta360.messages.Options.GyroInfo.GyroType":{"0":"INSDEV_IMU_TYPE_20948","1":"INSDEV_IMU_TYPE_40609"},"insta360.messages.Options.HwType":{"0":"HW_TYPE_UNKNOWN","1":"HW_TYPE_MFI","2":"HW_TYPE_NO_MFI"},"insta360.messages.Options.LANGUAGE_TYPE":{"0":"EN","1":"ZH","2":"JA"},"insta360.messages.Options.QualitySetting":{"0":"HIGH_QUALITY","1":"LOW_QUALITY"},"insta360.messages.Options.TelevisionSystem":{"0":"NTSC","1":"PAL"},"insta360.messages.Options.VideoEncodeType":{"0":"ENCODE_H264","1":"ENCODE_H265"},"insta360.messages.Options.WifiInfo.Mode":{"0":"AP","1":"STA","2":"P2P"},"insta360.messages.Options.WifiInfo.WifiState":{"0":"UNKNOWN","1":"AUTO","2":"ON","3":"OFF"},"insta360.messages.Options.WifiStatus":{"0":"AUTO","1":"ON"},"insta360.messages.PanoAspect":{"1":"PANO_ASPECT_360","4":"PANO_ASPECT_2_1"},"insta360.messages.PhotoSize":{"0":"Size_6912_3456","1":"Size_6272_3136","2":"Size_6080_3040","3":"Size_4000_3000","4":"Size_4000_2250","5":"Size_5212_3542","6":"Size_5312_2988","7":"Size_8000_6000","8":"Size_8000_4500","9":"Size_2976_2976","10":"Size_5984_5984","11":"Size_11968_5984","12":"Size_5952_2976"},"insta360.messages.PhotoSubMode":{"0":"PHOTO_SINGLE","8":"PHOTO_INSTA_PANO","100":"PHOTO_NONE"},"insta360.messages.PhotographyOptionType":{"0":"PHOTOGRAPHY_OPTION_UNKNOWN","1":"CHANNEL","2":"BRIGHTNESS","3":"CONTRAST","4":"SATURATION","5":"HUE","6":"SHARPNESS","7":"EXPOSURE_BIAS","8":"EXPOSURE_MODE","9":"EXPOSURE_PROG","10":"EXPOSURE_MANUAL","11":"AE_METER_MODE","12":"AE_MANUAL_METER_WEIGHT","13":"WHITE_BALANCE","14":"FLICKER","15":"EV_INDEX","16":"AUTO_MODE_VIDEO_PARAM","17":"AUTO_MODE_STILL_PARAM","18":"VIDEO_GAMMA_MODE","19":"LONG_EXPOSURE_MANUAL","20":"STILL_EXPOSURE_OPTIONS","21":"VIDEO_EXPOSURE_OPTIONS","22":"PREVIEW_MCTF_ENABLE","23":"PREVIEW_SPORT_MODE_ENABLE","24":"VIDEO_ISO_TOP_LIMIT","25":"RAW_CAPTURE_TYPE","26":"PHOTOGRAPHY_SELF_TIMER","27":"AEB_CAPTURE_NUM","28":"PREVIEW_SPORT_LEVEL","29":"RECORD_DURAION","30":"PHOTO_SIZE_ID","31":"RECORD_RESOLUTION","32":"PHOTO_GRAPHY_BITRATE","33":"FOV_TYPE","34":"FLOWSTATE_BASE_TYPE","35":"COLOR_MODE","36":"RES_REC_LIMIT","37":"ACCELERATE_FREQUENCY","38":"FOCAL_LENGTH_VALUE","39":"WHITE_BALANCE_VALUE","40":"PHOTO_RESOLUTION","41":"REMAINING_TIME","42":"DARK_EIS_ENABLE","43":"FLOWSTATE_LEVEL","44":"BURST_CAPTURE_NUM","45":"CACHE_CAPTURE_NUM","46":"METERING_ENABLE","51":"BURST_CAPTURE_TIME","52":"CACHE_CAPTURE_ENABLE","53":"ZOOM_SCALE","54":"PHOTO_GRAPHY_OPTIONS_TYPE_NUM","91":"DEEP_TRACK","98":"PANO_ASPECT","104":"FILTER_INTENSITY"},"insta360.messages.PhotographyOptions.AEMeterMode":{"0":"AE_METER_MODE_NORMAL","1":"AE_METER_MODE_MANUAL"},"insta360.messages.PhotographyOptions.COLOR_MODE":{"1":"COLOR_MODE_NORMAL","2":"COLOR_MODE_LOG","5":"COLOR_MODE_HDR"},"insta360.messages.PhotographyOptions.ExposureManual.RelateMode":{"0":"RELATE_MODE_VIDEO","1":"RELATE_MODE_STILL","2":"RELATE_MODE_VIDEO_AND_STILL"},"insta360.messages.PhotographyOptions.ExposureMode":{"0":"EXP_MODE_AUTO","1":"EXP_MODE_PROGRAM","2":"EXP_MODE_MANUAL"},"insta360.messages.PhotographyOptions.ExposureProg.ProgMode":{"0":"PROG_MODE_OFF","1":"PROG_MODE_ISO","2":"PROG_MODE_SHUTTER_SPEED"},"insta360.messages.PhotographyOptions.Flow_State_Level":{"0":"Flow_State_Level_Close","1":"Flow_State_Level_Low","2":"Flow_State_Level_Standard","3":"FLOW_State_Level_High"},"insta360.messages.PhotographyOptions.Fov_Type":{"0":"FOV_WIDE","1":"FOV_LINEAR","2":"FOV_ULTRAWIDE","3":"FOV_NARROW","4":"FOV_POV","5":"FOV_LINEAR_PLUS","6":"FOV_LINEAR_HORIZON","7":"FOV_TYPE_FPV","8":"FOV_TYPE_SUPER","9":"FOV_TYPE_TINYPLANET","10":"FOV_TYPE_INFINITYWIDE"},"insta360.messages.PhotographyOptions.PREVIEW_SPORT_LEVEL":{"0":"PREVIEW_SPORT_AUTO","1":"PREVIEW_SPORT_FAST","2":"PREVIEW_SPORT_FASTER"},"insta360.messages.PhotographyOptions.ShutterSpeed":{"0":"SPEED_AUTO","1":"SPEED_60","2":"SPEED_30","3":"SPEED_15","4":"SPEED_8","5":"SPEED_4","6":"SPEED_2","7":"SPEED_1P6","8":"SPEED_1P3","9":"SPEED_1","10":"SPEED_1D1P25","11":"SPEED_1D1P67","12":"SPEED_1D2","13":"SPEED_1D2P5","14":"SPEED_1D3","15":"SPEED_1D4","16":"SPEED_1D5","17":"SPEED_1D6P25","18":"SPEED_1D8P","19":"SPEED_1D10","20":"SPEED_1D12P5","21":"SPEED_1D15","22":"SPEED_1D20","23":"SPEED_1D25","24":"SPEED_1D30","25":"SPEED_1D40","26":"SPEED_1D50","27":"SPEED_1D60","28":"SPEED_1D80","29":"SPEED_1D100","30":"SPEED_1D120","31":"SPEED_1D160","32":"SPEED_1D200","33":"SPEED_1D240","34":"SPEED_1D320","35":"SPEED_1D400","36":"SPEED_1D500","37":"SPEED_1D640","38":"SPEED_1D800","39":"SPEED_1D1000","40":"SPEED_1D1250","41":"SPEED_1D1600","42":"SPEED_1D2000","43":"SPEED_1D2500","44":"SPEED_1D3200","45":"SPEED_1D4000","46":"SPEED_1D5000","47":"SPEED_1D6400","48":"SPEED_1D8000"},"insta360.messages.PhotographyOptions.WhiteBalance":{"0":"WB_AUTO","1":"WB_2700K","2":"WB_4000K","3":"WB_5000K","4":"WB_6500K","5":"WB_7500K"},"insta360.messages.RawCaptureType":{"0":"RAW_CAPTURE_TYPE_OFF","1":"RAW_CAPTURE_TYPE_DNG","2":"RAW_CAPTURE_TYPE_RAW","3":"RAW_CAPTURE_TYPE_PURESHOT","4":"RAW_CAPTURE_TYPE_PURESHOT_RAW"},"insta360.messages.Sensor.Type":{"0":"PANO_577","1":"WIDE_577","2":"WIDE_283","3":"WIDE_586","4":"AF_586","5":"PANO_283","6":"PANO_586","7":"ACTION_577"},"insta360.messages.SensorDevice":{"0":"SENSOR_DEVICE_UNKNOWN","1":"SENSOR_DEVICE_FRONT","2":"SENSOR_DEVICE_REAR","3":"SENSOR_DEVICE_ALL"},"insta360.messages.TakePicture.Mode":{"0":"NORMAL","1":"AEB","3":"BURST","4":"AEB_NIGHT"},"insta360.messages.VideoResolution":{"0":"RES_3840_1920P30","1":"RES_2560_1280P30","2":"RES_1920_960P30","3":"RES_2560_1280P60","4":"RES_2048_512P120","5":"RES_3328_832P60","6":"RES_3072_1536P30","7":"RES_2240_1120P30","8":"RES_2240_1120P24","9":"RES_1440_720P30","10":"RES_2880_2880P30","11":"RES_3840_1920P60","12":"RES_3840_1920P50","13":"RES_3008_1504P100","14":"RES_960_480P30","15":"RES_3040_1520P30","16":"RES_2176_1088P30","17":"RES_720_360P30","18":"RES_480_240P30","19":"RES_2880_2880P25","20":"RES_2880_2880P24","21":"RES_3840_1920P20","22":"RES_1920_960P20","23":"RES_3840_2160P60","24":"RES_3840_2160P30","25":"RES_2720_1530P100","26":"RES_1920_1080P200","27":"RES_1920_1080P240","28":"RES_1920_1080P120","29":"RES_1920_1080P30","30":"RES_5472_3078P30","31":"RES_4000_3000P30","32":"RES_854_640P30","33":"RES_720_406P30","34":"RES_424_240P15","35":"RES_1024_512P30","36":"RES_640_320P30","37":"RES_5312_2988P30","38":"RES_2720_1530P60","39":"RES_2720_1530P30","40":"RES_1920_1080P60","41":"RES_2720_2040P30","42":"RES_1920_1440P30","43":"RES_1280_720P30","44":"RES_1280_960P30","45":"RES_1152_768P30","46":"RES_5312_2988P25","47":"RES_5312_2988P24","48":"RES_3840_2160P25","49":"RES_3840_2160P24","50":"RES_2720_1530P25","51":"RES_2720_1530P24","52":"RES_1920_1080P25","53":"RES_1920_1080P24","54":"RES_4000_3000P25","55":"RES_4000_3000P24","56":"RES_2720_2040P25","57":"RES_2720_2040P24","58":"RES_1920_1440P25","59":"RES_1920_1440P24","60":"RES_2560_1440P30","61":"RES_2560_1440P60","62":"RES_1920_1440P60","63":"RES_1440_2560P30","64":"RES_1080_1920P30","65":"RES_1440_1920P30","66":"RES_1440_2560P60","67":"RES_1440_1920P60","68":"RES_1080_1920P60","69":"RES_2560_1440P25","70":"RES_1440_2560P25","71":"RES_1080_1920P25","72":"RES_720_1280P30","73":"RES_960_1280P30","74":"RES_1152_1152P30","75":"RES_640_360P30","76":"RES_640_480P30","77":"RES_360_640P30","78":"RES_480_640P30","79":"RES_368_368P30","80":"RES_854_854P30","81":"RES_1920_1080P50","82":"RES_1080_1920P50","83":"RES_2560_1440P50","84":"RES_1440_2560P50","85":"RES_1080_1920P24","86":"RES_2560_1440P24","87":"RES_1440_2560P24","88":"RES_1080_1920P120","89":"RES_1280_1280P30","90":"RES_2880_2880P15","91":"RES_1440_720P15","92":"RES_3840_2160P50","93":"RES_1280_1280P25","94":"RES_3040_3040P24","95":"RES_3040_3040P25","96":"RES_3040_3040P30","97":"RES_3840_1920P24","98":"RES_3840_1920P25","99":"RES_3040_1520P50","100":"RES_2720_1530P50","101":"RES_5312_3552P24","102":"RES_5312_3552P25","103":"RES_5312_3552P30","104":"RES_5472_2328P24","105":"RES_5472_2328P25","106":"RES_5472_2328P30","107":"RES_1600_900P30","108":"RES_1760_990P30","109":"RES_3840_1634P30","110":"RES_3840_1634P25","111":"RES_3840_1634P24","112":"RES_6720_2856P25","113":"RES_6720_2856P24","114":"RES_6016_2560P25","115":"RES_6016_2560P24","116":"RES_3200_3200P24","117":"RES_3200_3200P25","118":"RES_3200_3200P30","119":"RES_3072_3072P24","120":"RES_3072_3072P25","121":"RES_3072_3072P30","122":"RES_2160_3840P60","123":"RES_2160_3840P50","124":"RES_2160_3840P30","125":"RES_2160_3840P25","126":"RES_2160_3840P24","127":"RES_2880_2880P5","128":"RES_2880_2880P2","129":"RES_2880_2880P1","130":"RES_2880_2880P05","131":"RES_3000_1500P120","132":"RES_1530_2720P60","133":"RES_1530_2720P50","134":"RES_1530_2720P30","135":"RES_1530_2720P25","136":"RES_1530_2720P24","137":"RES_3840_960P120","138":"RES_1152_648P30","139":"RES_648_1152P30","140":"RES_1152_864P30","141":"RES_864_1152P30","142":"RES_2944_2880P30","143":"RES_3968_1920P30","144":"RES_4000_2000P24","145":"RES_4000_2000P25","146":"RES_4000_2000P30","147":"RES_4000_2000P50","148":"RES_4000_2000P60","149":"RES_1530_2720P100","150":"RES_1920_1080P100","151":"RES_1080_1920P100","152":"RES_4000_3000P50","153":"RES_4000_3000P60","154":"RES_7680_4320P30","155":"RES_2944_736P200","156":"RES_3456_1944P24","157":"RES_3456_1944P25","158":"RES_3456_1944P30","159":"RES_3456_1944P50","160":"RES_3456_1944P60","161":"RES_1944_3456P24","162":"RES_1944_3456P25","163":"RES_1944_3456P30","164":"RES_2944_736P180","165":"RES_3840_3840P24","166":"RES_3840_3840P25","167":"RES_3840_3840P30","168":"RES_3584_2400P24","169":"RES_3584_2400P25","170":"RES_3584_2400P30","171":"RES_3584_2400P50","172":"RES_3584_2400P60","173":"RES_2400_3584P24","174":"RES_2400_3584P25","175":"RES_2400_3584P30","176":"RES_2400_3584P50","177":"RES_2400_3584P60","178":"RES_2880_1440P24","179":"RES_2880_1440P25","180":"RES_2880_1440P30","181":"RES_2880_1440P50","182":"RES_2880_1440P60","183":"RES_1440_2880P24","184":"RES_1440_2880P25","185":"RES_1440_2880P30","186":"RES_1440_2880P50","187":"RES_1440_2880P60","188":"RES_2944_2944P30","189":"RES_2944_2944P25","190":"RES_2944_2944P24","191":"RES_1472_1472P30","192":"RES_3584_2016P30","193":"RES_3584_2016P25","194":"RES_3584_2016P24","195":"RES_2016_3584P30","196":"RES_2016_3584P25","197":"RES_2016_3584P24","198":"RES_2880_720P30","199":"RES_3584_2016P50","200":"RES_3584_2016P60","201":"RES_2016_3584P50","202":"RES_2016_3584P60","203":"RES_3840_2880P30","204":"RES_3840_2880P25","205":"RES_3840_2880P24","206":"RES_2880_1440P48","207":"RES_1440_2880P48","208":"RES_3840_1920P48","209":"RES_640_640P30","210":"RES_7680_4320P24","211":"RES_7680_4320P25","212":"RES_7680_3268P25","213":"RES_7680_3268P30","214":"RES_3840_2160P120","215":"RES_2720_2040P60","216":"RES_2720_2040P50","217":"RES_2720_1530P120","218":"RES_1920_1440P50","219":"RES_7680_3268P24","220":"RES_3840_2160P100","221":"RES_2560_1440P1","222":"RES_1440_2560P1","223":"RES_2560_1440P2","224":"RES_1440_2560P2","225":"RES_2560_1440P5","226":"RES_1440_2560P5","227":"RES_2560_1440P15","228":"RES_1440_2560P15","229":"RES_NUM","242":"RES_2688_1520P120","243":"RES_2688_1520P100","244":"RES_2688_1520P60","245":"RES_2688_1520P50","246":"RES_2688_1520P30","247":"RES_2688_1520P25","248":"RES_2688_1520P24","258":"RES_3840_2160P48","260":"RES_1920_1080P48","331":"RES_2688_1520P48","433":"RES_3840_1632P120","434":"RES_3840_1632P100","435":"RES_3840_1632P60","436":"RES_3840_1632P50","437":"RES_3840_1632P48","438":"RES_3840_1632P30","439":"RES_3840_1632P25","440":"RES_3840_1632P24","446":"RES_3072_3072P60","447":"RES_3072_3072P50"},"insta360.messages.VideoSubMode":{"0":"VIDEO_NORMAL","1":"VIDEO_BULLETTIME","2":"VIDEO_TIMELAPSE","3":"VIDEO_HDR","4":"VIDEO_TIMESHIFT","5":"VIDEO_SUPER","6":"VIDEO_LOOPRECORDING","7":"VIDEO_FPV","8":"VIDEO_MOVIE","9":"VIDEO_SLOW_MOTION","10":"VIDEO_SELFIE","11":"VIDEO_PURE","100":"VIDEO_NONE"}}}
+{
+  "messages": {
+    "insta360.messages.BatteryStatus": {
+      "1": {
+        "name": "power_type",
+        "ref": "insta360.messages.BatteryStatus.PowerType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "battery_level", "repeated": false, "type": "uint32" },
+      "3": { "name": "battery_scale", "repeated": false, "type": "uint32" },
+      "4": {
+        "name": "battery_type",
+        "ref": "insta360.messages.BatteryStatus.BatteryType",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.ButtonFollowOptions": {
+      "1": {
+        "name": "click",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": {
+        "name": "double_click",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "3": {
+        "name": "triple_click",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "4": {
+        "name": "long_press",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "5": {
+        "name": "shutdown_click",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "6": {
+        "name": "shutdown_double_click",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "7": {
+        "name": "shutdown_triple_click",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "8": {
+        "name": "shutdown_long_press",
+        "ref": "insta360.messages.ButtonFollowMode",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.ButtonPressOptions": {
+      "1": {
+        "name": "click",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": {
+        "name": "double_click",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "3": {
+        "name": "triple_click",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "4": {
+        "name": "long_press",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "5": {
+        "name": "short_press",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "6": {
+        "name": "shutdown_click",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "7": {
+        "name": "shutdown_double_click",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "8": {
+        "name": "shutdown_triple_click",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "9": {
+        "name": "shutdown_long_press",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "10": {
+        "name": "shutdown_short_press",
+        "ref": "insta360.messages.ButtonPressMode",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.CameraCaptureStatus": {
+      "1": {
+        "name": "state",
+        "ref": "insta360.messages.CameraCaptureState",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "capture_time", "repeated": false, "type": "uint32" },
+      "3": { "name": "capture_nums", "repeated": false, "type": "uint32" },
+      "4": { "name": "keyTimePointDetail", "repeated": false, "type": "string" }
+    },
+    "insta360.messages.ChargeboxConnectedStatus": {
+      "1": {
+        "name": "chargebox_connected_state",
+        "ref": "insta360.messages.ChargeboxConnectedStatus.ChargeboxConnectedType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": {
+        "name": "chargingbox_battery_status",
+        "ref": "insta360.messages.BatteryStatus",
+        "repeated": false,
+        "type": "message"
+      },
+      "3": {
+        "name": "chargebox_onoff_status",
+        "ref": "insta360.messages.ChargeboxConnectedStatus.ChargeboxOnOffInfo",
+        "repeated": false,
+        "type": "enum"
+      },
+      "4": {
+        "name": "chargebox_usb_connected_state",
+        "ref": "insta360.messages.ChargeboxConnectedStatus.ChargeboxUsbBtConnectedType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "5": {
+        "name": "chargebox_bt_connected_state",
+        "ref": "insta360.messages.ChargeboxConnectedStatus.ChargeboxUsbBtConnectedType",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.DeepTrack": {
+      "1": { "name": "unknown_1", "type": "uint32", "repeated": false },
+      "2": { "name": "unknown_2", "type": "uint32", "repeated": false },
+      "3": { "name": "unknown_3", "type": "uint32", "repeated": false },
+      "4": { "name": "state", "type": "uint32", "repeated": false }
+    },
+    "insta360.messages.ExposureOptions": {
+      "1": {
+        "name": "program",
+        "ref": "insta360.messages.ExposureOptions.Program",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "iso", "repeated": false, "type": "uint32" },
+      "3": { "name": "shutter_speed", "repeated": false, "type": "double" }
+    },
+    "insta360.messages.ExtraMetadata": {
+      "1": { "name": "serial_number", "repeated": false, "type": "string" },
+      "2": { "name": "camera_type", "repeated": false, "type": "string" },
+      "3": { "name": "fw_version", "repeated": false, "type": "string" },
+      "4": { "name": "file_type", "repeated": false, "type": "string" },
+      "5": { "name": "offset", "repeated": false, "type": "string" },
+      "6": { "name": "ip", "repeated": false, "type": "string" },
+      "7": { "name": "creation_time", "repeated": false, "type": "uint64" },
+      "8": { "name": "export_time", "repeated": false, "type": "uint64" },
+      "9": { "name": "file_size", "repeated": false, "type": "uint64" },
+      "10": { "name": "total_time", "repeated": false, "type": "uint32" },
+      "11": { "name": "gps", "repeated": false, "type": "bytes" },
+      "12": { "name": "orientation", "repeated": false, "type": "bytes" },
+      "13": {
+        "name": "user_options",
+        "ref": "insta360.messages.ExtraMetadata.ExtraUserOptions",
+        "repeated": false,
+        "type": "message"
+      },
+      "14": { "name": "gyro", "repeated": false, "type": "bytes" },
+      "15": {
+        "name": "hdr_state",
+        "ref": "insta360.messages.ExtraMetadata.HDR_STATE",
+        "repeated": false,
+        "type": "enum"
+      },
+      "16": { "name": "hdr_identifier", "repeated": false, "type": "string" },
+      "17": { "name": "original_offset", "repeated": false, "type": "string" },
+      "18": {
+        "name": "trigger_source",
+        "ref": "insta360.messages.ExtraMetadata.TriggerSource",
+        "repeated": false,
+        "type": "enum"
+      },
+      "19": {
+        "name": "dimension",
+        "ref": "insta360.messages.ExtraMetadata.Vector2",
+        "repeated": false,
+        "type": "message"
+      },
+      "20": { "name": "frame_rate", "repeated": false, "type": "int32" },
+      "21": {
+        "name": "image_translate",
+        "ref": "insta360.messages.ExtraMetadata.Vector2",
+        "repeated": false,
+        "type": "message"
+      },
+      "22": { "name": "gamma_mode", "repeated": false, "type": "string" },
+      "23": {
+        "name": "thumbnail_gyro_index",
+        "ref": "insta360.messages.ExtraMetadata.GyroIndex",
+        "repeated": false,
+        "type": "message"
+      },
+      "24": { "name": "first_frame_timestamp", "repeated": false, "type": "int64" },
+      "25": { "name": "rolling_shutter_time", "repeated": false, "type": "double" },
+      "26": {
+        "name": "file_group_info",
+        "ref": "insta360.messages.ExtraMetadata.FileGroupInfo",
+        "repeated": false,
+        "type": "message"
+      },
+      "27": {
+        "name": "window_crop_info",
+        "ref": "insta360.messages.WindowCropInfo",
+        "repeated": false,
+        "type": "message"
+      },
+      "28": { "name": "gyro_timestamp", "repeated": false, "type": "double" },
+      "29": { "name": "is_has_gyro_timestamp", "repeated": false, "type": "bool" },
+      "30": { "name": "timelapse_interval", "repeated": false, "type": "uint32" },
+      "31": { "name": "gyro_calib", "repeated": false, "type": "bytes" },
+      "32": {
+        "name": "evo_status_mode",
+        "ref": "insta360.messages.ExtraMetadata.EvoStatusMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "33": { "name": "evo_status_id", "repeated": false, "type": "string" },
+      "34": { "name": "original_offset_3d", "repeated": false, "type": "string" },
+      "35": {
+        "name": "gps_sources",
+        "ref": "insta360.messages.ExtraMetadata.GpsSource",
+        "repeated": true,
+        "type": "enum"
+      },
+      "36": { "name": "first_gps_timestamp", "repeated": false, "type": "int64" },
+      "37": { "name": "orientation_calib", "repeated": false, "type": "bytes" },
+      "38": { "name": "is_collected", "repeated": false, "type": "bool" },
+      "39": { "name": "recycle_time", "repeated": false, "type": "uint64" },
+      "40": { "name": "total_frames", "repeated": false, "type": "uint32" },
+      "41": { "name": "is_selfie", "repeated": false, "type": "bool" },
+      "42": { "name": "is_flowstate_online", "repeated": false, "type": "bool" },
+      "43": { "name": "is_dewarp", "repeated": false, "type": "bool" },
+      "44": {
+        "name": "resolution_size",
+        "ref": "insta360.messages.ExtraMetadata.Vector2",
+        "repeated": false,
+        "type": "message"
+      },
+      "45": {
+        "name": "battery_type",
+        "ref": "insta360.messages.ExtraMetadata.Battery_type",
+        "repeated": false,
+        "type": "enum"
+      },
+      "46": {
+        "name": "cam_posture",
+        "ref": "insta360.messages.ExtraMetadata.Camera_Posture",
+        "repeated": false,
+        "type": "enum"
+      },
+      "47": {
+        "name": "fov_type",
+        "ref": "insta360.messages.ExtraMetadata.Image_FovType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "48": { "name": "distance", "repeated": false, "type": "double" },
+      "49": { "name": "fov", "repeated": false, "type": "double" },
+      "50": {
+        "name": "gyro_filter_type",
+        "ref": "insta360.messages.ExtraMetadata.Gyro_FilterType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "51": {
+        "name": "gyro_type",
+        "ref": "insta360.messages.ExtraMetadata.GyroType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "52": {
+        "name": "media_data_rotate_angel",
+        "ref": "insta360.messages.ExtraMetadata.VideoMediaDataRotateAngle",
+        "repeated": false,
+        "type": "enum"
+      },
+      "53": { "name": "offset_v2", "repeated": false, "type": "string" },
+      "54": { "name": "offset_v3", "repeated": false, "type": "string" },
+      "55": { "name": "original_offset_v2", "repeated": false, "type": "string" },
+      "56": { "name": "original_offset_v3", "repeated": false, "type": "string" },
+      "57": {
+        "name": "focusSensor",
+        "ref": "insta360.messages.ExtraMetadata.SensorDevice",
+        "repeated": false,
+        "type": "enum"
+      },
+      "58": {
+        "name": "expectOutputType",
+        "ref": "insta360.messages.ExtraMetadata.ExpectOutputType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "59": { "name": "timelapse_interval_in_millisecond", "repeated": false, "type": "bool" },
+      "60": { "name": "photo_rot", "repeated": true, "type": "float" },
+      "61": {
+        "name": "audio_mode",
+        "ref": "insta360.messages.ExtraMetadata.AudioModeType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "62": { "name": "is_raw_gyro", "repeated": false, "type": "bool" },
+      "63": {
+        "name": "raw_capture_type",
+        "ref": "insta360.messages.ExtraMetadata.RawCaptureType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "64": {
+        "name": "pts_type",
+        "ref": "insta360.messages.ExtraMetadata.VideoPtsType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "65": {
+        "name": "gyro_cfg_info",
+        "ref": "insta360.messages.ExtraMetadata.GyroConfigInfo",
+        "repeated": false,
+        "type": "message"
+      },
+      "66": {
+        "name": "lens_283M_type1",
+        "ref": "insta360.messages.ExtraMetadata.Lens283MType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "67": {
+        "name": "lens_283M_type2",
+        "ref": "insta360.messages.ExtraMetadata.Lens283MType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "68": {
+        "name": "offset_states",
+        "ref": "insta360.messages.OffsetState",
+        "repeated": false,
+        "type": "enum"
+      },
+      "69": { "name": "q_i_uav", "repeated": true, "type": "float" },
+      "70": { "name": "r_uav_i", "repeated": true, "type": "float" },
+      "71": {
+        "name": "auto_clip_para",
+        "ref": "insta360.messages.ExtraMetadata.AutoClipParam",
+        "repeated": false,
+        "type": "message"
+      },
+      "72": {
+        "name": "meta_track_para",
+        "ref": "insta360.messages.ExtraMetadata.MetaTrackParam",
+        "repeated": false,
+        "type": "message"
+      },
+      "73": {
+        "name": "time_scale",
+        "ref": "insta360.messages.ExtraMetadata.TimeScale",
+        "repeated": false,
+        "type": "enum"
+      },
+      "74": {
+        "name": "hdr_process_type",
+        "ref": "insta360.messages.ExtraMetadata.HdrProcessType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "75": {
+        "name": "thumbnail_type",
+        "ref": "insta360.messages.ExtraMetadata.ThumbnailType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "76": {
+        "name": "pureshot_process_type",
+        "ref": "insta360.messages.ExtraMetadata.PureShotProcessType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "77": { "name": "pre_rec_time_flag", "repeated": false, "type": "bool" },
+      "78": {
+        "name": "frame_rate_av_rational",
+        "ref": "insta360.messages.ExtraMetadata.FrameRateAVRational",
+        "repeated": false,
+        "type": "message"
+      }
+    },
+    "insta360.messages.ExtraMetadata.AiLibVersion": {
+      "1": { "name": "major", "repeated": false, "type": "uint32" },
+      "2": { "name": "minor", "repeated": false, "type": "uint32" },
+      "3": { "name": "patch", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.ExtraMetadata.AutoClipParam": {
+      "1": {
+        "name": "version",
+        "ref": "insta360.messages.ExtraMetadata.AutoClipVersion",
+        "repeated": false,
+        "type": "message"
+      },
+      "2": { "name": "sample_rate", "repeated": false, "type": "float" },
+      "3": { "name": "img_w", "repeated": false, "type": "uint32" },
+      "4": { "name": "img_h", "repeated": false, "type": "uint32" },
+      "5": { "name": "img_pitch", "repeated": false, "type": "uint32" },
+      "6": {
+        "name": "compute_type",
+        "ref": "insta360.messages.ExtraMetadata.ComputeType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "7": { "name": "fps", "repeated": false, "type": "uint32" },
+      "8": { "name": "seq_diff", "repeated": false, "type": "uint32" },
+      "9": { "name": "pts_diff", "repeated": false, "type": "uint32" },
+      "10": { "name": "total_frame", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.ExtraMetadata.AutoClipVersion": {
+      "1": {
+        "name": "platform",
+        "ref": "insta360.messages.ExtraMetadata.AiPlatform",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": {
+        "name": "algorithm",
+        "ref": "insta360.messages.ExtraMetadata.AiAlgorithm",
+        "repeated": false,
+        "type": "enum"
+      },
+      "3": {
+        "name": "model_ver",
+        "ref": "insta360.messages.ExtraMetadata.AiLibVersion",
+        "repeated": false,
+        "type": "message"
+      },
+      "4": {
+        "name": "svc_ver",
+        "ref": "insta360.messages.ExtraMetadata.AiLibVersion",
+        "repeated": false,
+        "type": "message"
+      }
+    },
+    "insta360.messages.ExtraMetadata.ExtraUserOptions": {
+      "1": { "name": "filter", "repeated": false, "type": "string" },
+      "2": { "name": "befilter", "repeated": false, "type": "string" },
+      "3": { "name": "euler", "repeated": false, "type": "bytes" },
+      "4": { "name": "rm_purple", "repeated": false, "type": "bool" },
+      "5": { "name": "gyro_calibrate_mode", "repeated": false, "type": "uint32" },
+      "6": { "name": "euler_enable", "repeated": false, "type": "bool" },
+      "7": {
+        "name": "logo_type",
+        "ref": "insta360.messages.ExtraMetadata.ExtraUserOptions.LogoType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "8": { "name": "adjustFilters", "repeated": false, "type": "string" },
+      "9": { "name": "lut_filter", "repeated": false, "type": "string" },
+      "10": {
+        "name": "offset_convert_states",
+        "ref": "insta360.messages.ExtraMetadata.ExtraUserOptions.OffsetConvertState",
+        "repeated": true,
+        "type": "enum"
+      },
+      "11": { "name": "play_trim_recommend_timestamp", "repeated": false, "type": "double" }
+    },
+    "insta360.messages.ExtraMetadata.FileGroupInfo": {
+      "1": {
+        "name": "type",
+        "ref": "insta360.messages.ExtraMetadata.SubMediaType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "index", "repeated": false, "type": "uint32" },
+      "3": { "name": "identify", "repeated": false, "type": "string" },
+      "4": { "name": "total", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.ExtraMetadata.FrameRateAVRational": {
+      "1": { "name": "num", "repeated": false, "type": "uint32" },
+      "2": { "name": "den", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.ExtraMetadata.GyroConfigInfo": {
+      "1": { "name": "acc_range", "repeated": false, "type": "uint32" },
+      "2": { "name": "gyro_range", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.ExtraMetadata.GyroIndex": {
+      "1": { "name": "index", "repeated": false, "type": "int32" },
+      "2": { "name": "timestamp", "repeated": false, "type": "int64" }
+    },
+    "insta360.messages.ExtraMetadata.MetaTrackParam": {
+      "1": { "name": "ImuDataSize", "repeated": false, "type": "uint64" },
+      "2": { "name": "AAADataSize", "repeated": false, "type": "uint64" },
+      "3": { "name": "Compress", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.ExtraMetadata.Vector2": {
+      "1": { "name": "x", "repeated": false, "type": "int32" },
+      "2": { "name": "y", "repeated": false, "type": "int32" }
+    },
+    "insta360.messages.GetCurrentCaptureStatusResp": {
+      "1": {
+        "name": "status",
+        "ref": "insta360.messages.CameraCaptureStatus",
+        "repeated": false,
+        "type": "message"
+      }
+    },
+    "insta360.messages.GetOptions": {
+      "1": {
+        "name": "option_types",
+        "ref": "insta360.messages.OptionType",
+        "repeated": true,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.GetOptionsResp": {
+      "1": {
+        "name": "option_types",
+        "ref": "insta360.messages.OptionType",
+        "repeated": true,
+        "type": "enum"
+      },
+      "2": {
+        "name": "value",
+        "ref": "insta360.messages.Options",
+        "repeated": false,
+        "type": "message"
+      }
+    },
+    "insta360.messages.GetPhotographyOptions": {
+      "1": {
+        "name": "option_types",
+        "ref": "insta360.messages.PhotographyOptionType",
+        "repeated": true,
+        "type": "enum"
+      },
+      "2": {
+        "name": "function_mode",
+        "ref": "insta360.messages.FunctionMode",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.GetPhotographyOptionsResp": {
+      "1": {
+        "name": "option_types",
+        "ref": "insta360.messages.PhotographyOptionType",
+        "repeated": true,
+        "type": "enum"
+      },
+      "2": {
+        "name": "value",
+        "ref": "insta360.messages.PhotographyOptions",
+        "repeated": false,
+        "type": "message"
+      }
+    },
+    "insta360.messages.Options": {
+      "1": {
+        "name": "video_resolution",
+        "ref": "insta360.messages.VideoResolution",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": {
+        "name": "photo_size",
+        "ref": "insta360.messages.PhotoSize",
+        "repeated": false,
+        "type": "enum"
+      },
+      "3": { "name": "video_bitrate", "repeated": false, "type": "uint32" },
+      "4": { "name": "audio_bitrate", "repeated": false, "type": "uint32" },
+      "5": { "name": "audio_samplerate", "repeated": false, "type": "uint32" },
+      "6": { "name": "origin_offset", "repeated": false, "type": "string" },
+      "7": { "name": "capture_time_limit", "repeated": false, "type": "uint32" },
+      "8": { "name": "gps_timeout", "repeated": false, "type": "uint32" },
+      "9": { "name": "remaining_capture_time", "repeated": false, "type": "uint32" },
+      "10": { "name": "remaining_pictures", "repeated": false, "type": "uint32" },
+      "11": {
+        "name": "battery_status",
+        "ref": "insta360.messages.BatteryStatus",
+        "repeated": false,
+        "type": "message"
+      },
+      "12": { "name": "local_time", "repeated": false, "type": "uint64" },
+      "13": { "name": "time_zone_seconds_from_GMT", "repeated": false, "type": "int32" },
+      "14": { "name": "mute", "repeated": false, "type": "bool" },
+      "15": { "name": "serial_number", "repeated": false, "type": "string" },
+      "16": { "name": "UUID", "repeated": false, "type": "string" },
+      "17": {
+        "name": "pressOptions",
+        "ref": "insta360.messages.ButtonPressOptions",
+        "repeated": false,
+        "type": "message"
+      },
+      "19": { "name": "activate_time", "repeated": false, "type": "uint64" },
+      "20": {
+        "name": "storage_state",
+        "ref": "insta360.messages.StorageState",
+        "repeated": false,
+        "type": "message"
+      },
+      "21": { "name": "lens_index", "repeated": false, "type": "uint32" },
+      "22": { "name": "media_offset", "repeated": false, "type": "string" },
+      "23": { "name": "self_timer", "repeated": false, "type": "uint32" },
+      "24": { "name": "gyro_sample_rate", "repeated": false, "type": "uint32" },
+      "25": {
+        "name": "acc_range",
+        "ref": "insta360.messages.Options.AccFullScaleRange",
+        "repeated": false,
+        "type": "enum"
+      },
+      "26": {
+        "name": "gyro_range",
+        "ref": "insta360.messages.Options.GyroFullScaleRange",
+        "repeated": false,
+        "type": "enum"
+      },
+      "27": { "name": "take_raw_picture", "repeated": false, "type": "bool" },
+      "28": {
+        "name": "gamma_mode",
+        "ref": "insta360.messages.GammaMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "29": { "name": "media_time", "repeated": false, "type": "int64" },
+      "30": { "name": "firmwareRevision", "repeated": false, "type": "string" },
+      "31": {
+        "name": "sys_adoption",
+        "ref": "insta360.messages.Options.AdoptionSystem",
+        "repeated": false,
+        "type": "enum"
+      },
+      "32": { "name": "cpu_type", "repeated": false, "type": "string" },
+      "33": {
+        "name": "gyro_filter_config",
+        "ref": "insta360.messages.Options.GyroFilterConfig",
+        "repeated": false,
+        "type": "message"
+      },
+      "34": { "name": "mctf_enable", "repeated": false, "type": "bool" },
+      "35": { "name": "sport_mode_enable", "repeated": false, "type": "bool" },
+      "36": {
+        "name": "wifi_info",
+        "ref": "insta360.messages.Options.WifiInfo",
+        "repeated": false,
+        "type": "message"
+      },
+      "37": {
+        "name": "wifi_channel_list",
+        "ref": "insta360.messages.Options.WifiChannelList",
+        "repeated": false,
+        "type": "message"
+      },
+      "38": { "name": "authorization_id", "repeated": false, "type": "string" },
+      "39": { "name": "calibration_offset", "repeated": false, "type": "string" },
+      "40": {
+        "name": "photo_sub_mode",
+        "ref": "insta360.messages.PhotoSubMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "41": {
+        "name": "video_sub_mode",
+        "ref": "insta360.messages.VideoSubMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "42": {
+        "name": "second_stream_res",
+        "ref": "insta360.messages.VideoResolution",
+        "repeated": false,
+        "type": "enum"
+      },
+      "43": {
+        "name": "wifi_status",
+        "ref": "insta360.messages.Options.WifiStatus",
+        "repeated": false,
+        "type": "enum"
+      },
+      "44": {
+        "name": "evo_status_mode",
+        "ref": "insta360.messages.Options.EvoStatusMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "45": { "name": "origin_offset_3d", "repeated": false, "type": "string" },
+      "46": { "name": "media_offset_3d", "repeated": false, "type": "string" },
+      "47": { "name": "calibration_offset_3d", "repeated": false, "type": "string" },
+      "48": { "name": "camera_type", "repeated": false, "type": "string" },
+      "49": { "name": "bt_remote_version", "repeated": false, "type": "string" },
+      "50": {
+        "name": "bt_remote_type",
+        "ref": "insta360.messages.Options.BTRemoteType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "51": {
+        "name": "quality_setting",
+        "ref": "insta360.messages.Options.QualitySetting",
+        "repeated": false,
+        "type": "enum"
+      },
+      "52": { "name": "over_heat_protection", "repeated": false, "type": "bool" },
+      "53": { "name": "calibration_orientation", "repeated": false, "type": "bytes" },
+      "54": { "name": "standby_duration", "repeated": false, "type": "uint32" },
+      "55": { "name": "quick_capture_enable", "repeated": false, "type": "bool" },
+      "56": { "name": "bt_mac_addr", "repeated": false, "type": "string" },
+      "57": {
+        "name": "television_system",
+        "ref": "insta360.messages.Options.TelevisionSystem",
+        "repeated": false,
+        "type": "enum"
+      },
+      "58": { "name": "sensor0_serial_vr360", "repeated": false, "type": "string" },
+      "59": { "name": "sensor1_serial_vr360", "repeated": false, "type": "string" },
+      "60": { "name": "sensor_serial_vr180", "repeated": false, "type": "string" },
+      "61": { "name": "mobvoi_license", "repeated": false, "type": "string" },
+      "62": { "name": "mobvoi_public_key", "repeated": false, "type": "string" },
+      "63": {
+        "name": "gyro_info",
+        "ref": "insta360.messages.Options.GyroInfo",
+        "repeated": false,
+        "type": "message"
+      },
+      "64": { "name": "sensor_id", "repeated": false, "type": "string" },
+      "65": { "name": "enableInternalFlowstate", "repeated": false, "type": "bool" },
+      "66": {
+        "name": "video_encode_type",
+        "ref": "insta360.messages.Options.VideoEncodeType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "67": {
+        "name": "sensor",
+        "ref": "insta360.messages.Sensor",
+        "repeated": false,
+        "type": "message"
+      },
+      "68": { "name": "is_selfie", "repeated": false, "type": "bool" },
+      "69": { "name": "rolling_shutter_time", "repeated": false, "type": "double" },
+      "70": { "name": "gyro_timestamp", "repeated": false, "type": "double" },
+      "71": {
+        "name": "video_fov",
+        "ref": "insta360.messages.Options.FovType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "72": {
+        "name": "still_fov",
+        "ref": "insta360.messages.Options.FovType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "73": { "name": "Gyro_Polyfit_State", "repeated": false, "type": "bool" },
+      "74": { "name": "Gyro_Calibrate_State", "repeated": false, "type": "bool" },
+      "75": { "name": "mobvoi_license_verity_state", "repeated": false, "type": "bool" },
+      "76": {
+        "name": "flicker",
+        "ref": "insta360.messages.Flicker",
+        "repeated": false,
+        "type": "enum"
+      },
+      "77": { "name": "temp_value", "repeated": false, "type": "int32" },
+      "78": { "name": "origin_offset_v2", "repeated": false, "type": "string" },
+      "79": { "name": "origin_offset_v3", "repeated": false, "type": "string" },
+      "80": { "name": "media_offset_v2", "repeated": false, "type": "string" },
+      "81": { "name": "media_offset_v3", "repeated": false, "type": "string" },
+      "82": {
+        "name": "focusSensor",
+        "ref": "insta360.messages.SensorDevice",
+        "repeated": false,
+        "type": "enum"
+      },
+      "83": {
+        "name": "expectOutputType",
+        "ref": "insta360.messages.Options.ExpectOutputType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "84": {
+        "name": "hw_type",
+        "ref": "insta360.messages.Options.HwType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "85": {
+        "name": "ChargeboxConnectedStatus",
+        "ref": "insta360.messages.ChargeboxConnectedStatus",
+        "repeated": false,
+        "type": "message"
+      },
+      "88": {
+        "name": "camera_language",
+        "ref": "insta360.messages.Options.LANGUAGE_TYPE",
+        "repeated": false,
+        "type": "enum"
+      },
+      "89": { "name": "ble_version", "repeated": false, "type": "string" },
+      "93": {
+        "name": "camera_posture",
+        "ref": "insta360.messages.Options.CameraPostureType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "97": {
+        "name": "bt_wakeup_sw",
+        "ref": "insta360.messages.Options.Bt_Wakeup_Sw",
+        "repeated": false,
+        "type": "enum"
+      },
+      "103": {
+        "name": "offset_states",
+        "ref": "insta360.messages.OffsetState",
+        "repeated": false,
+        "type": "enum"
+      },
+      "110": { "name": "ota_pkg_version", "repeated": false, "type": "string" },
+      "114": { "name": "box_ota_pkg_version", "repeated": false, "type": "string" },
+      "115": { "name": "box_bt_version", "repeated": false, "type": "string" },
+      "116": { "name": "box_version", "repeated": false, "type": "string" },
+      "117": { "name": "go3_version", "repeated": false, "type": "string" },
+      "118": { "name": "wifi_working_status", "repeated": false, "type": "bool" },
+      "119": {
+        "name": "followOptions",
+        "ref": "insta360.messages.ButtonFollowOptions",
+        "repeated": false,
+        "type": "message"
+      },
+      "120": { "name": "led_switch", "repeated": false, "type": "bool" },
+      "122": {
+        "name": "camera_posture_when_capture_start",
+        "ref": "insta360.messages.Options.CameraPostureType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "123": {
+        "name": "chargebox_connected_status_when_capture_start",
+        "ref": "insta360.messages.ChargeboxConnectedStatus",
+        "repeated": false,
+        "type": "message"
+      },
+      "124": {
+        "name": "window_crop_info",
+        "ref": "insta360.messages.WindowCropInfo",
+        "repeated": false,
+        "type": "message"
+      }
+    },
+    "insta360.messages.Options.GyroFilterConfig": {
+      "1": { "name": "dlpf_value", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.Options.GyroInfo": {
+      "1": {
+        "name": "gyro_type",
+        "ref": "insta360.messages.Options.GyroInfo.GyroType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": {
+        "name": "gyro_pos",
+        "ref": "insta360.messages.Options.GyroInfo.GyroPos",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.Options.WifiChannelList": {
+      "1": { "name": "country_code", "repeated": false, "type": "string" },
+      "2": { "name": "channel_list", "repeated": false, "type": "bytes" }
+    },
+    "insta360.messages.Options.WifiInfo": {
+      "1": { "name": "ssid", "repeated": false, "type": "string" },
+      "2": { "name": "password", "repeated": false, "type": "string" },
+      "3": { "name": "channel", "repeated": false, "type": "int32" },
+      "4": {
+        "name": "mode",
+        "ref": "insta360.messages.Options.WifiInfo.Mode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "5": {
+        "name": "wifi_state",
+        "ref": "insta360.messages.Options.WifiInfo.WifiState",
+        "repeated": false,
+        "type": "enum"
+      },
+      "6": { "name": "passwd_version", "repeated": false, "type": "int32" },
+      "7": { "name": "mac_addr", "repeated": false, "type": "string" }
+    },
+    "insta360.messages.PhotographyOptions": {
+      "1": { "name": "channel", "repeated": false, "type": "uint32" },
+      "2": { "name": "brightness", "repeated": false, "type": "sint32" },
+      "3": { "name": "contrast", "repeated": false, "type": "uint32" },
+      "4": { "name": "saturation", "repeated": false, "type": "uint32" },
+      "5": { "name": "hue", "repeated": false, "type": "sint32" },
+      "6": { "name": "sharpness", "repeated": false, "type": "uint32" },
+      "7": { "name": "exposure_bias", "repeated": false, "type": "sint32" },
+      "8": {
+        "name": "exposure_mode",
+        "ref": "insta360.messages.PhotographyOptions.ExposureMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "9": {
+        "name": "exposure_prog",
+        "ref": "insta360.messages.PhotographyOptions.ExposureProg",
+        "repeated": false,
+        "type": "message"
+      },
+      "10": {
+        "name": "exposure_manual",
+        "ref": "insta360.messages.PhotographyOptions.ExposureManual",
+        "repeated": false,
+        "type": "message"
+      },
+      "11": {
+        "name": "meter_mode",
+        "ref": "insta360.messages.PhotographyOptions.AEMeterMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "12": { "name": "manual_meter_weights", "repeated": true, "type": "uint32" },
+      "13": {
+        "name": "white_balance",
+        "ref": "insta360.messages.PhotographyOptions.WhiteBalance",
+        "repeated": false,
+        "type": "enum"
+      },
+      "14": {
+        "name": "flicker",
+        "ref": "insta360.messages.Flicker",
+        "repeated": false,
+        "type": "enum"
+      },
+      "15": { "name": "ev_index", "repeated": false, "type": "uint32" },
+      "16": {
+        "name": "auto_mode_video_param",
+        "ref": "insta360.messages.PhotographyOptions.ExposureParameter",
+        "repeated": false,
+        "type": "message"
+      },
+      "17": {
+        "name": "auto_mode_still_param",
+        "ref": "insta360.messages.PhotographyOptions.ExposureParameter",
+        "repeated": false,
+        "type": "message"
+      },
+      "18": {
+        "name": "gamma_mode",
+        "ref": "insta360.messages.GammaMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "19": {
+        "name": "long_exposure_manual",
+        "ref": "insta360.messages.PhotographyOptions.LongExposureManual",
+        "repeated": false,
+        "type": "message"
+      },
+      "20": {
+        "name": "still_exposure",
+        "ref": "insta360.messages.ExposureOptions",
+        "repeated": false,
+        "type": "message"
+      },
+      "21": {
+        "name": "video_exposure",
+        "ref": "insta360.messages.ExposureOptions",
+        "repeated": false,
+        "type": "message"
+      },
+      "22": { "name": "preview_mctf_enable", "repeated": false, "type": "bool" },
+      "23": { "name": "preview_sport_mode_enable", "repeated": false, "type": "bool" },
+      "24": { "name": "video_iso_top_limit", "repeated": false, "type": "uint32" },
+      "25": {
+        "name": "raw_capture_type",
+        "ref": "insta360.messages.RawCaptureType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "26": { "name": "photography_self_timer", "repeated": false, "type": "uint32" },
+      "27": { "name": "aeb_capture_num", "repeated": false, "type": "uint32" },
+      "28": {
+        "name": "preview_sport_level",
+        "ref": "insta360.messages.PhotographyOptions.PREVIEW_SPORT_LEVEL",
+        "repeated": false,
+        "type": "enum"
+      },
+      "29": { "name": "record_duration", "repeated": false, "type": "uint32" },
+      "30": { "name": "photo_size_id", "repeated": false, "type": "uint32" },
+      "31": {
+        "name": "record_resolution",
+        "ref": "insta360.messages.VideoResolution",
+        "repeated": false,
+        "type": "enum"
+      },
+      "32": { "name": "video_bitrate", "repeated": false, "type": "uint32" },
+      "33": {
+        "name": "fov_type",
+        "ref": "insta360.messages.PhotographyOptions.Fov_Type",
+        "repeated": false,
+        "type": "enum"
+      },
+      "34": { "name": "flowstate_base_enable", "repeated": false, "type": "bool" },
+      "35": {
+        "name": "color_mode",
+        "ref": "insta360.messages.PhotographyOptions.COLOR_MODE",
+        "repeated": false,
+        "type": "enum"
+      },
+      "36": {
+        "name": "res_rec_limit",
+        "ref": "insta360.messages.PhotographyOptions.ResRecLimit",
+        "repeated": true,
+        "type": "message"
+      },
+      "37": { "name": "accelerate_frequency", "repeated": false, "type": "uint32" },
+      "38": { "name": "focal_length_value", "repeated": false, "type": "double" },
+      "39": { "name": "white_balance_value", "repeated": false, "type": "uint32" },
+      "40": {
+        "name": "photo_resolution",
+        "ref": "insta360.messages.PhotoSize",
+        "repeated": false,
+        "type": "enum"
+      },
+      "41": { "name": "remaining_time", "repeated": false, "type": "uint32" },
+      "42": { "name": "dark_eis_enable", "repeated": false, "type": "bool" },
+      "43": {
+        "name": "flow_state_level",
+        "ref": "insta360.messages.PhotographyOptions.Flow_State_Level",
+        "repeated": false,
+        "type": "enum"
+      },
+      "44": { "name": "burst_capture_num", "repeated": false, "type": "uint32" },
+      "45": { "name": "cache_capture_num", "repeated": false, "type": "uint32" },
+      "46": { "name": "metering_enable", "repeated": false, "type": "bool" },
+      "51": { "name": "burst_capture_time", "repeated": false, "type": "uint32" },
+      "52": { "name": "cache_capture_enable", "repeated": false, "type": "bool" },
+      "53": { "name": "zoom_scale", "repeated": false, "type": "double" },
+      "91": {
+        "name": "deep_track",
+        "type": "message",
+        "repeated": false,
+        "ref": "insta360.messages.DeepTrack"
+      },
+      "98": {
+        "name": "pano_aspect",
+        "type": "enum",
+        "repeated": false,
+        "ref": "insta360.messages.PanoAspect"
+      },
+      "104": {
+        "name": "filter_intensity",
+        "type": "enum",
+        "repeated": false,
+        "ref": "insta360.messages.FilterIntensity"
+      }
+    },
+    "insta360.messages.PhotographyOptions.ExposureManual": {
+      "1": {
+        "name": "relate_mode",
+        "ref": "insta360.messages.PhotographyOptions.ExposureManual.RelateMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "iso", "repeated": false, "type": "uint32" },
+      "3": {
+        "name": "shutter_speed",
+        "ref": "insta360.messages.PhotographyOptions.ShutterSpeed",
+        "repeated": false,
+        "type": "enum"
+      },
+      "4": { "name": "video_iso", "repeated": false, "type": "uint32" },
+      "5": {
+        "name": "video_shutter_speed",
+        "ref": "insta360.messages.PhotographyOptions.ShutterSpeed",
+        "repeated": false,
+        "type": "enum"
+      },
+      "6": { "name": "still_iso", "repeated": false, "type": "uint32" },
+      "7": {
+        "name": "still_shutter_speed",
+        "ref": "insta360.messages.PhotographyOptions.ShutterSpeed",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.PhotographyOptions.ExposureParameter": {
+      "1": { "name": "iso", "repeated": false, "type": "uint32" },
+      "2": {
+        "name": "shutter_speed",
+        "ref": "insta360.messages.PhotographyOptions.ShutterSpeed",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.PhotographyOptions.ExposureProg": {
+      "1": {
+        "name": "mode",
+        "ref": "insta360.messages.PhotographyOptions.ExposureProg.ProgMode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "iso", "repeated": false, "type": "uint32" },
+      "3": {
+        "name": "shutter_speed",
+        "ref": "insta360.messages.PhotographyOptions.ShutterSpeed",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.PhotographyOptions.LongExposureManual": {
+      "1": { "name": "iso", "repeated": false, "type": "uint32" },
+      "2": { "name": "shutter_speed", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.PhotographyOptions.ResRecLimit": {
+      "1": {
+        "name": "video_res",
+        "ref": "insta360.messages.VideoResolution",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "limit_time", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.Sensor": {
+      "1": { "name": "serials", "repeated": true, "type": "string" },
+      "2": {
+        "name": "type",
+        "ref": "insta360.messages.Sensor.Type",
+        "repeated": false,
+        "type": "enum"
+      },
+      "3": { "name": "id", "repeated": true, "type": "string" }
+    },
+    "insta360.messages.SetOptions": {
+      "1": {
+        "name": "option_types",
+        "ref": "insta360.messages.OptionType",
+        "repeated": true,
+        "type": "enum"
+      },
+      "2": {
+        "name": "value",
+        "ref": "insta360.messages.Options",
+        "repeated": false,
+        "type": "message"
+      }
+    },
+    "insta360.messages.SetOptionsResp": {
+      "1": {
+        "name": "option_types",
+        "ref": "insta360.messages.OptionType",
+        "repeated": true,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.SetPhotographyOptions": {
+      "1": {
+        "name": "option_types",
+        "ref": "insta360.messages.PhotographyOptionType",
+        "repeated": true,
+        "type": "enum"
+      },
+      "2": {
+        "name": "value",
+        "ref": "insta360.messages.PhotographyOptions",
+        "repeated": false,
+        "type": "message"
+      },
+      "3": {
+        "name": "function_mode",
+        "ref": "insta360.messages.FunctionMode",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.SetPhotographyOptionsResp": {
+      "1": {
+        "name": "success_types",
+        "ref": "insta360.messages.PhotographyOptionType",
+        "repeated": true,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.StartCapture": {
+      "1": {
+        "name": "mode",
+        "ref": "insta360.messages.CaptureMode",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.StopCapture": {
+      "1": {
+        "name": "extra_metadata",
+        "ref": "insta360.messages.ExtraMetadata",
+        "repeated": false,
+        "type": "message"
+      },
+      "2": {
+        "name": "mode",
+        "ref": "insta360.messages.CaptureMode",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.StorageState": {
+      "1": {
+        "name": "card_state",
+        "ref": "insta360.messages.CardState",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": { "name": "free_space", "repeated": false, "type": "uint64" },
+      "3": { "name": "total_space", "repeated": false, "type": "uint64" },
+      "4": {
+        "name": "location",
+        "ref": "insta360.messages.CardLocation",
+        "repeated": false,
+        "type": "enum"
+      }
+    },
+    "insta360.messages.TakePicture": {
+      "1": {
+        "name": "mode",
+        "ref": "insta360.messages.TakePicture.Mode",
+        "repeated": false,
+        "type": "enum"
+      },
+      "2": {
+        "name": "extra_metadata",
+        "ref": "insta360.messages.ExtraMetadata",
+        "repeated": false,
+        "type": "message"
+      },
+      "3": { "name": "aeb_ev_bias", "repeated": true, "type": "sint32" },
+      "4": {
+        "name": "raw_capture_type",
+        "ref": "insta360.messages.RawCaptureType",
+        "repeated": false,
+        "type": "enum"
+      },
+      "5": { "name": "isInstaPanoEnabled", "repeated": false, "type": "bool" },
+      "6": {
+        "name": "focusSensor",
+        "ref": "insta360.messages.SensorDevice",
+        "repeated": false,
+        "type": "enum"
+      },
+      "7": { "name": "selfTimer", "repeated": false, "type": "uint32" }
+    },
+    "insta360.messages.WindowCropInfo": {
+      "1": { "name": "src_width", "repeated": false, "type": "uint32" },
+      "2": { "name": "src_height", "repeated": false, "type": "uint32" },
+      "3": { "name": "dst_width", "repeated": false, "type": "uint32" },
+      "4": { "name": "dst_height", "repeated": false, "type": "uint32" },
+      "5": { "name": "crop_offset_x", "repeated": false, "type": "int32" },
+      "6": { "name": "crop_offset_y", "repeated": false, "type": "int32" }
+    }
+  },
+  "enums": {
+    "insta360.messages.BatteryStatus.BatteryType": {
+      "0": "THICK",
+      "1": "THIN",
+      "2": "VERTICAL",
+      "100": "NONE"
+    },
+    "insta360.messages.BatteryStatus.PowerType": { "0": "BATTERY", "1": "ADAPTER" },
+    "insta360.messages.ButtonFollowMode": {
+      "0": "FOLLOW_UNKNOWN",
+      "1": "FOLLOW_FULL",
+      "2": "FOLLOW_PARM",
+      "3": "FOLLOW_MODE",
+      "4": "FOLLOW_NONE"
+    },
+    "insta360.messages.ButtonPressMode": {
+      "0": "DO_NOT_CHANGE",
+      "1": "DO_NOTHING",
+      "2": "SHUT_DOWN",
+      "3": "TAKE_PICTURE",
+      "4": "CAPTURE",
+      "5": "SELFTIMER",
+      "6": "TIMELAPSE",
+      "7": "HIGH_FRAME_RATE",
+      "8": "ACTION_TIMELAPSE_VIDEO",
+      "9": "INTERVAL_SHOOTING",
+      "10": "ACTION_INTERVAL_VIDEO",
+      "11": "TAKE_HDR_IMAGE",
+      "12": "ACTION_STATIC_TIMELAPSE",
+      "13": "ACTION_CALIBRATE_GYRO",
+      "14": "ACTION_HDR_CAPTURE",
+      "15": "ACTION_TIMESHIFT",
+      "16": "TAKE_BURST_IMAGE",
+      "17": "TAKE_AEB_NIGHT_IMAGE",
+      "18": "SUPER_CAPTURE",
+      "19": "ACTION_LOOPRECORDING",
+      "20": "TAKE_STARLAPSE_IMAGE",
+      "21": "FPV_RECORDING",
+      "22": "MOVIE_RECORDING",
+      "23": "SLOW_MOTION_RECORDING",
+      "24": "SELFIE_RECORDING",
+      "25": "FOLLOW_CHARGEBOX",
+      "26": "PURE_VIDEO"
+    },
+    "insta360.messages.CameraCaptureState": {
+      "0": "NOT_CAPTURE",
+      "1": "NORMAL_CAPTURE",
+      "2": "TIMELAPSE_CAPTURE",
+      "3": "INTERVAL_SHOOTING_CAPTURE",
+      "4": "SINGLE_SHOOTING",
+      "5": "HDR_SHOOTING",
+      "6": "SELF_TIMER_SHOOTING",
+      "7": "BULLET_TIME_CAPTURE",
+      "8": "SETTINGS_NEW_VALUE",
+      "9": "HDR_CAPTURE",
+      "10": "BURST_SHOOTING",
+      "11": "STATIC_TIMELAPSE_SHOOTING",
+      "12": "INTERVAL_VIDEO_CAPTURE",
+      "13": "TIMESHIFT_CAPTURE",
+      "14": "AEB_NIGHT_SHOOTING",
+      "15": "SINGLE_POWER_PANO_SHOOTING",
+      "16": "HDR_POWER_PANO_SHOOTING",
+      "17": "SUPER_NORMAL_CAPTURE",
+      "18": "LOOP_RECORDING_CAPTURE",
+      "19": "STARLAPSE_SHOOTING",
+      "20": "FPV_RECORDING_CAPTURE",
+      "21": "MOVIE_RECORDING_CAPTURE",
+      "22": "SLOW_MOTION_CAPTURE",
+      "23": "SELFIE_RECORDING_CAPTURE",
+      "24": "PURE_RECORDING_CAPTURE"
+    },
+    "insta360.messages.CaptureMode": {
+      "0": "Capture_MODE_UNKNOWN",
+      "1": "Capture_MODE_NORMAL",
+      "2": "Capture_MODE_BULLETTIME",
+      "3": "Capture_MODE_HDR",
+      "4": "Capture_MODE_TIMESHIFT",
+      "5": "Capture_MODE_SUPER_VIDEO",
+      "6": "Capture_MODE_LOOPRECORDING",
+      "7": "Capture_MODE_FPV",
+      "8": "Capture_MODE_MOVIE",
+      "9": "Capture_MODE_SLOWMOTION",
+      "10": "Capture_MODE_SELFIE",
+      "11": "Capture_MODE_PURE_VIDEO"
+    },
+    "insta360.messages.CardLocation": { "0": "STOR_CL_CAMERA", "1": "STOR_CL_READER" },
+    "insta360.messages.CardState": {
+      "0": "STOR_CS_PASS",
+      "1": "STOR_CS_NOCARD",
+      "2": "STOR_CS_NOSPACE",
+      "3": "STOR_CS_INVALID_FORMAT",
+      "4": "STOR_CS_WPCARD",
+      "5": "STOR_CS_OTHER_ERROR"
+    },
+    "insta360.messages.ChargeboxConnectedStatus.ChargeboxConnectedType": {
+      "0": "disconnected",
+      "1": "connected"
+    },
+    "insta360.messages.ChargeboxConnectedStatus.ChargeboxOnOffInfo": {
+      "0": "offline",
+      "1": "online"
+    },
+    "insta360.messages.ChargeboxConnectedStatus.ChargeboxUsbBtConnectedType": {
+      "0": "usb_bt_status_undefined",
+      "1": "usb_bt_status_disconnected",
+      "2": "usb_bt_status_connected"
+    },
+    "insta360.messages.ExposureOptions.Program": {
+      "0": "AUTO",
+      "1": "ISO_PRIORITY",
+      "2": "SHUTTER_PRIORITY",
+      "3": "MANUAL",
+      "4": "ADAPTIVE"
+    },
+    "insta360.messages.ExtraMetadata.AiAlgorithm": { "0": "EDITOR" },
+    "insta360.messages.ExtraMetadata.AiPlatform": { "0": "CV5", "1": "CV22", "2": "H22" },
+    "insta360.messages.ExtraMetadata.AudioModeType": {
+      "0": "AUDIO_MODE_UNKNOWN",
+      "1": "AUDIO_MODE_FOCUS",
+      "2": "AUDIO_MODE_WINDREDUCTION",
+      "3": "AUDIO_MODE_360",
+      "4": "AUDIO_MODE_STEREO",
+      "5": "AUDIO_MODE_EXTMICDEV",
+      "6": "AUDIO_MODE_AIRPODDEV",
+      "7": "AUDIO_MODE_RESERVE1",
+      "8": "AUDIO_MODE_RESERVE2"
+    },
+    "insta360.messages.ExtraMetadata.Battery_type": { "0": "THICK", "1": "THIN", "2": "VERTICAL" },
+    "insta360.messages.ExtraMetadata.Camera_Posture": {
+      "0": "CAMERA_ROTATE_0",
+      "1": "CAMERA_ROTATE_90",
+      "2": "CAMERA_ROTATE_180",
+      "3": "CAMERA_ROTATE_270"
+    },
+    "insta360.messages.ExtraMetadata.ComputeType": {
+      "0": "COMPUTE_CPU",
+      "1": "COMPUTE_VPU",
+      "2": "COMPUTE_DSP"
+    },
+    "insta360.messages.ExtraMetadata.EvoStatusMode": {
+      "0": "UNKNOWN_STATUS_MODE",
+      "1": "DEGREE180",
+      "2": "DEGREE360"
+    },
+    "insta360.messages.ExtraMetadata.ExpectOutputType": {
+      "0": "DEFAULT",
+      "1": "INSTA_PANO",
+      "2": "MULTI_CAMERA",
+      "3": "ONE_TAKE"
+    },
+    "insta360.messages.ExtraMetadata.ExtraUserOptions.LogoType": {
+      "0": "UNKNOWN_LOGO_TYPE",
+      "1": "NO_LOGO",
+      "2": "INSTA_LOGO"
+    },
+    "insta360.messages.ExtraMetadata.ExtraUserOptions.OffsetConvertState": {
+      "0": "WaterProof",
+      "1": "DivingWater",
+      "2": "DivingAir",
+      "3": "StitchOptimization",
+      "4": "Protect",
+      "5": "SphereProtect",
+      "6": "FpvProtect"
+    },
+    "insta360.messages.ExtraMetadata.GpsSource": { "0": "GSV", "1": "DASHBOARD", "2": "REMOTE" },
+    "insta360.messages.ExtraMetadata.GyroType": {
+      "0": "INSDEV_IMU_TYPE_20948",
+      "1": "INSDEV_IMU_TYPE_40609"
+    },
+    "insta360.messages.ExtraMetadata.Gyro_FilterType": {
+      "0": "GYRO_FILTER_TYPE_UNKNOWN",
+      "1": "GYRO_FILTER_TYPE_BRUTE",
+      "2": "GYRO_FILTER_TYPE_AKF"
+    },
+    "insta360.messages.ExtraMetadata.HDR_STATE": {
+      "0": "NOT_HDR",
+      "1": "WAITING_PROCESS",
+      "2": "PROCESSED"
+    },
+    "insta360.messages.ExtraMetadata.HdrProcessType": {
+      "0": "HDR_PROCESS_EXTERNAL",
+      "1": "HDR_PROCESS_INNER"
+    },
+    "insta360.messages.ExtraMetadata.Image_FovType": {
+      "0": "FOV_TYPE_UNKNOWN",
+      "1": "FOV_TYPE_WIDE",
+      "2": "FOV_TYPE_LINEAR",
+      "3": "FOV_TYPE_ULTRAWIDE",
+      "4": "FOV_TYPE_NARROW",
+      "5": "FOV_TYPE_POV",
+      "6": "FOV_TYPE_LINEARPLUS",
+      "7": "FOV_TYPE_LINEARHORIZON",
+      "8": "FOV_TYPE_FPV",
+      "9": "FOV_TYPE_SUPER",
+      "10": "FOV_TYPE_TINYPLANET",
+      "11": "FOV_TYPE_INFINITYWIDE",
+      "12": "FOV_TYPE_NUM"
+    },
+    "insta360.messages.ExtraMetadata.Lens283MType": {
+      "0": "LENS_UNKNOW",
+      "1": "LENS_LOW_TRANSPARENCY",
+      "2": "LENS_HIGH_TRANSPARENCY"
+    },
+    "insta360.messages.ExtraMetadata.PureShotProcessType": {
+      "0": "PURESHOT_PROCESS_EXTERNAL",
+      "1": "PURESHOT_PROCESS_INNER"
+    },
+    "insta360.messages.ExtraMetadata.RawCaptureType": {
+      "0": "RAW_CAPTURE_TYPE_OFF",
+      "1": "RAW_CAPTURE_TYPE_DNG",
+      "2": "RAW_CAPTURE_TYPE_RAW",
+      "3": "RAW_CAPTURE_TYPE_PURESHOT",
+      "4": "RAW_CAPTURE_TYPE_PURESHOT_RAW"
+    },
+    "insta360.messages.ExtraMetadata.SensorDevice": {
+      "0": "SENSOR_DEVICE_UNKNOWN",
+      "1": "SENSOR_DEVICE_FRONT",
+      "2": "SENSOR_DEVICE_REAR",
+      "3": "SENSOR_DEVICE_ALL"
+    },
+    "insta360.messages.ExtraMetadata.SubMediaType": {
+      "0": "VIDEO_NORMAL",
+      "1": "VIDEO_BULLETTIME",
+      "2": "VIDEO_TIMELAPSE",
+      "3": "PHOTO_NORMAL",
+      "4": "PHOTO_HDR",
+      "5": "PHOTO_INTERVALSHOOTING",
+      "6": "VIDEO_HDR",
+      "7": "PHOTO_BURST",
+      "8": "VIDEO_STATIC_TIMELAPSE",
+      "9": "VIDEO_TIMESHIFT",
+      "10": "PHOTO_AEB_NIGHT_MODE",
+      "11": "VIDEO_SUPER_NORMAL",
+      "12": "VIDEO_LOOPRECORDING",
+      "13": "PHOTO_STARLAPSE",
+      "14": "PHOTO_PANO_MODE",
+      "15": "VIDEO_FPV",
+      "16": "VIDEO_MOVIE",
+      "17": "VIDEO_SLOWMOTION",
+      "18": "VIDEO_SELFIE",
+      "19": "PHOTO_PURESHOTPLUS",
+      "20": "VIDEO_PURE",
+      "21": "VIDEO_STARLAPSE"
+    },
+    "insta360.messages.ExtraMetadata.ThumbnailType": {
+      "0": "THUMBNAIL_TYPE_UNKNOWN",
+      "1": "THUMBNAIL_TYPE_YUV",
+      "2": "THUMBNAIL_TYPE_JPEG",
+      "3": "THUMBNAIL_TYPE_H264"
+    },
+    "insta360.messages.ExtraMetadata.TimeScale": {
+      "0": "TIMESCALE_1X",
+      "1": "TIMESCALE_4X",
+      "2": "TIMESCALE_8X",
+      "3": "TIMESCALE_1_4X",
+      "4": "TIMESCALE_1_8X"
+    },
+    "insta360.messages.ExtraMetadata.TriggerSource": {
+      "0": "Unknown",
+      "1": "CameraButton",
+      "2": "RemoteControl",
+      "3": "USB",
+      "4": "BtRemote"
+    },
+    "insta360.messages.ExtraMetadata.VideoMediaDataRotateAngle": {
+      "0": "MEDIA_DATA_ROTATE_UNKNOWN",
+      "1": "MEDIA_DATA_ROTATE_ANGLE_0",
+      "3": "MEDIA_DATA_ROTATE_ANGLE_180",
+      "6": "MEDIA_DATA_ROTATE_ANGLE_90",
+      "8": "MEDIA_DATA_ROTATE_ANGLE_270"
+    },
+    "insta360.messages.ExtraMetadata.VideoPtsType": {
+      "0": "VIDEO_PTS_UNKNOWN",
+      "1": "VIDEO_PTS_MP4",
+      "2": "VIDEO_PTS_EXPOSURE_FILE"
+    },
+    "insta360.messages.FilterIntensity": {
+      "1": "INTENSITY_LOW",
+      "2": "INTENSITY_MEDIUM",
+      "3": "INTENSITY_HIGH"
+    },
+    "insta360.messages.Flicker": { "0": "FLICKER_AUTO", "1": "FLICKER_60HZ", "2": "FLICKER_50HZ" },
+    "insta360.messages.FunctionMode": {
+      "0": "FUNCTION_MODE_NORMAL",
+      "1": "FUNCTION_MODE_LIVE_STREAM",
+      "2": "FUNCTION_MODE_MOBILE_TIMELAPSE",
+      "3": "FUNCTION_MODE_INTERVAL_SHOOTING",
+      "4": "FUNCTION_MODE_HIGH_FRAME_RATE",
+      "5": "FUNCTION_MODE_BURST",
+      "6": "FUNCTION_MODE_NORMAL_IMAGE",
+      "7": "FUNCTION_MODE_NORMAL_VIDEO",
+      "8": "FUNCTION_MODE_HDR_IMAGE",
+      "9": "FUNCTION_MODE_HDR_VIDEO",
+      "10": "FUNCTION_MODE_INTERVAL_VIDEO",
+      "11": "FUNCTION_MODE_STATIC_TIMELAPSE",
+      "12": "FUNCTION_MODE_TIMESHIFT",
+      "13": "FUNCTION_MODE_AEB_NIGHT_IMAGE",
+      "14": "FUNCTION_MODE_NORMAL_POWER_PANO_IMAGE",
+      "15": "FUNCTION_MODE_HDR_POWER_PANO_IMAGE",
+      "16": "FUNCTION_MODE_SUPER_VIDEO",
+      "17": "FUNCTION_MODE_LOOP_RECORDING_VIDEO",
+      "18": "FUNCTION_MODE_STARLAPSE_IMAGE",
+      "19": "FUNCTION_MODE_FPV_VIDEO",
+      "20": "FUNCTION_MODE_MOVIE_VIDEO",
+      "21": "FUNCTION_MODE_SLOWMOTION_VIDEO",
+      "22": "FUNCTION_MODE_SELFIE_VIDEO",
+      "23": "FUNCTION_MODE_QC_SINGLE_PRESS",
+      "24": "FUNCTION_MODE_QC_DOUBLE_PRESS",
+      "25": "FUNCTION_MODE_CAMERA_SINGLE_PRESS",
+      "26": "FUNCTION_MODE_CAMERA_DOUBLE_PRESS",
+      "27": "FUNCTION_MODE_PURE_VIDEO"
+    },
+    "insta360.messages.GammaMode": {
+      "0": "FILTER_NONE",
+      "15": "FILTER_LEICA_NATURAL",
+      "16": "FILTER_LEICA_VIVID",
+      "24": "FILTER_NC_FILM",
+      "26": "FILTER_CC_FILM",
+      "34": "FILTER_POS_FILM",
+      "35": "FILTER_NEG_FILM",
+      "36": "FILTER_LEICA_CHROME",
+      "37": "FILTER_CINEMATIC",
+      "38": "FILTER_FRESH"
+    },
+    "insta360.messages.OffsetState": { "0": "Common", "1": "SphereProtect", "2": "DivingWater" },
+    "insta360.messages.OptionType": {
+      "0": "OPTION_UNKNOWN",
+      "1": "VIDEO_RESOLUTION",
+      "2": "PHOTO_SIZE",
+      "3": "VIDEO_BITRATE",
+      "4": "AUDIO_BITRATE",
+      "5": "AUDIO_SAMPLERATE",
+      "6": "ORIGIN_OFFSET",
+      "7": "CAPTURE_TIME_LIMIT",
+      "8": "GPS_TIMEOUT",
+      "9": "REMAINING_CAPTURE_TIME",
+      "10": "REMAINING_PICTURES",
+      "11": "BATTERY_STATUS",
+      "12": "LOCAL_TIME",
+      "13": "TIME_ZONE",
+      "14": "MUTE",
+      "15": "SERIAL_NUMBER",
+      "16": "UUID",
+      "17": "BUTTON_PRESS_OPTIONS",
+      "19": "ACTIVATE_TIME",
+      "20": "STORAGE_STATE",
+      "21": "LENS_INDEX",
+      "22": "MEDIA_OFFSET",
+      "23": "SELF_TIMER",
+      "24": "GYRO_SAMPLE_RATE",
+      "25": "ACC_FULL_SCALE_RANGE",
+      "26": "GYRO_FULL_SCALE_RANGE",
+      "27": "TAKE_RAW_PICTURE",
+      "28": "GAMMA_MODE",
+      "29": "MEDIA_TIME",
+      "30": "FIRMWAREREVISION",
+      "31": "SYS_ADOPTION",
+      "32": "CPU_TYPE",
+      "33": "GYRO_FILTER",
+      "34": "MCTF_ENABLE",
+      "35": "SPORT_MODE_ENABLE",
+      "36": "WIFI_INFO",
+      "37": "WIFI_CHANNEL_LIST",
+      "38": "AUTHORIZATION_ID",
+      "39": "CALIBRATION_OFFSET",
+      "40": "PHOTO_SUB_MODE",
+      "41": "VIDEO_SUB_MODE",
+      "42": "SECOND_STREAM_RES",
+      "43": "WIFI_STATUS",
+      "44": "EVO_STATUS_MODE",
+      "45": "ORIGIN_OFFSET_3D",
+      "46": "MEDIA_OFFSET_3D",
+      "47": "CALIBRATION_OFFSET_3D",
+      "48": "CAMERA_TYPE",
+      "49": "BT_REMOTE_VERSION",
+      "50": "BT_REMOTE_TYPE",
+      "51": "QUALITY_SETTING",
+      "52": "OVERHEAT_PROTECTION",
+      "53": "CALIBRATION_ORIENTATION",
+      "54": "STANDBY_DURATION",
+      "55": "QUICK_CAPTURE_ENABLE",
+      "56": "BT_MAC_ADDR",
+      "57": "TELEVISION_SYSTEM",
+      "58": "SENSOR0_SERIAL_VR360",
+      "59": "SENSOR1_SERIAL_VR360",
+      "60": "SENSOR_SERIAL_VR180",
+      "61": "MOBVOI_LICENSE",
+      "62": "MOBVOI_PUBLIC_KEY",
+      "63": "GYRO_INFO",
+      "64": "SENSOR_ID",
+      "65": "INTERNAL_FLOWSTATE",
+      "66": "VIDEO_ENCODE_TYPE",
+      "67": "SENSOR_INFO",
+      "68": "IS_SELFIE",
+      "69": "ROLLING_SHUTTER_TIME",
+      "70": "GYRO_TIME_STAMP",
+      "71": "VIDEO_FOV",
+      "72": "STILL_FOV",
+      "73": "GYRO_POLYFIT_STATE",
+      "74": "GYRO_CALIBRATE_STATE",
+      "75": "MOBVOI_LICENSE_VERITY_STATE",
+      "76": "FLICKER_GLOBAL",
+      "77": "TEMP_VALUE",
+      "78": "ORIGIN_OFFSET_V2",
+      "79": "ORIGIN_OFFSET_V3",
+      "80": "MEDIA_OFFSET_V2",
+      "81": "MEDIA_OFFSET_V3",
+      "82": "INSTAPANO_FOCUS_SENSOR",
+      "83": "EXPECT_OUTPUT_TYPE",
+      "84": "HW_TYPE",
+      "85": "CHARGEBOX_CONNECTED_STATUS",
+      "86": "BT_CAR_TABLE",
+      "87": "PTZ_CTRL",
+      "88": "CAMERA_LANGUAGE",
+      "89": "HW_BLE_VERSION",
+      "93": "CAMERA_POSTURE",
+      "97": "BT_WAKEUP_SW",
+      "103": "OFFSET_STATES",
+      "110": "OTA_PKG_VERSION",
+      "114": "BOX_OTA_PKG_VERSION",
+      "115": "BOX_BT_VERSION",
+      "116": "BOX_VERSION",
+      "117": "GO3_VERSION",
+      "118": "WIFI_WORKING_STATUS",
+      "119": "BUTTON_FOLLOW_OPTION",
+      "120": "LED_SWITCH",
+      "122": "CAMERA_POSTURE_WHEN_CAPTURE_START",
+      "123": "CHARGEBOX_CONNECTED_STATUS_WHEN_CAPTURE_START",
+      "124": "WINDOW_CROP_INFO",
+      "125": "OPTIONS_NUM"
+    },
+    "insta360.messages.Options.AccFullScaleRange": {
+      "0": "RANGE_2G",
+      "1": "RANGE_4G",
+      "2": "RANGE_8G",
+      "3": "RANGE_16G"
+    },
+    "insta360.messages.Options.AdoptionSystem": { "0": "PHONE_IOS", "1": "PHONE_ANDROID" },
+    "insta360.messages.Options.BTRemoteType": {
+      "0": "UNKNOWN_BT_REMOTE",
+      "1": "BT_REMOTE_WITHOUT_GPS",
+      "2": "BT_REMOTE_WITH_GPS"
+    },
+    "insta360.messages.Options.Bt_Wakeup_Sw": {
+      "0": "Bt_Wakeup_Sw_Off",
+      "1": "Bt_Wakeup_Sw_On",
+      "2": "Bt_Wakeup_Sw_Unknown"
+    },
+    "insta360.messages.Options.CameraPostureType": {
+      "0": "CAMERA_POSTURE_ROTATE_0",
+      "1": "CAMERA_POSTURE_ROTATE_90",
+      "2": "CAMERA_POSTURE_ROTATE_180",
+      "3": "CAMERA_POSTURE_ROTATE_270",
+      "4": "CAMERA_POSTURE_UP",
+      "5": "CAMERA_POSTURE_DOWN"
+    },
+    "insta360.messages.Options.EvoStatusMode": {
+      "0": "UNKNOWN_STATUS_MODE",
+      "1": "DEGREE180",
+      "2": "DEGREE360"
+    },
+    "insta360.messages.Options.ExpectOutputType": {
+      "0": "DEFAULT",
+      "1": "INSTA_PANO",
+      "2": "MULTI_CAMERA",
+      "3": "ONE_TAKE"
+    },
+    "insta360.messages.Options.FovType": {
+      "0": "FOV_WIDE",
+      "1": "FOV_LINEAR",
+      "2": "FOV_ULTRAWIDE",
+      "3": "FOV_NARROW"
+    },
+    "insta360.messages.Options.GyroFullScaleRange": {
+      "0": "RANGE_250DPS",
+      "1": "RANGE_500DPS",
+      "2": "RANGE_1000DPS",
+      "3": "RANGE_2000DPS"
+    },
+    "insta360.messages.Options.GyroInfo.GyroPos": {
+      "0": "INSDEV_IMU_POS_VIN0",
+      "1": "INSDEV_IMU_POS_VIN1",
+      "2": "INSDEV_IMU_POS_UNKNOWN"
+    },
+    "insta360.messages.Options.GyroInfo.GyroType": {
+      "0": "INSDEV_IMU_TYPE_20948",
+      "1": "INSDEV_IMU_TYPE_40609"
+    },
+    "insta360.messages.Options.HwType": {
+      "0": "HW_TYPE_UNKNOWN",
+      "1": "HW_TYPE_MFI",
+      "2": "HW_TYPE_NO_MFI"
+    },
+    "insta360.messages.Options.LANGUAGE_TYPE": { "0": "EN", "1": "ZH", "2": "JA" },
+    "insta360.messages.Options.QualitySetting": { "0": "HIGH_QUALITY", "1": "LOW_QUALITY" },
+    "insta360.messages.Options.TelevisionSystem": { "0": "NTSC", "1": "PAL" },
+    "insta360.messages.Options.VideoEncodeType": { "0": "ENCODE_H264", "1": "ENCODE_H265" },
+    "insta360.messages.Options.WifiInfo.Mode": { "0": "AP", "1": "STA", "2": "P2P" },
+    "insta360.messages.Options.WifiInfo.WifiState": {
+      "0": "UNKNOWN",
+      "1": "AUTO",
+      "2": "ON",
+      "3": "OFF"
+    },
+    "insta360.messages.Options.WifiStatus": { "0": "AUTO", "1": "ON" },
+    "insta360.messages.PanoAspect": { "1": "PANO_ASPECT_360", "4": "PANO_ASPECT_2_1" },
+    "insta360.messages.PhotoSize": {
+      "0": "Size_6912_3456",
+      "1": "Size_6272_3136",
+      "2": "Size_6080_3040",
+      "3": "Size_4000_3000",
+      "4": "Size_4000_2250",
+      "5": "Size_5212_3542",
+      "6": "Size_5312_2988",
+      "7": "Size_8000_6000",
+      "8": "Size_8000_4500",
+      "9": "Size_2976_2976",
+      "10": "Size_5984_5984",
+      "11": "Size_11968_5984",
+      "12": "Size_5952_2976"
+    },
+    "insta360.messages.PhotoSubMode": {
+      "0": "PHOTO_SINGLE",
+      "8": "PHOTO_INSTA_PANO",
+      "100": "PHOTO_NONE"
+    },
+    "insta360.messages.PhotographyOptionType": {
+      "0": "PHOTOGRAPHY_OPTION_UNKNOWN",
+      "1": "CHANNEL",
+      "2": "BRIGHTNESS",
+      "3": "CONTRAST",
+      "4": "SATURATION",
+      "5": "HUE",
+      "6": "SHARPNESS",
+      "7": "EXPOSURE_BIAS",
+      "8": "EXPOSURE_MODE",
+      "9": "EXPOSURE_PROG",
+      "10": "EXPOSURE_MANUAL",
+      "11": "AE_METER_MODE",
+      "12": "AE_MANUAL_METER_WEIGHT",
+      "13": "WHITE_BALANCE",
+      "14": "FLICKER",
+      "15": "EV_INDEX",
+      "16": "AUTO_MODE_VIDEO_PARAM",
+      "17": "AUTO_MODE_STILL_PARAM",
+      "18": "VIDEO_GAMMA_MODE",
+      "19": "LONG_EXPOSURE_MANUAL",
+      "20": "STILL_EXPOSURE_OPTIONS",
+      "21": "VIDEO_EXPOSURE_OPTIONS",
+      "22": "PREVIEW_MCTF_ENABLE",
+      "23": "PREVIEW_SPORT_MODE_ENABLE",
+      "24": "VIDEO_ISO_TOP_LIMIT",
+      "25": "RAW_CAPTURE_TYPE",
+      "26": "PHOTOGRAPHY_SELF_TIMER",
+      "27": "AEB_CAPTURE_NUM",
+      "28": "PREVIEW_SPORT_LEVEL",
+      "29": "RECORD_DURAION",
+      "30": "PHOTO_SIZE_ID",
+      "31": "RECORD_RESOLUTION",
+      "32": "PHOTO_GRAPHY_BITRATE",
+      "33": "FOV_TYPE",
+      "34": "FLOWSTATE_BASE_TYPE",
+      "35": "COLOR_MODE",
+      "36": "RES_REC_LIMIT",
+      "37": "ACCELERATE_FREQUENCY",
+      "38": "FOCAL_LENGTH_VALUE",
+      "39": "WHITE_BALANCE_VALUE",
+      "40": "PHOTO_RESOLUTION",
+      "41": "REMAINING_TIME",
+      "42": "DARK_EIS_ENABLE",
+      "43": "FLOWSTATE_LEVEL",
+      "44": "BURST_CAPTURE_NUM",
+      "45": "CACHE_CAPTURE_NUM",
+      "46": "METERING_ENABLE",
+      "51": "BURST_CAPTURE_TIME",
+      "52": "CACHE_CAPTURE_ENABLE",
+      "53": "ZOOM_SCALE",
+      "54": "PHOTO_GRAPHY_OPTIONS_TYPE_NUM",
+      "91": "DEEP_TRACK",
+      "98": "PANO_ASPECT",
+      "104": "FILTER_INTENSITY"
+    },
+    "insta360.messages.PhotographyOptions.AEMeterMode": {
+      "0": "AE_METER_MODE_NORMAL",
+      "1": "AE_METER_MODE_MANUAL"
+    },
+    "insta360.messages.PhotographyOptions.COLOR_MODE": {
+      "1": "COLOR_MODE_NORMAL",
+      "2": "COLOR_MODE_LOG",
+      "5": "COLOR_MODE_HDR"
+    },
+    "insta360.messages.PhotographyOptions.ExposureManual.RelateMode": {
+      "0": "RELATE_MODE_VIDEO",
+      "1": "RELATE_MODE_STILL",
+      "2": "RELATE_MODE_VIDEO_AND_STILL"
+    },
+    "insta360.messages.PhotographyOptions.ExposureMode": {
+      "0": "EXP_MODE_AUTO",
+      "1": "EXP_MODE_PROGRAM",
+      "2": "EXP_MODE_MANUAL"
+    },
+    "insta360.messages.PhotographyOptions.ExposureProg.ProgMode": {
+      "0": "PROG_MODE_OFF",
+      "1": "PROG_MODE_ISO",
+      "2": "PROG_MODE_SHUTTER_SPEED"
+    },
+    "insta360.messages.PhotographyOptions.Flow_State_Level": {
+      "0": "Flow_State_Level_Close",
+      "1": "Flow_State_Level_Low",
+      "2": "Flow_State_Level_Standard",
+      "3": "FLOW_State_Level_High"
+    },
+    "insta360.messages.PhotographyOptions.Fov_Type": {
+      "0": "FOV_WIDE",
+      "1": "FOV_LINEAR",
+      "2": "FOV_ULTRAWIDE",
+      "3": "FOV_NARROW",
+      "4": "FOV_POV",
+      "5": "FOV_LINEAR_PLUS",
+      "6": "FOV_LINEAR_HORIZON",
+      "7": "FOV_TYPE_FPV",
+      "8": "FOV_TYPE_SUPER",
+      "9": "FOV_TYPE_TINYPLANET",
+      "10": "FOV_TYPE_INFINITYWIDE"
+    },
+    "insta360.messages.PhotographyOptions.PREVIEW_SPORT_LEVEL": {
+      "0": "PREVIEW_SPORT_AUTO",
+      "1": "PREVIEW_SPORT_FAST",
+      "2": "PREVIEW_SPORT_FASTER"
+    },
+    "insta360.messages.PhotographyOptions.ShutterSpeed": {
+      "0": "SPEED_AUTO",
+      "1": "SPEED_60",
+      "2": "SPEED_30",
+      "3": "SPEED_15",
+      "4": "SPEED_8",
+      "5": "SPEED_4",
+      "6": "SPEED_2",
+      "7": "SPEED_1P6",
+      "8": "SPEED_1P3",
+      "9": "SPEED_1",
+      "10": "SPEED_1D1P25",
+      "11": "SPEED_1D1P67",
+      "12": "SPEED_1D2",
+      "13": "SPEED_1D2P5",
+      "14": "SPEED_1D3",
+      "15": "SPEED_1D4",
+      "16": "SPEED_1D5",
+      "17": "SPEED_1D6P25",
+      "18": "SPEED_1D8P",
+      "19": "SPEED_1D10",
+      "20": "SPEED_1D12P5",
+      "21": "SPEED_1D15",
+      "22": "SPEED_1D20",
+      "23": "SPEED_1D25",
+      "24": "SPEED_1D30",
+      "25": "SPEED_1D40",
+      "26": "SPEED_1D50",
+      "27": "SPEED_1D60",
+      "28": "SPEED_1D80",
+      "29": "SPEED_1D100",
+      "30": "SPEED_1D120",
+      "31": "SPEED_1D160",
+      "32": "SPEED_1D200",
+      "33": "SPEED_1D240",
+      "34": "SPEED_1D320",
+      "35": "SPEED_1D400",
+      "36": "SPEED_1D500",
+      "37": "SPEED_1D640",
+      "38": "SPEED_1D800",
+      "39": "SPEED_1D1000",
+      "40": "SPEED_1D1250",
+      "41": "SPEED_1D1600",
+      "42": "SPEED_1D2000",
+      "43": "SPEED_1D2500",
+      "44": "SPEED_1D3200",
+      "45": "SPEED_1D4000",
+      "46": "SPEED_1D5000",
+      "47": "SPEED_1D6400",
+      "48": "SPEED_1D8000"
+    },
+    "insta360.messages.PhotographyOptions.WhiteBalance": {
+      "0": "WB_AUTO",
+      "1": "WB_2700K",
+      "2": "WB_4000K",
+      "3": "WB_5000K",
+      "4": "WB_6500K",
+      "5": "WB_7500K"
+    },
+    "insta360.messages.RawCaptureType": {
+      "0": "RAW_CAPTURE_TYPE_OFF",
+      "1": "RAW_CAPTURE_TYPE_DNG",
+      "2": "RAW_CAPTURE_TYPE_RAW",
+      "3": "RAW_CAPTURE_TYPE_PURESHOT",
+      "4": "RAW_CAPTURE_TYPE_PURESHOT_RAW"
+    },
+    "insta360.messages.Sensor.Type": {
+      "0": "PANO_577",
+      "1": "WIDE_577",
+      "2": "WIDE_283",
+      "3": "WIDE_586",
+      "4": "AF_586",
+      "5": "PANO_283",
+      "6": "PANO_586",
+      "7": "ACTION_577"
+    },
+    "insta360.messages.SensorDevice": {
+      "0": "SENSOR_DEVICE_UNKNOWN",
+      "1": "SENSOR_DEVICE_FRONT",
+      "2": "SENSOR_DEVICE_REAR",
+      "3": "SENSOR_DEVICE_ALL"
+    },
+    "insta360.messages.TakePicture.Mode": {
+      "0": "NORMAL",
+      "1": "AEB",
+      "3": "BURST",
+      "4": "AEB_NIGHT"
+    },
+    "insta360.messages.VideoResolution": {
+      "0": "RES_3840_1920P30",
+      "1": "RES_2560_1280P30",
+      "2": "RES_1920_960P30",
+      "3": "RES_2560_1280P60",
+      "4": "RES_2048_512P120",
+      "5": "RES_3328_832P60",
+      "6": "RES_3072_1536P30",
+      "7": "RES_2240_1120P30",
+      "8": "RES_2240_1120P24",
+      "9": "RES_1440_720P30",
+      "10": "RES_2880_2880P30",
+      "11": "RES_3840_1920P60",
+      "12": "RES_3840_1920P50",
+      "13": "RES_3008_1504P100",
+      "14": "RES_960_480P30",
+      "15": "RES_3040_1520P30",
+      "16": "RES_2176_1088P30",
+      "17": "RES_720_360P30",
+      "18": "RES_480_240P30",
+      "19": "RES_2880_2880P25",
+      "20": "RES_2880_2880P24",
+      "21": "RES_3840_1920P20",
+      "22": "RES_1920_960P20",
+      "23": "RES_3840_2160P60",
+      "24": "RES_3840_2160P30",
+      "25": "RES_2720_1530P100",
+      "26": "RES_1920_1080P200",
+      "27": "RES_1920_1080P240",
+      "28": "RES_1920_1080P120",
+      "29": "RES_1920_1080P30",
+      "30": "RES_5472_3078P30",
+      "31": "RES_4000_3000P30",
+      "32": "RES_854_640P30",
+      "33": "RES_720_406P30",
+      "34": "RES_424_240P15",
+      "35": "RES_1024_512P30",
+      "36": "RES_640_320P30",
+      "37": "RES_5312_2988P30",
+      "38": "RES_2720_1530P60",
+      "39": "RES_2720_1530P30",
+      "40": "RES_1920_1080P60",
+      "41": "RES_2720_2040P30",
+      "42": "RES_1920_1440P30",
+      "43": "RES_1280_720P30",
+      "44": "RES_1280_960P30",
+      "45": "RES_1152_768P30",
+      "46": "RES_5312_2988P25",
+      "47": "RES_5312_2988P24",
+      "48": "RES_3840_2160P25",
+      "49": "RES_3840_2160P24",
+      "50": "RES_2720_1530P25",
+      "51": "RES_2720_1530P24",
+      "52": "RES_1920_1080P25",
+      "53": "RES_1920_1080P24",
+      "54": "RES_4000_3000P25",
+      "55": "RES_4000_3000P24",
+      "56": "RES_2720_2040P25",
+      "57": "RES_2720_2040P24",
+      "58": "RES_1920_1440P25",
+      "59": "RES_1920_1440P24",
+      "60": "RES_2560_1440P30",
+      "61": "RES_2560_1440P60",
+      "62": "RES_1920_1440P60",
+      "63": "RES_1440_2560P30",
+      "64": "RES_1080_1920P30",
+      "65": "RES_1440_1920P30",
+      "66": "RES_1440_2560P60",
+      "67": "RES_1440_1920P60",
+      "68": "RES_1080_1920P60",
+      "69": "RES_2560_1440P25",
+      "70": "RES_1440_2560P25",
+      "71": "RES_1080_1920P25",
+      "72": "RES_720_1280P30",
+      "73": "RES_960_1280P30",
+      "74": "RES_1152_1152P30",
+      "75": "RES_640_360P30",
+      "76": "RES_640_480P30",
+      "77": "RES_360_640P30",
+      "78": "RES_480_640P30",
+      "79": "RES_368_368P30",
+      "80": "RES_854_854P30",
+      "81": "RES_1920_1080P50",
+      "82": "RES_1080_1920P50",
+      "83": "RES_2560_1440P50",
+      "84": "RES_1440_2560P50",
+      "85": "RES_1080_1920P24",
+      "86": "RES_2560_1440P24",
+      "87": "RES_1440_2560P24",
+      "88": "RES_1080_1920P120",
+      "89": "RES_1280_1280P30",
+      "90": "RES_2880_2880P15",
+      "91": "RES_1440_720P15",
+      "92": "RES_3840_2160P50",
+      "93": "RES_1280_1280P25",
+      "94": "RES_3040_3040P24",
+      "95": "RES_3040_3040P25",
+      "96": "RES_3040_3040P30",
+      "97": "RES_3840_1920P24",
+      "98": "RES_3840_1920P25",
+      "99": "RES_3040_1520P50",
+      "100": "RES_2720_1530P50",
+      "101": "RES_5312_3552P24",
+      "102": "RES_5312_3552P25",
+      "103": "RES_5312_3552P30",
+      "104": "RES_5472_2328P24",
+      "105": "RES_5472_2328P25",
+      "106": "RES_5472_2328P30",
+      "107": "RES_1600_900P30",
+      "108": "RES_1760_990P30",
+      "109": "RES_3840_1634P30",
+      "110": "RES_3840_1634P25",
+      "111": "RES_3840_1634P24",
+      "112": "RES_6720_2856P25",
+      "113": "RES_6720_2856P24",
+      "114": "RES_6016_2560P25",
+      "115": "RES_6016_2560P24",
+      "116": "RES_3200_3200P24",
+      "117": "RES_3200_3200P25",
+      "118": "RES_3200_3200P30",
+      "119": "RES_3072_3072P24",
+      "120": "RES_3072_3072P25",
+      "121": "RES_3072_3072P30",
+      "122": "RES_2160_3840P60",
+      "123": "RES_2160_3840P50",
+      "124": "RES_2160_3840P30",
+      "125": "RES_2160_3840P25",
+      "126": "RES_2160_3840P24",
+      "127": "RES_2880_2880P5",
+      "128": "RES_2880_2880P2",
+      "129": "RES_2880_2880P1",
+      "130": "RES_2880_2880P05",
+      "131": "RES_3000_1500P120",
+      "132": "RES_1530_2720P60",
+      "133": "RES_1530_2720P50",
+      "134": "RES_1530_2720P30",
+      "135": "RES_1530_2720P25",
+      "136": "RES_1530_2720P24",
+      "137": "RES_3840_960P120",
+      "138": "RES_1152_648P30",
+      "139": "RES_648_1152P30",
+      "140": "RES_1152_864P30",
+      "141": "RES_864_1152P30",
+      "142": "RES_2944_2880P30",
+      "143": "RES_3968_1920P30",
+      "144": "RES_4000_2000P24",
+      "145": "RES_4000_2000P25",
+      "146": "RES_4000_2000P30",
+      "147": "RES_4000_2000P50",
+      "148": "RES_4000_2000P60",
+      "149": "RES_1530_2720P100",
+      "150": "RES_1920_1080P100",
+      "151": "RES_1080_1920P100",
+      "152": "RES_4000_3000P50",
+      "153": "RES_4000_3000P60",
+      "154": "RES_7680_4320P30",
+      "155": "RES_2944_736P200",
+      "156": "RES_3456_1944P24",
+      "157": "RES_3456_1944P25",
+      "158": "RES_3456_1944P30",
+      "159": "RES_3456_1944P50",
+      "160": "RES_3456_1944P60",
+      "161": "RES_1944_3456P24",
+      "162": "RES_1944_3456P25",
+      "163": "RES_1944_3456P30",
+      "164": "RES_2944_736P180",
+      "165": "RES_3840_3840P24",
+      "166": "RES_3840_3840P25",
+      "167": "RES_3840_3840P30",
+      "168": "RES_3584_2400P24",
+      "169": "RES_3584_2400P25",
+      "170": "RES_3584_2400P30",
+      "171": "RES_3584_2400P50",
+      "172": "RES_3584_2400P60",
+      "173": "RES_2400_3584P24",
+      "174": "RES_2400_3584P25",
+      "175": "RES_2400_3584P30",
+      "176": "RES_2400_3584P50",
+      "177": "RES_2400_3584P60",
+      "178": "RES_2880_1440P24",
+      "179": "RES_2880_1440P25",
+      "180": "RES_2880_1440P30",
+      "181": "RES_2880_1440P50",
+      "182": "RES_2880_1440P60",
+      "183": "RES_1440_2880P24",
+      "184": "RES_1440_2880P25",
+      "185": "RES_1440_2880P30",
+      "186": "RES_1440_2880P50",
+      "187": "RES_1440_2880P60",
+      "188": "RES_2944_2944P30",
+      "189": "RES_2944_2944P25",
+      "190": "RES_2944_2944P24",
+      "191": "RES_1472_1472P30",
+      "192": "RES_3584_2016P30",
+      "193": "RES_3584_2016P25",
+      "194": "RES_3584_2016P24",
+      "195": "RES_2016_3584P30",
+      "196": "RES_2016_3584P25",
+      "197": "RES_2016_3584P24",
+      "198": "RES_2880_720P30",
+      "199": "RES_3584_2016P50",
+      "200": "RES_3584_2016P60",
+      "201": "RES_2016_3584P50",
+      "202": "RES_2016_3584P60",
+      "203": "RES_3840_2880P30",
+      "204": "RES_3840_2880P25",
+      "205": "RES_3840_2880P24",
+      "206": "RES_2880_1440P48",
+      "207": "RES_1440_2880P48",
+      "208": "RES_3840_1920P48",
+      "209": "RES_640_640P30",
+      "210": "RES_7680_4320P24",
+      "211": "RES_7680_4320P25",
+      "212": "RES_7680_3268P25",
+      "213": "RES_7680_3268P30",
+      "214": "RES_3840_2160P120",
+      "215": "RES_2720_2040P60",
+      "216": "RES_2720_2040P50",
+      "217": "RES_2720_1530P120",
+      "218": "RES_1920_1440P50",
+      "219": "RES_7680_3268P24",
+      "220": "RES_3840_2160P100",
+      "221": "RES_2560_1440P1",
+      "222": "RES_1440_2560P1",
+      "223": "RES_2560_1440P2",
+      "224": "RES_1440_2560P2",
+      "225": "RES_2560_1440P5",
+      "226": "RES_1440_2560P5",
+      "227": "RES_2560_1440P15",
+      "228": "RES_1440_2560P15",
+      "229": "RES_NUM",
+      "242": "RES_2688_1520P120",
+      "243": "RES_2688_1520P100",
+      "244": "RES_2688_1520P60",
+      "245": "RES_2688_1520P50",
+      "246": "RES_2688_1520P30",
+      "247": "RES_2688_1520P25",
+      "248": "RES_2688_1520P24",
+      "258": "RES_3840_2160P48",
+      "260": "RES_1920_1080P48",
+      "331": "RES_2688_1520P48",
+      "433": "RES_3840_1632P120",
+      "434": "RES_3840_1632P100",
+      "435": "RES_3840_1632P60",
+      "436": "RES_3840_1632P50",
+      "437": "RES_3840_1632P48",
+      "438": "RES_3840_1632P30",
+      "439": "RES_3840_1632P25",
+      "440": "RES_3840_1632P24",
+      "446": "RES_3072_3072P60",
+      "447": "RES_3072_3072P50"
+    },
+    "insta360.messages.VideoSubMode": {
+      "0": "VIDEO_NORMAL",
+      "1": "VIDEO_BULLETTIME",
+      "2": "VIDEO_TIMELAPSE",
+      "3": "VIDEO_HDR",
+      "4": "VIDEO_TIMESHIFT",
+      "5": "VIDEO_SUPER",
+      "6": "VIDEO_LOOPRECORDING",
+      "7": "VIDEO_FPV",
+      "8": "VIDEO_MOVIE",
+      "9": "VIDEO_SLOW_MOTION",
+      "10": "VIDEO_SELFIE",
+      "11": "VIDEO_PURE",
+      "100": "VIDEO_NONE"
+    }
+  }
+}

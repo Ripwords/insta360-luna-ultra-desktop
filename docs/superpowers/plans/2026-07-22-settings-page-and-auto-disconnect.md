@@ -24,20 +24,20 @@
 
 ## File Structure
 
-| Path | Responsibility |
-| --- | --- |
-| `app/utils/cameraHealth.ts` | NEW. Consecutive-failure counter and armed callback. Pure module, no Vue. |
-| `tests/cameraHealth.test.ts` | NEW. Unit tests for the counter. |
-| `app/utils/lunaClient.ts` | MODIFY. `cameraFetch` reports success/failure to `cameraHealth`. |
-| `app/composables/useCamera.ts` | MODIFY. Arm/disarm the detector, add `forceDisconnect`, persist the host. |
-| `app/components/WatermarkSettingsForm.vue` | NEW. Watermark controls extracted from the download modal. |
-| `app/components/DownloadOptionsModal.vue` | MODIFY. Consumes the extracted form. |
-| `app/pages/settings.vue` | NEW. Camera, Watermark and Appearance sections. |
-| `app/layouts/default.vue` | MODIFY. Settings nav entry, `ColorwayToggle` removed from the footer. |
-| `app/components/CameraStatusChip.vue` | MODIFY. Becomes a link to `/settings`. |
-| `app/pages/index.vue` | MODIFY. Reduced to connect/disconnect. |
-| `app/components/MediaPreview.vue` | MODIFY. Header action row and arrow insets. |
-| `app/pages/gallery.vue` | MODIFY. "Select day" visibility, skeleton loading state. |
+| Path                                       | Responsibility                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| `app/utils/cameraHealth.ts`                | NEW. Consecutive-failure counter and armed callback. Pure module, no Vue. |
+| `tests/cameraHealth.test.ts`               | NEW. Unit tests for the counter.                                          |
+| `app/utils/lunaClient.ts`                  | MODIFY. `cameraFetch` reports success/failure to `cameraHealth`.          |
+| `app/composables/useCamera.ts`             | MODIFY. Arm/disarm the detector, add `forceDisconnect`, persist the host. |
+| `app/components/WatermarkSettingsForm.vue` | NEW. Watermark controls extracted from the download modal.                |
+| `app/components/DownloadOptionsModal.vue`  | MODIFY. Consumes the extracted form.                                      |
+| `app/pages/settings.vue`                   | NEW. Camera, Watermark and Appearance sections.                           |
+| `app/layouts/default.vue`                  | MODIFY. Settings nav entry, `ColorwayToggle` removed from the footer.     |
+| `app/components/CameraStatusChip.vue`      | MODIFY. Becomes a link to `/settings`.                                    |
+| `app/pages/index.vue`                      | MODIFY. Reduced to connect/disconnect.                                    |
+| `app/components/MediaPreview.vue`          | MODIFY. Header action row and arrow insets.                               |
+| `app/pages/gallery.vue`                    | MODIFY. "Select day" visibility, skeleton loading state.                  |
 
 **Not in this plan:** `app/pages/downloads.vue`. The spec asked for an empty state and an inline retry on failed rows. Both already exist (`downloads.vue:31-41` and `downloads.vue:87-95`). No work needed.
 
@@ -46,10 +46,12 @@
 ### Task 1: Camera health counter
 
 **Files:**
+
 - Create: `app/utils/cameraHealth.ts`
 - Test: `tests/cameraHealth.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `FAILURE_THRESHOLD: number` (value `3`)
@@ -198,10 +200,12 @@ git commit -m "feat: add camera health failure counter"
 ### Task 2: Feed the counter from cameraFetch and hard-disconnect
 
 **Files:**
+
 - Modify: `app/utils/lunaClient.ts:32-39`
 - Modify: `app/composables/useCamera.ts`
 
 **Interfaces:**
+
 - Consumes: `armCameraHealth`, `disarmCameraHealth`, `reportCameraSuccess`, `reportCameraFailure`, `FAILURE_THRESHOLD` from Task 1.
 - Produces: `useCamera()` gains no new public members. `disconnect()` keeps its existing signature `(): Promise<void>`.
 
@@ -251,53 +255,53 @@ import { armCameraHealth, disarmCameraHealth, FAILURE_THRESHOLD } from "~/utils/
 Replace the existing `disconnect` function with these two functions:
 
 ```ts
-  /**
-   * Tear down the session without touching `wantConnection`. Shared by the
-   * user-initiated disconnect and the health-detector disconnect.
-   */
-  async function teardown() {
-    clearRetryTimer();
-    disarmCameraHealth();
-    await lunaClient.disconnect();
-    status.value = "disconnected";
-    info.value = null;
-    library.value = [];
-  }
+/**
+ * Tear down the session without touching `wantConnection`. Shared by the
+ * user-initiated disconnect and the health-detector disconnect.
+ */
+async function teardown() {
+  clearRetryTimer();
+  disarmCameraHealth();
+  await lunaClient.disconnect();
+  status.value = "disconnected";
+  info.value = null;
+  library.value = [];
+}
 
-  async function disconnect() {
-    wantConnection.value = false;
-    await teardown();
-    error.value = null;
-  }
+async function disconnect() {
+  wantConnection.value = false;
+  await teardown();
+  error.value = null;
+}
 
-  /**
-   * The camera stopped answering. Drop the session and leave it dropped:
-   * clearing `wantConnection` keeps the backoff reconnect loop dormant so it
-   * cannot immediately undo this. The user reconnects deliberately.
-   */
-  async function forceDisconnect() {
-    wantConnection.value = false;
-    await teardown();
-    error.value = `Lost contact with the camera. Disconnected after ${FAILURE_THRESHOLD} failed requests.`;
-  }
+/**
+ * The camera stopped answering. Drop the session and leave it dropped:
+ * clearing `wantConnection` keeps the backoff reconnect loop dormant so it
+ * cannot immediately undo this. The user reconnects deliberately.
+ */
+async function forceDisconnect() {
+  wantConnection.value = false;
+  await teardown();
+  error.value = `Lost contact with the camera. Disconnected after ${FAILURE_THRESHOLD} failed requests.`;
+}
 ```
 
 In `connect()`, arm the detector immediately after `wantConnection.value = true;`:
 
 ```ts
-      wantConnection.value = true;
-      armCameraHealth(() => {
-        void forceDisconnect();
-      });
+wantConnection.value = true;
+armCameraHealth(() => {
+  void forceDisconnect();
+});
 ```
 
 In `tryReconnect()`, re-arm after a successful reconnect. Replace `retryAttempt.value = 0;` in the `try` block (the one directly after `error.value = null;`) with:
 
 ```ts
-      retryAttempt.value = 0;
-      armCameraHealth(() => {
-        void forceDisconnect();
-      });
+retryAttempt.value = 0;
+armCameraHealth(() => {
+  void forceDisconnect();
+});
 ```
 
 - [ ] **Step 3: Run the full suite**
@@ -322,9 +326,11 @@ git commit -m "feat: disconnect the camera after three failed requests"
 ### Task 3: Persist the camera host
 
 **Files:**
+
 - Modify: `app/composables/useCamera.ts`
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: `useCamera().host` is a `Ref<string>` restored from and written to `localStorage` under `luna-camera-host`. Later tasks bind an input straight to it.
 
@@ -340,13 +346,13 @@ const HOST_STORAGE_KEY = "luna-camera-host";
 Replace the `host` state initialiser:
 
 ```ts
-  const host = useState<string>("camera-host", () => {
-    if (import.meta.client) {
-      const stored = localStorage.getItem(HOST_STORAGE_KEY);
-      if (stored) return stored;
-    }
-    return DEFAULT_HOST;
-  });
+const host = useState<string>("camera-host", () => {
+  if (import.meta.client) {
+    const stored = localStorage.getItem(HOST_STORAGE_KEY);
+    if (stored) return stored;
+  }
+  return DEFAULT_HOST;
+});
 ```
 
 - [ ] **Step 2: Write it back on change**
@@ -354,13 +360,13 @@ Replace the `host` state initialiser:
 Directly after the `const retryAttempt = ...` line, add:
 
 ```ts
-  // Persisted so the home page can ship a bare Connect button: a user on a
-  // non-default gateway should not have to retype it every launch.
-  if (import.meta.client) {
-    watch(host, (value) => {
-      localStorage.setItem(HOST_STORAGE_KEY, value.trim());
-    });
-  }
+// Persisted so the home page can ship a bare Connect button: a user on a
+// non-default gateway should not have to retype it every launch.
+if (import.meta.client) {
+  watch(host, (value) => {
+    localStorage.setItem(HOST_STORAGE_KEY, value.trim());
+  });
+}
 ```
 
 - [ ] **Step 3: Typecheck and lint**
@@ -380,10 +386,12 @@ git commit -m "feat: persist the camera host across launches"
 ### Task 4: Extract the watermark form
 
 **Files:**
+
 - Create: `app/components/WatermarkSettingsForm.vue`
 - Modify: `app/components/DownloadOptionsModal.vue`
 
 **Interfaces:**
+
 - Consumes: `useWatermarkSettings()` (existing).
 - Produces: `<WatermarkSettingsForm :preview-src="string | undefined" />`. It owns the enable switch, the preview and the position picker. It renders no title, no footer and no buttons.
 
@@ -470,8 +478,10 @@ const previewSrc = computed(() => photos.value[0]?.srcUrl);
 
 const summary = computed(() => {
   const parts: string[] = [];
-  if (photos.value.length > 0) parts.push(`${photos.value.length} ${photos.value.length === 1 ? "photo" : "photos"}`);
-  if (videos.value.length > 0) parts.push(`${videos.value.length} ${videos.value.length === 1 ? "video" : "videos"}`);
+  if (photos.value.length > 0)
+    parts.push(`${photos.value.length} ${photos.value.length === 1 ? "photo" : "photos"}`);
+  if (videos.value.length > 0)
+    parts.push(`${videos.value.length} ${videos.value.length === 1 ? "video" : "videos"}`);
   return parts.join(" and ");
 });
 </script>
@@ -520,11 +530,13 @@ git commit -m "refactor: extract WatermarkSettingsForm from the download modal"
 ### Task 5: Settings page and navigation
 
 **Files:**
+
 - Create: `app/pages/settings.vue`
 - Modify: `app/layouts/default.vue`
 - Modify: `app/components/CameraStatusChip.vue`
 
 **Interfaces:**
+
 - Consumes: `useCamera()` (`info`, `library`, `host`, `error`, `isConnected`, `isBusy`, `available`, `connect`, `disconnect`), `useWatermarkSettings()` (`reset`), `WatermarkSettingsForm` from Task 4, `ColorwayToggle` (existing).
 - Produces: the `/settings` route.
 
@@ -534,7 +546,8 @@ Create `app/pages/settings.vue`:
 
 ```vue
 <script setup lang="ts">
-const { info, library, host, error, isConnected, isBusy, available, connect, disconnect } = useCamera();
+const { info, library, host, error, isConnected, isBusy, available, connect, disconnect } =
+  useCamera();
 const { reset: resetWatermark } = useWatermarkSettings();
 
 useHead({ title: "Settings" });
@@ -582,20 +595,32 @@ useHead({ title: "Settings" });
             </template>
           </UFormField>
 
-          <UAlert v-if="error" icon="i-lucide-triangle-alert" color="error" variant="subtle" :title="error">
+          <UAlert
+            v-if="error"
+            icon="i-lucide-triangle-alert"
+            color="error"
+            variant="subtle"
+            :title="error"
+          >
             <template #description>
               <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs">
                 <li>Make sure your computer is joined to the camera's Wi-Fi network.</li>
-                <li>Confirm the address matches the camera's gateway (default <span class="font-mono">192.168.42.1</span>).</li>
                 <li>
-                  On macOS, allow <span class="font-medium">Luna Ultra Desktop</span> under System Settings &rsaquo;
-                  Privacy &amp; Security &rsaquo; Local Network.
+                  Confirm the address matches the camera's gateway (default
+                  <span class="font-mono">192.168.42.1</span>).
+                </li>
+                <li>
+                  On macOS, allow <span class="font-medium">Luna Ultra Desktop</span> under System
+                  Settings &rsaquo; Privacy &amp; Security &rsaquo; Local Network.
                 </li>
               </ul>
             </template>
           </UAlert>
 
-          <dl v-if="isConnected && info" class="grid grid-cols-2 gap-x-8 gap-y-4 border-t border-default pt-4 text-sm">
+          <dl
+            v-if="isConnected && info"
+            class="grid grid-cols-2 gap-x-8 gap-y-4 border-t border-default pt-4 text-sm"
+          >
             <div>
               <dt class="text-muted">Device</dt>
               <dd class="mt-0.5 text-default">{{ info.deviceName ?? "Luna Ultra" }}</dd>
@@ -641,13 +666,21 @@ useHead({ title: "Settings" });
         <section class="space-y-4">
           <div class="space-y-1">
             <h2 class="text-sm font-semibold text-highlighted">Watermark</h2>
-            <p class="text-sm text-muted">Applied to photos as they download. Videos transfer untouched.</p>
+            <p class="text-sm text-muted">
+              Applied to photos as they download. Videos transfer untouched.
+            </p>
           </div>
 
           <WatermarkSettingsForm />
 
           <div class="flex justify-end border-t border-default pt-4">
-            <UButton label="Reset to default" icon="i-lucide-rotate-ccw" color="neutral" variant="ghost" @click="resetWatermark" />
+            <UButton
+              label="Reset to default"
+              icon="i-lucide-rotate-ccw"
+              color="neutral"
+              variant="ghost"
+              @click="resetWatermark"
+            />
           </div>
         </section>
 
@@ -705,12 +738,12 @@ const items = computed<NavigationMenuItem[][]>(() => [
 Then remove `ColorwayToggle` from the sidebar footer. Replace the `#footer` template:
 
 ```vue
-      <template #footer="{ collapsed }">
-        <div class="flex w-full flex-col gap-3" :class="collapsed ? 'items-center' : ''">
-          <UpdateBanner :collapsed="collapsed" />
-          <CameraStatusChip :collapsed="collapsed" />
-        </div>
-      </template>
+<template #footer="{ collapsed }">
+  <div class="flex w-full flex-col gap-3" :class="collapsed ? 'items-center' : ''">
+    <UpdateBanner :collapsed="collapsed" />
+    <CameraStatusChip :collapsed="collapsed" />
+  </div>
+</template>
 ```
 
 - [ ] **Step 3: Make the status chip a link**
@@ -726,8 +759,17 @@ In `app/components/CameraStatusChip.vue`, wrap the badge in a `NuxtLink`. Replac
       :class="collapsed ? '' : 'w-full'"
       aria-label="Camera settings"
     >
-      <UBadge :color="meta.color" variant="subtle" size="md" :class="collapsed ? 'px-1.5' : 'w-full justify-start'">
-        <UIcon :name="meta.icon" class="size-3.5 shrink-0" :class="meta.spin ? 'animate-spin' : ''" />
+      <UBadge
+        :color="meta.color"
+        variant="subtle"
+        size="md"
+        :class="collapsed ? 'px-1.5' : 'w-full justify-start'"
+      >
+        <UIcon
+          :name="meta.icon"
+          class="size-3.5 shrink-0"
+          :class="meta.spin ? 'animate-spin' : ''"
+        />
         <span v-if="!collapsed">{{ meta.label }}</span>
       </UBadge>
     </NuxtLink>
@@ -753,9 +795,11 @@ git commit -m "feat: add a dedicated settings page"
 ### Task 6: Reduce the home page to connect and disconnect
 
 **Files:**
+
 - Modify: `app/pages/index.vue`
 
 **Interfaces:**
+
 - Consumes: `useCamera()`, `LunaModel` (existing), the `/settings` route from Task 5.
 - Produces: nothing consumed by later tasks.
 
@@ -816,7 +860,8 @@ watch(isConnected, (connected) => {
                 Pair your Luna Ultra
               </h1>
               <p class="max-w-md text-muted">
-                Join the camera's Wi-Fi network, then connect to browse, download and manage everything you shot.
+                Join the camera's Wi-Fi network, then connect to browse, download and manage
+                everything you shot.
               </p>
             </div>
 
@@ -839,7 +884,13 @@ watch(isConnected, (connected) => {
               :title="error"
             >
               <template #actions>
-                <UButton label="Open settings" size="xs" color="neutral" variant="outline" to="/settings" />
+                <UButton
+                  label="Open settings"
+                  size="xs"
+                  color="neutral"
+                  variant="outline"
+                  to="/settings"
+                />
               </template>
             </UAlert>
 
@@ -852,7 +903,13 @@ watch(isConnected, (connected) => {
                 :disabled="!available"
                 @click="connect"
               />
-              <UButton size="xl" label="View downloads" color="neutral" variant="ghost" to="/downloads" />
+              <UButton
+                size="xl"
+                label="View downloads"
+                color="neutral"
+                variant="ghost"
+                to="/downloads"
+              />
             </div>
           </template>
         </div>
@@ -884,10 +941,12 @@ git commit -m "feat: reduce the home page to connect and disconnect"
 ### Task 7: Media preview action row and arrow insets
 
 **Files:**
+
 - Modify: `app/components/MediaPreview.vue:84-88` (header actions)
 - Modify: `app/components/MediaPreview.vue:143-166` (prev/next arrows)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: nothing consumed by later tasks. The `download`, `delete` and `open` emits are unchanged.
 
@@ -911,7 +970,7 @@ const moreItems = computed(() => [
 Replace the header action row (the `<div class="flex items-center gap-1.5">` holding the three buttons):
 
 ```vue
-          <div class="flex items-center gap-1.5">
+<div class="flex items-center gap-1.5">
             <UButton icon="i-lucide-arrow-down-to-line" label="Download" size="sm" color="neutral" variant="outline" @click="emit('download')" />
             <UDropdownMenu :items="moreItems">
               <UButton icon="i-lucide-ellipsis" size="sm" color="neutral" variant="ghost" aria-label="More actions" />
@@ -936,26 +995,26 @@ relative flex min-h-0 flex-1 items-center justify-center bg-black/95 px-16 dark:
 Then change the two arrow buttons' positioning classes from `left-4` and `right-4` to `left-3` and `right-3`:
 
 ```vue
-          <UButton
-            v-if="hasPrev"
-            icon="i-lucide-chevron-left"
-            size="lg"
-            color="neutral"
-            variant="solid"
-            class="absolute left-3 top-1/2 -translate-y-1/2"
-            aria-label="Previous file"
-            @click="emit('prev')"
-          />
-          <UButton
-            v-if="hasNext"
-            icon="i-lucide-chevron-right"
-            size="lg"
-            color="neutral"
-            variant="solid"
-            class="absolute right-3 top-1/2 -translate-y-1/2"
-            aria-label="Next file"
-            @click="emit('next')"
-          />
+<UButton
+  v-if="hasPrev"
+  icon="i-lucide-chevron-left"
+  size="lg"
+  color="neutral"
+  variant="solid"
+  class="absolute left-3 top-1/2 -translate-y-1/2"
+  aria-label="Previous file"
+  @click="emit('prev')"
+/>
+<UButton
+  v-if="hasNext"
+  icon="i-lucide-chevron-right"
+  size="lg"
+  color="neutral"
+  variant="solid"
+  class="absolute right-3 top-1/2 -translate-y-1/2"
+  aria-label="Next file"
+  @click="emit('next')"
+/>
 ```
 
 `PanoViewer` and the loading overlay use `absolute inset-0`, so they still fill the area edge to edge; only the `object-contain` image is inset, which is what we want.
@@ -978,10 +1037,12 @@ git commit -m "fix: separate delete from download in the media preview"
 ### Task 8: Gallery day selection and skeleton loading
 
 **Files:**
+
 - Modify: `app/pages/gallery.vue:216-226` (the day heading row)
 - Modify: `app/pages/gallery.vue:215-219` (the loading state block)
 
 **Interfaces:**
+
 - Consumes: `tileMin` (existing computed), `loadingLibrary` (existing).
 - Produces: nothing consumed by later tasks.
 
@@ -990,7 +1051,7 @@ git commit -m "fix: separate delete from download in the media preview"
 In `app/pages/gallery.vue`, replace the day heading row:
 
 ```vue
-          <div class="mb-2.5 flex items-baseline gap-3">
+<div class="mb-2.5 flex items-baseline gap-3">
             <h2 class="text-sm font-semibold text-highlighted">{{ group.label }}</h2>
             <span class="font-mono text-xs text-muted tabular-nums">{{ group.items.length }}</span>
             <UButton

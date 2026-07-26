@@ -77,5 +77,16 @@ export function useLiveView() {
     return lunaClient.liveViewStats().catch(() => null);
   }
 
-  return { active, starting, transport, streamUrl, error, diagnostics, note, start, stop, refreshStats };
+  return {
+    active,
+    starting,
+    transport,
+    streamUrl,
+    error,
+    diagnostics,
+    note,
+    start,
+    stop,
+    refreshStats,
+  };
 }

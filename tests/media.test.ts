@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatDuration, dayLabel, groupByDay, isEquirectangular } from "~/utils/media";
+import {
+  formatBytes,
+  formatDuration,
+  dayLabel,
+  groupByDay,
+  isEquirectangular,
+} from "~/utils/media";
 import type { MediaItem } from "~/types/media";
 
 function item(id: string, takenAt: string, type: "photo" | "video" = "photo"): MediaItem {

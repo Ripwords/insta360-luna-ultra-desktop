@@ -120,7 +120,11 @@ describe("decodeRawPreview", () => {
 
   it("gray-world balances a neutral frame to near-neutral output", () => {
     // Raw green is twice red/blue (typical Bayer). Gray-world should equalize.
-    const buf = buildRawDng({ width: 16, height: 16, samples: flatFrame(16, 16, 20000, 40000, 20000) });
+    const buf = buildRawDng({
+      width: 16,
+      height: 16,
+      samples: flatFrame(16, 16, 20000, 40000, 20000),
+    });
     const meta = parseRawImageMeta(buf)!;
     const out = decodeRawPreview(buf, meta, 4)!;
     const [r, g, b] = [out.data[0]!, out.data[1]!, out.data[2]!];
@@ -132,7 +136,11 @@ describe("decodeRawPreview", () => {
   });
 
   it("still decodes when the buffer is truncated a few bytes short of EOF", () => {
-    const full = buildRawDng({ width: 32, height: 32, samples: flatFrame(32, 32, 30000, 30000, 30000) });
+    const full = buildRawDng({
+      width: 32,
+      height: 32,
+      samples: flatFrame(32, 32, 30000, 30000, 30000),
+    });
     // Chop the tail: a streamed download that stopped a few bytes early.
     const truncated = full.slice(0, full.byteLength - 200);
     const meta = parseRawImageMeta(truncated)!;
@@ -143,7 +151,11 @@ describe("decodeRawPreview", () => {
   });
 
   it("routes CFA channels correctly (red-dominant raw -> red output) with WB off", () => {
-    const buf = buildRawDng({ width: 16, height: 16, samples: flatFrame(16, 16, 60000, 20000, 20000) });
+    const buf = buildRawDng({
+      width: 16,
+      height: 16,
+      samples: flatFrame(16, 16, 60000, 20000, 20000),
+    });
     const meta = parseRawImageMeta(buf)!;
     const out = decodeRawPreview(buf, meta, 4, { whiteBalance: "none" })!;
     const [r, g, b] = [out.data[0]!, out.data[1]!, out.data[2]!];

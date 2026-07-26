@@ -279,9 +279,7 @@ if (unusedOverrides.length + unusedAdditions.length + unusedMessages.length > 0)
 
 const trimmed = {
   messages: Object.fromEntries(
-    [...messages]
-      .sort()
-      .map((n) => [n, { ...full.messages[n], ...MESSAGE_ADDITIONS[n] }]),
+    [...messages].sort().map((n) => [n, { ...full.messages[n], ...MESSAGE_ADDITIONS[n] }]),
   ),
   enums: Object.fromEntries(
     [...enums]

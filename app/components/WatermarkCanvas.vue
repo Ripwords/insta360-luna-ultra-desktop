@@ -7,7 +7,7 @@ import { cameraFetch } from "~/utils/lunaClient";
 const props = defineProps<{ src?: string }>();
 
 const { settings } = useWatermarkSettings();
-const canvas = ref<HTMLCanvasElement | null>(null);
+const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const loading = ref(true);
 
 let image: HTMLImageElement | null = null;

@@ -93,7 +93,9 @@ describe("parseLunaIndex", () => {
 
   it("builds absolute URLs and camera paths", () => {
     expect(files[1]!.srcUrl).toBe(`${CAMERA_BASE}IMG_20260718_142012_00_002.jpg`);
-    expect(files[1]!.cameraPath).toBe("/storage_internal/DCIM/Camera01/IMG_20260718_142012_00_002.jpg");
+    expect(files[1]!.cameraPath).toBe(
+      "/storage_internal/DCIM/Camera01/IMG_20260718_142012_00_002.jpg",
+    );
   });
 
   it("prefers filename timestamps over index columns", () => {

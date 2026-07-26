@@ -43,24 +43,31 @@ const items = computed<NavigationMenuItem[][]>(() => [
   <UDashboardGroup storage="local" storage-key="luna-dashboard">
     <UDashboardSidebar collapsible resizable :min-size="12" :default-size="16" :max-size="20">
       <template #header="{ collapsed }">
-        <NuxtLink to="/" class="flex items-center gap-2.5 overflow-hidden" aria-label="Luna Ultra home">
+        <NuxtLink
+          to="/"
+          class="flex items-center gap-2.5 overflow-hidden"
+          aria-label="Luna Ultra home"
+        >
           <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-inverted">
             <UIcon name="i-lucide-moon" class="size-4.5 text-inverted" />
           </span>
-          <span v-if="!collapsed" class="truncate text-sm font-semibold tracking-tight text-highlighted">
+          <span
+            v-if="!collapsed"
+            class="truncate text-sm font-semibold tracking-tight text-highlighted"
+          >
             Luna Ultra
           </span>
         </NuxtLink>
       </template>
 
       <template #default="{ collapsed }">
-        <UNavigationMenu :collapsed="collapsed" :items="items" orientation="vertical" class="mt-2" />
+        <UNavigationMenu :collapsed :items orientation="vertical" class="mt-2" />
       </template>
 
       <template #footer="{ collapsed }">
         <div class="flex w-full flex-col gap-3" :class="collapsed ? 'items-center' : ''">
-          <UpdateBanner :collapsed="collapsed" />
-          <CameraStatusChip :collapsed="collapsed" />
+          <UpdateBanner :collapsed />
+          <CameraStatusChip :collapsed />
         </div>
       </template>
     </UDashboardSidebar>

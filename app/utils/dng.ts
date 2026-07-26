@@ -12,7 +12,18 @@ export interface EmbeddedJpeg {
 }
 
 const TYPE_SIZE: Record<number, number> = {
-  1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8,
+  1: 1,
+  2: 1,
+  3: 2,
+  4: 4,
+  5: 8,
+  6: 1,
+  7: 1,
+  8: 2,
+  9: 4,
+  10: 8,
+  11: 4,
+  12: 8,
 };
 
 export function findEmbeddedJpegs(buffer: ArrayBuffer): EmbeddedJpeg[] {
@@ -21,8 +32,10 @@ export function findEmbeddedJpegs(buffer: ArrayBuffer): EmbeddedJpeg[] {
 
   const order = view.getUint16(0, false);
   let little: boolean;
-  if (order === 0x4949) little = true; // "II"
-  else if (order === 0x4d4d) little = false; // "MM"
+  if (order === 0x4949)
+    little = true; // "II"
+  else if (order === 0x4d4d)
+    little = false; // "MM"
   else return [];
 
   if (view.getUint16(2, little) !== 42) return [];
@@ -57,7 +70,8 @@ export function findEmbeddedJpegs(buffer: ArrayBuffer): EmbeddedJpeg[] {
   }
 
   function walk(ifdOffset: number, depth: number): void {
-    if (depth > 4 || ifdOffset <= 0 || ifdOffset + 2 > view.byteLength || visited.has(ifdOffset)) return;
+    if (depth > 4 || ifdOffset <= 0 || ifdOffset + 2 > view.byteLength || visited.has(ifdOffset))
+      return;
     visited.add(ifdOffset);
 
     const count = u16(ifdOffset);
@@ -75,21 +89,43 @@ export function findEmbeddedJpegs(buffer: ArrayBuffer): EmbeddedJpeg[] {
       const tag = u16(eo);
       const values = entryValues(eo);
       switch (tag) {
-        case 0x0201: jpegOffset = values[0] ?? -1; break; // JPEGInterchangeFormat
-        case 0x0202: jpegLength = values[0] ?? -1; break; // JPEGInterchangeFormatLength
-        case 0x0103: compression = values[0] ?? -1; break; // Compression
-        case 0x0111: blockOffsets.push(...values); break; // StripOffsets
-        case 0x0117: blockCounts.push(...values); break; // StripByteCounts
-        case 0x0144: blockOffsets.push(...values); break; // TileOffsets
-        case 0x0145: blockCounts.push(...values); break; // TileByteCounts
-        case 0x014a: subIfds.push(...values); break; // SubIFDs
-        case 0x8769: exifIfd = values[0] ?? -1; break; // ExifIFD
+        case 0x0201:
+          jpegOffset = values[0] ?? -1;
+          break; // JPEGInterchangeFormat
+        case 0x0202:
+          jpegLength = values[0] ?? -1;
+          break; // JPEGInterchangeFormatLength
+        case 0x0103:
+          compression = values[0] ?? -1;
+          break; // Compression
+        case 0x0111:
+          blockOffsets.push(...values);
+          break; // StripOffsets
+        case 0x0117:
+          blockCounts.push(...values);
+          break; // StripByteCounts
+        case 0x0144:
+          blockOffsets.push(...values);
+          break; // TileOffsets
+        case 0x0145:
+          blockCounts.push(...values);
+          break; // TileByteCounts
+        case 0x014a:
+          subIfds.push(...values);
+          break; // SubIFDs
+        case 0x8769:
+          exifIfd = values[0] ?? -1;
+          break; // ExifIFD
       }
     }
 
     if (jpegOffset > 0 && jpegLength > 0) pushCandidate(jpegOffset, jpegLength);
     // A JPEG-compressed preview stored as a single strip or tile
-    if ((compression === 6 || compression === 7) && blockOffsets.length === 1 && blockCounts.length === 1) {
+    if (
+      (compression === 6 || compression === 7) &&
+      blockOffsets.length === 1 &&
+      blockCounts.length === 1
+    ) {
       pushCandidate(blockOffsets[0]!, blockCounts[0]!);
     }
 
@@ -107,7 +143,10 @@ export function findEmbeddedJpegs(buffer: ArrayBuffer): EmbeddedJpeg[] {
  * `prefer` picks the largest embedded JPEG (a full preview) or the smallest
  * (a lightweight thumbnail). Returns null when no preview is present.
  */
-export function extractDngPreview(buffer: ArrayBuffer, prefer: "largest" | "smallest" = "largest"): Blob | null {
+export function extractDngPreview(
+  buffer: ArrayBuffer,
+  prefer: "largest" | "smallest" = "largest",
+): Blob | null {
   const jpegs = findEmbeddedJpegs(buffer);
   if (jpegs.length === 0) return null;
   jpegs.sort((a, b) => (prefer === "largest" ? b.length - a.length : a.length - b.length));

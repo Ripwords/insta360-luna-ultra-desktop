@@ -1,0 +1,10 @@
+#!/bin/sh
+# Enforces the "always fmt and lint before commits" rule from CLAUDE.md.
+#
+# The actual work is configured under "lint-staged" in package.json: it formats
+# and auto-fixes only the staged files, then re-stages the results so the commit
+# contains the fixed code. Anything left unfixed fails and aborts the commit.
+#
+# Enabled by `git config core.hooksPath .githooks`, which the `postinstall`
+# script sets automatically. Skip a run with `git commit --no-verify`.
+exec bun x lint-staged

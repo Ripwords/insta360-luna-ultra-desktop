@@ -275,12 +275,17 @@ const ordered = <T>(values: Iterable<T>, order: T[]): T[] =>
 
 /** Frame sizes this mode offers, largest first. */
 export const sizesFor = (modeId: string): string[] =>
-  ordered(partsFor(modeId).map((parts) => parts.size), SIZE_ORDER);
+  ordered(
+    partsFor(modeId).map((parts) => parts.size),
+    SIZE_ORDER,
+  );
 
 /** Aspects that frame size has in this mode. */
 export const aspectsFor = (modeId: string, size: string): string[] =>
   ordered(
-    partsFor(modeId).filter((parts) => parts.size === size).map((parts) => parts.aspect),
+    partsFor(modeId)
+      .filter((parts) => parts.size === size)
+      .map((parts) => parts.aspect),
     ASPECT_ORDER,
   );
 
