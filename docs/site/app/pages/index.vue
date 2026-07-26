@@ -1,14 +1,18 @@
 <script setup lang="ts">
-// `getCameraTransport` lives in the layer (repo root `app/utils/transport.ts`)
-// and is deliberately NOT imported here: the "~" alias only ever points at
-// *this app's own* srcDir (docs/site/app), it does not cross layer
-// boundaries, so `import ... from "~/utils/transport"` 404s from this app.
-// Cross-layer utils are reachable only through Nuxt's auto-import scanning,
-// which does cover every extended layer's `utils/` dir — so calling
-// `getCameraTransport` with no import at all proves three things at once:
-// layer component resolution, layer util resolution via auto-import, and
-// that the transport registry is reachable from this app.
-const transportAvailable = getCameraTransport().available;
+// `getCameraTransport` lives in the layer (repo root `app/utils/transport.ts`).
+// The plain "~" alias always resolves against *this app's own* srcDir
+// (docs/site/app), never the layer's, for both types and values — so
+// `import ... from "~/utils/transport"` 404s from this app. `#layer` (see
+// nuxt.config.ts) points at the layer's srcDir directly, so this explicit
+// import — including the type import below — resolves and typechecks.
+// Using it here proves three things at once: layer component resolution
+// (CameraStatusChip), layer util resolution via an explicit cross-layer
+// import, and that the transport registry is reachable from this app.
+import { getCameraTransport } from "#layer/utils/transport";
+import type { CameraTransport } from "#layer/utils/transport";
+
+const transport: CameraTransport = getCameraTransport();
+const transportAvailable = transport.available;
 </script>
 
 <template>

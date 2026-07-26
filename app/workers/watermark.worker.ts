@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
-import { WATERMARK_ASSET_URL } from "~/utils/watermark";
-import type { WatermarkPosition } from "~/utils/watermark";
-import { composeWatermarked } from "~/utils/watermarkCompose";
+import { WATERMARK_ASSET_URL } from "../utils/watermark";
+import type { WatermarkPosition } from "../utils/watermark";
+import { composeWatermarked } from "../utils/watermarkCompose";
 
 export interface WatermarkRequest {
   id: number;

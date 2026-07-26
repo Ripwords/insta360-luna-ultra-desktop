@@ -1,23 +1,5 @@
 import { useNuxt } from "@nuxt/kit";
-import { createRequire } from "node:module";
-import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-
-const require = createRequire(import.meta.url);
-
-// nuxt-og-image (bundled by @nuxtjs/seo) imports the bare `h3` specifier
-// without declaring it as its own dependency. This workspace's flat
-// dependency store also contains h3@2.0.1-rc.20 — pulled in as a pinned
-// devDependency of @nuxt/test-utils (`h3-next`), unrelated to this app —
-// and Bun's hoisting elects that newer major version for any *undeclared*
-// "h3" import. h3 2.x dropped the `sendError` export nuxt-og-image needs,
-// so every request 500'd with "does not provide an export named
-// 'sendError'". Force the server bundle to resolve `h3` the same way
-// nitropack does (it correctly depends on `h3: ^1.15.11`), instead of
-// letting the ambiguous bare specifier fall through to the wrong version.
-const h3Path = require.resolve("h3", {
-  paths: [dirname(require.resolve("nitropack/package.json"))],
-});
 
 export default defineNuxtConfig({
   // The desktop app at the repo root is the layer: its components,
@@ -34,7 +16,17 @@ export default defineNuxtConfig({
   extends: ["../../"],
 
   alias: {
-    h3: h3Path,
+    // Cross-layer `~/...` imports don't work: `~` always resolves against
+    // *this app's own* srcDir (docs/site/app), never the layer's, for both
+    // types and values. `#layer` points at the layer's srcDir directly, and
+    // Nuxt writes it into the generated tsconfig `paths`, so
+    // `import { getCameraTransport } from "#layer/utils/transport"` and
+    // `import type { CameraTransport } from "#layer/utils/transport"` both
+    // resolve and typecheck. Auto-import still covers plain, unqualified
+    // references (as CameraStatusChip's own auto-registration does); this
+    // alias is for the cases — like an explicit type import — that
+    // auto-import doesn't reach.
+    "#layer": fileURLToPath(new URL("../../app", import.meta.url)),
   },
 
   // Nuxt's `css` config array is not layer-aware: the layer's own
@@ -53,28 +45,6 @@ export default defineNuxtConfig({
           ? fileURLToPath(new URL("../../app/assets/css/main.css", import.meta.url))
           : entry,
       );
-    },
-
-    // `extends` also inherits every OTHER page from the desktop app
-    // (camera/gallery/downloads/settings) since docs/site doesn't override
-    // them. `camera`/`gallery`/`downloads` transitively import
-    // worker-bundled code (e.g. `watermark.worker.ts` via the layout's old
-    // download-progress indicator) whose cross-layer "~" imports don't
-    // survive Vite's isolated worker sub-build, which broke `nuxt
-    // generate` outright (the client build statically discovers every
-    // registered route, worker included, regardless of whether it is ever
-    // prerendered). `/settings` is kept: `CameraStatusChip` (used on the
-    // probe page) always links there, and settings.vue doesn't touch the
-    // watermark worker. Deciding which inherited routes docs/site should
-    // actually serve long-term is Task 2's job ("route re-prefixing and
-    // docs layout"); for this gate, keep only what docs/site needs so the
-    // `generate` run isn't blocked by pages this task never asked for.
-    "pages:extend"(pages) {
-      const docsSiteDir = fileURLToPath(new URL(".", import.meta.url));
-      for (let i = pages.length - 1; i >= 0; i--) {
-        const page = pages[i];
-        if (page?.path !== "/settings" && !page?.file?.startsWith(docsSiteDir)) pages.splice(i, 1);
-      }
     },
   },
 
@@ -100,15 +70,24 @@ export default defineNuxtConfig({
     baseURL: "/luna-ultra-desktop/",
   },
 
+  // Origin only — no path. `@nuxtjs/seo` combines `site.url` with
+  // `app.baseURL` itself; including the path in both produces a
+  // doubled-up prefix (`https://ripwords.github.io/luna-ultra-desktop/luna-ultra-desktop`)
+  // in sitemap.xml and the canonical link tag. Origin-only + baseURL
+  // produces the correct single-prefixed URLs.
   site: {
-    url: "https://ripwords.github.io/luna-ultra-desktop",
+    url: "https://ripwords.github.io",
     name: "Luna Ultra Desktop",
   },
 
-  // @nuxt/robots (bundled by @nuxtjs/seo) refuses to generate a robots.txt
-  // when `site.url` carries a path, which it does here for a GitHub Pages
-  // project site — it throws mid-request, which crashed every route with a
-  // 500. Real robots/sitemap output is Task 4's job; disable it for now.
+  // @nuxt/robots (bundled by @nuxtjs/seo) refuses to emit a robots.txt for
+  // any non-root `app.baseURL` (the trigger is baseURL, not site.url) — a
+  // build-time `logger.error` that self-disables robots.txt, not a runtime
+  // throw. This is a permanent decision, not a workaround: a GitHub Pages
+  // project site can only ever serve `/luna-ultra-desktop/robots.txt`,
+  // which crawlers ignore — only `https://ripwords.github.io/robots.txt`
+  // (repo root) is authoritative, and this site doesn't own that path.
+  // robots.txt is out of scope for this site.
   robots: {
     robotsTxt: false,
   },

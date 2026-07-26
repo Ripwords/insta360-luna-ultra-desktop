@@ -1,5 +1,5 @@
-import { watermarkRect } from "~/utils/watermark";
-import type { WatermarkPosition } from "~/utils/watermark";
+import { watermarkRect } from "./watermark";
+import type { WatermarkPosition } from "./watermark";
 
 /** Quality for the re-encode a watermarked download necessarily costs. */
 export const WATERMARK_JPEG_QUALITY = 0.92;

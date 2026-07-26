@@ -1,4 +1,4 @@
-import { LUNA_WATERMARK_LAYOUT } from "~/utils/watermarkLayout";
+import { LUNA_WATERMARK_LAYOUT } from "./watermarkLayout";
 
 export type WatermarkPosition =
   | "top-left"

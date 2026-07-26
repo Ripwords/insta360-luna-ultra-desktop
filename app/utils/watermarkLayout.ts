@@ -1,4 +1,4 @@
-import type { WatermarkPosition } from "~/utils/watermark";
+import type { WatermarkPosition } from "./watermark";
 
 /**
  * Official Insta360 Luna Ultra watermark placement table, extracted from
