@@ -77,20 +77,12 @@ jobs:
         include:
           - platform: macos-latest # Apple Silicon
             args: "--target aarch64-apple-darwin"
-            bundle: "src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg"
-            alias: "Luna-Ultra-Desktop-mac-apple-silicon.dmg"
           - platform: macos-latest # Intel
             args: "--target x86_64-apple-darwin"
-            bundle: "src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg"
-            alias: "Luna-Ultra-Desktop-mac-intel.dmg"
           - platform: ubuntu-22.04
             args: ""
-            bundle: "src-tauri/target/release/bundle/appimage/*.AppImage"
-            alias: "Luna-Ultra-Desktop-linux-x86_64.AppImage"
           - platform: windows-latest
             args: ""
-            bundle: "src-tauri/target/release/bundle/nsis/*-setup.exe"
-            alias: "Luna-Ultra-Desktop-windows-x64.exe"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -135,19 +127,6 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           includeUpdaterJson: true
           args: ${{ matrix.args }}
-
-      # tauri's bundle filenames carry the version (Luna.Ultra.Desktop_0.3.0_aarch64.dmg),
-      # so nothing static can link to them. Upload a second copy under a version-free
-      # name to give the README's /releases/latest/download/<name> URLs a fixed target.
-      - name: Upload version-free copy for the README download links
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          src=$(ls -1 ${{ matrix.bundle }} | head -1)
-          cp "$src" "${{ matrix.alias }}"
-          gh release upload "${GITHUB_REF_NAME}" "${{ matrix.alias }}" --clobber
 
   publish:
     needs: [create-release, build]
