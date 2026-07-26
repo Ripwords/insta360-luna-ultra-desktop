@@ -4,7 +4,7 @@
 
 **Goal:** Put a swappable `CameraTransport` behind every camera call, then extract the shared UI into a Nuxt layer, so a second Nuxt app (the docs site) can render the real components against a mock camera.
 
-**Architecture:** A module-level registry in `utils/transport.ts` holds the current transport, defaulting to the existing `lunaClient` object — so the desktop app's behaviour is unchanged by construction. Ten call sites move from importing `lunaClient` directly to reading the registry. Then `components/`, `composables/`, `utils/`, `types/`, `assets/`, `pages/` and `app.config.ts` move to `layers/camera/app/`, which the root app extends.
+**Architecture:** A module-level registry in `utils/transport.ts` holds the current transport, defaulting to the existing `lunaClient` object — so the desktop app's behaviour is unchanged by construction. Ten call sites move from importing `lunaClient` directly to reading the registry. Nothing moves on disk: the docs site will consume the desktop app as a Nuxt layer in place via `extends: ["../.."]`.
 
 **Tech Stack:** Nuxt 4, Nuxt UI 4, TypeScript 7, Vitest 4, Bun, Tauri 2.
 
@@ -22,7 +22,9 @@
 
 Spec: `docs/superpowers/specs/2026-07-26-docs-site-and-live-demo-design.md`
 
-**Do not start Task 7 until the Task 6 gate passes.** Tasks 1–6 are a refactor of a shipping app; Task 7 moves 60+ files and is very hard to review if it lands on top of unverified changes.
+**Do not start Task 7 until the Task 6 gate passes.** Tasks 1–5 refactor a shipping app; the README should not describe a seam that has not been proven against a real camera session.
+
+**Scope change, 2026-07-26.** The original Task 7 extracted everything into a `layers/camera/` Nuxt layer. That move is cancelled — see the note in Task 7 for why it turned out to be unnecessary. This plan now delivers the transport seam and nothing else; the desktop app's file tree is left exactly as it was.
 
 ---
 
@@ -39,13 +41,12 @@ Spec: `docs/superpowers/specs/2026-07-26-docs-site-and-live-demo-design.md`
 | `tests/nuxt/useCamera.test.ts`              | Connect, disconnect, reconnect, library refresh.           |
 | `tests/nuxt/useGallery.test.ts`             | Delete calls `deleteFiles` with camera paths.              |
 | `tests/nuxt/useLiveView.test.ts`            | OSC preferred, annexb fallback, stop.                      |
-| `layers/camera/nuxt.config.ts`              | Layer config: `@nuxt/ui`, css, icon bundle.                |
-| `layers/camera/app/components/AppShell.vue` | The dashboard shell, formerly `layouts/default.vue`.       |
-| `app/layouts/default.vue`                   | Three lines wrapping `<AppShell>`.                         |
+| `tests/nuxt/harness.ts`                     | `mountComposable()` — runs a composable in a Nuxt app.     |
+| `tests/helpers/media.ts`                    | `makeMediaItem()` — a complete, valid `MediaItem`.         |
 
-**Modified:** `app/utils/lunaClient.ts` (add `fetch`, `probe`, `onDisconnect`), the ten call sites, `vitest.config.ts`, `package.json`, `.github/workflows/ci.yml`, `nuxt.config.ts`.
+**Modified:** `app/utils/lunaClient.ts` (add `fetch`, `probe`, `onDisconnect`; un-export `cameraFetch`/`probeCamera`), the ten call sites, `vitest.config.ts`, `package.json`, `.github/workflows/ci.yml`, `README.md`.
 
-**Moved in Task 7:** `app/{components,composables,utils,types,assets,pages}` and `app/app.config.ts` → `layers/camera/app/`.
+**Moved:** nothing. No file changes location in this plan.
 
 ---
 
@@ -988,238 +989,85 @@ git commit --allow-empty -m "chore: verify transport seam against luna_mock_serv
 ```
 
 ---
-
-### Task 7: Extract the `camera` layer
-
-**Files:**
-
-- Create: `layers/camera/nuxt.config.ts`
-- Create: `layers/camera/app/components/AppShell.vue`
-- Create: `app/layouts/default.vue` (replacing the old one)
-- Move: `app/{components,composables,utils,types,assets,pages,workers}` → `layers/camera/app/`
-- Move: `app/app.config.ts` → `layers/camera/app/app.config.ts`
-- Modify: `nuxt.config.ts`, `vitest.config.ts`, `.gitignore` (if it references `app/`)
-- Keep in place: `app/app.vue`
-
-**Interfaces:**
-
-- Consumes: the sealed seam from Task 5.
-- Produces: a layer at `layers/camera` that any Nuxt app can `extends`. The docs site (second plan) depends only on this path and on `CameraTransport`.
-
-Pure file moves plus config. **No logic edits.** If you find yourself changing behaviour, stop — it belongs in an earlier task.
-
-- [ ] **Step 1: Move the directories with git**
-
-```bash
-mkdir -p layers/camera/app
-git mv app/components layers/camera/app/components
-git mv app/composables layers/camera/app/composables
-git mv app/utils layers/camera/app/utils
-git mv app/workers layers/camera/app/workers
-git mv app/types layers/camera/app/types
-git mv app/assets layers/camera/app/assets
-git mv app/pages layers/camera/app/pages
-git mv app/app.config.ts layers/camera/app/app.config.ts
-```
-
-`git mv` keeps rename detection intact, which makes this reviewable. `app/app.vue` stays where it is — it is the root app's entry, not shared.
-
-`app/workers/` moves too. `watermarkClient.ts` reaches the worker by relative URL
-(`new Worker(new URL("../workers/watermark.worker.ts", import.meta.url))`) and by
-type import (`~/workers/watermark.worker`). Moving `utils/` and `workers/`
-together keeps the relative path valid, and `~` resolves to the layer's own
-`app/`, so the type import survives. Verify both in Step 8 by running a
-watermarked download.
-
-- [ ] **Step 2: Turn the layout into a component**
-
-```bash
-git mv app/layouts/default.vue layers/camera/app/components/AppShell.vue
-```
-
-The file needs **no edits** — it already ends with `<slot />` inside `UDashboardGroup`, which is exactly what a shell component wants.
-
-- [ ] **Step 3: Give the root app a layout again**
-
-Create `app/layouts/default.vue`:
-
-```vue
-<template>
-  <AppShell>
-    <slot />
-  </AppShell>
-</template>
-```
-
-`AppShell` resolves via the layer's auto-imported components. The layout is deliberately not named `app-shell`: the root app's pages have no `definePageMeta({ layout })`, so they must keep finding a `default` layout.
-
-- [ ] **Step 4: Write the layer config**
-
-Create `layers/camera/nuxt.config.ts`:
-
-```ts
-export default defineNuxtConfig({
-  modules: ["@nuxt/ui"],
-  // Bundle every statically-referenced icon so the app works fully offline
-  // (the Tauri build must never fetch icons from the Iconify CDN at runtime)
-  icon: {
-    clientBundle: {
-      scan: true,
-      sizeLimitKb: 512,
-    },
-  },
-  css: ["~/assets/css/main.css"],
-  compatibilityDate: "2026-06-30",
-});
-```
-
-Inside a layer, `~` resolves to that layer's own `app/` directory, so the css path points at the file just moved to `layers/camera/app/assets/css/main.css`.
-
-- [ ] **Step 5: Slim the root config**
-
-Rewrite `nuxt.config.ts`, moving the shared keys out and keeping only what is Tauri-specific:
-
-```ts
-// https://nuxt.com/docs/api/configuration/nuxt-config
-export default defineNuxtConfig({
-  extends: ["./layers/camera"],
-  devtools: {
-    enabled: true,
-  },
-  compatibilityDate: "2026-06-30",
-  ssr: false,
-  vite: {
-    // Better support for Tauri CLI output
-    clearScreen: false,
-    // Enable environment variables
-    // Additional environment variables can be found at
-    // https://v2.tauri.app/reference/environment-variables/
-    envPrefix: ["VITE_", "TAURI_"],
-    server: {
-      // Tauri requires a consistent port
-      strictPort: true,
-    },
-  },
-  // Avoids error [unhandledRejection] EMFILE: too many open files, watch
-  ignore: ["**/src-tauri/**"],
-});
-```
-
-`modules`, `icon` and `css` now come from the layer.
-
-- [ ] **Step 6: Repoint the vitest alias**
-
-In `vitest.config.ts`, the `~` alias must follow the moved files:
-
-```ts
-    alias: {
-      "~": fileURLToPath(new URL("./layers/camera/app", import.meta.url)),
-    },
-```
-
-`vitest.nuxt.config.ts` needs no change — the Nuxt environment resolves `~` through the real Nuxt context, which now includes the layer.
-
-- [ ] **Step 7: Run the full suite**
-
-Run: `bun run test && bun run typecheck && bun run lint`
-Expected: all pass. Failures here are almost always a stale import path or the alias in Step 6.
-
-- [ ] **Step 8: Confirm the app still builds and runs**
-
-```bash
-bun run dev
-```
-
-Expected: the app boots, the sidebar renders with its nav, status chip and update banner, and all five routes (`/`, `/camera`, `/gallery`, `/downloads`, `/settings`) resolve exactly as before.
-
-- [ ] **Step 9: Commit**
-
-```bash
-git add -A
-git commit -m "refactor: extract shared camera UI into layers/camera"
-```
-
----
-
-### Task 8: Post-move verification and documentation
+### Task 7: Document the seam
 
 **Files:**
 
 - Modify: `README.md` (the "Project layout" details block, plus the test commands)
 
-`CLAUDE.md` needs no edit — its Vue conventions use generic examples and never
-name `app/` paths. Step 5's grep confirms that rather than assuming it.
-
 **Interfaces:**
 
-- Consumes: the layer from Task 7.
-- Produces: a repo whose documented layout matches its actual layout, ready for the docs-site plan.
+- Consumes: the sealed seam from Task 5, verified by Task 6.
+- Produces: a repo whose documented layout and test commands match reality, ready for the docs-site plan.
 
-- [ ] **Step 1: Re-run the Task 6 manual checklist**
+> **Scope change, 2026-07-26.** This task originally extracted
+> `app/{components,composables,utils,types,assets,pages,workers}` into a
+> `layers/camera/` Nuxt layer. That move is **cancelled**. A Nuxt layer does not
+> have to live in `layers/` — any directory with a `nuxt.config.ts` is a valid
+> layer, including the repo root. The docs site will therefore declare
+> `extends: ["../.."]` and consume the desktop app in place, with zero files
+> moved. Route collisions and layout precedence are handled entirely from the
+> docs side (a `pages:extend` hook re-prefixing app routes to `/demo/*`, and the
+> docs site's own `layouts/default.vue` shadowing the app's).
+>
+> The one residual need — the sidebar shell must be reachable as a component,
+> since a layout cannot be imported by name from another app — moves to the
+> docs-site plan as a two-file `AppShell.vue` extraction, judged in the context
+> where it is actually required.
+>
+> Net effect on this plan: the transport seam (Tasks 1–6) is the whole
+> deliverable. The desktop app's file tree is left exactly as it was.
 
-Repeat Task 6 Steps 2 and 3 in full against `luna_mock_server`. The file move should have changed nothing, which is exactly why it is worth proving — a broken import path can typecheck and still fail at runtime through a dynamic import.
-
-- [ ] **Step 2: Update the README project layout**
-
-In `README.md`, inside the "Project layout" `<details>` block, replace the tree with:
-
-```
-layers/camera/app/       Shared UI layer (extended by the desktop app)
-  components/               Vue components, incl. AppShell (the dashboard shell)
-  composables/useCamera     Connection lifecycle, auto-reconnect
-  composables/useGallery    Selection, filtering, delete
-  composables/useDownloads  Download queue + watermark compositing
-  composables/useUpdater    Auto-update checker
-  utils/transport.ts        CameraTransport interface + registry
-  utils/lunaClient.ts       Real transport: Rust commands + HTTP listing
-  utils/lunaIndex.ts        Camera HTTP index parser
-  utils/watermark*.ts       Official watermark placement engine
-  pages/                    Connect, camera, gallery, downloads, settings
-app/                     Desktop app entry (app.vue, default layout)
-src-tauri/src/luna.rs    Luna Ultra TCP control protocol (Rust)
-luna_mock_server/        Camera emulator for development and tests
-scripts/probe-*.mjs      On-device protocol probes (calibration, live view, file list)
-tests/                   Vitest unit tests (node) and tests/nuxt (Nuxt runtime)
-docs/FEATURES.md         Feature map: shipped, gated, and on hold
-docs/superpowers/specs/  Protocol findings of record
-screenshots/             Product screenshots
-```
-
-- [ ] **Step 3: Add a note on the seam to the README development section**
+- [ ] **Step 1: Add a note on the seam to the README development section**
 
 After the test commands block in `## Development`, add:
 
 ```markdown
-Every camera call goes through `CameraTransport` (`layers/camera/app/utils/transport.ts`).
+Every camera call goes through `CameraTransport` (`app/utils/transport.ts`).
 `lunaClient` — the real TCP/HTTP implementation — is imported by that one module
 and nowhere else, which is what lets tests and the docs-site demo swap in a fake
 camera. Keep it that way.
 ```
 
-- [ ] **Step 4: Update the test commands in the README**
+- [ ] **Step 2: Update the test commands in the README**
 
-Replace `bun x vitest run` with `bun run test` in the `## Development` block, and annotate it:
+The `## Development` block currently says `bun x vitest run` runs the frontend
+unit tests. There are now two vitest projects. Replace that line with:
 
 ```
-bun run test                                       # frontend unit tests (node + Nuxt)
+bun run test                                       # frontend unit tests (node + Nuxt runtime)
 ```
 
-- [ ] **Step 5: Verify the docs are accurate**
+- [ ] **Step 3: Update the project layout block**
+
+In the `<details>` "Project layout" block, add the two new entries so the tree
+matches reality. Leave every existing line alone — nothing moved:
+
+```
+app/utils/transport.ts   CameraTransport interface + registry (the swappable seam)
+tests/nuxt/              Composable tests needing a Nuxt runtime
+```
+
+- [ ] **Step 4: Verify the docs are accurate**
 
 Run:
 
 ```bash
 bun run test && bun run typecheck && bun run lint
-grep -rn "app/components\|app/composables\|app/utils" README.md CLAUDE.md
+grep -n "vitest run" README.md
 ```
 
-Expected: tests pass; the grep returns nothing that describes the old layout as current.
+Expected: tests pass; the grep shows no stale `bun x vitest run` presented as the
+way to run the frontend suite.
 
-- [ ] **Step 6: Commit**
+`CLAUDE.md` needs no edit — its Vue conventions use generic examples and never
+name `app/` paths.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add README.md
-git commit -m "docs: describe the camera layer and transport seam"
+git commit -m "docs: describe the transport seam and the two test projects"
 ```
 
 ---
@@ -1230,7 +1078,11 @@ At the end of this plan:
 
 - Every camera call reads `useCameraTransport()`; `lunaClient` is imported by exactly one module.
 - The composables have test coverage they have never had, driven by a fake camera.
-- `layers/camera` is a self-contained Nuxt layer any app can extend.
-- The desktop app behaves exactly as it did before.
+- The desktop app behaves exactly as it did before, and its file tree is unchanged.
 
-The second plan — docs site, mock transport, fixtures, inline demo components — depends on this one only through the `layers/camera` path and the `CameraTransport` interface.
+The second plan — docs site, mock transport, fixtures, inline demo components —
+depends on this one only through the `CameraTransport` interface. It consumes the
+desktop app as a Nuxt layer in place (`extends: ["../.."]` from `docs/site/`) and
+owns the one residual change to `app/`: extracting the sidebar shell from
+`layouts/default.vue` into an `AppShell.vue` component so demo pages can mount it
+without the docs pages inheriting it.

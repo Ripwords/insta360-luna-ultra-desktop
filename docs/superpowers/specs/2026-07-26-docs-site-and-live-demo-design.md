@@ -17,8 +17,17 @@ Two requirements pull in opposite directions and both must hold:
 - The demo must be the **actual shipping components**, not a rebuild, so it
   never drifts from the app.
 
-The design resolves this by extracting a Nuxt layer both apps extend, and
-rendering the demo client-only inside otherwise-prerendered pages.
+The design resolves this by having the docs site consume the desktop app as a
+Nuxt layer, and rendering the demo client-only inside otherwise-prerendered
+pages.
+
+**Revision, 2026-07-26.** An earlier draft extracted the shared UI into a
+dedicated `layers/camera/` directory that both apps would extend. That is
+cancelled: a Nuxt layer needs only a `nuxt.config.ts`, so the repo root is
+already a valid layer, and the docs site can declare `extends: ["../.."]` to
+consume the desktop app **in place, with zero files moved**. Route collisions and
+layout precedence are solved from the docs side either way. This keeps the
+desktop app's tree untouched, which is the point.
 
 ## Verdict: feasible, and the seam is unusually clean
 
@@ -41,23 +50,19 @@ browser. `bun run ui:dev` already boots the app in a browser today.
 ## Architecture
 
 ```
-layers/camera/                    NEW — shared app layer
-  nuxt.config.ts                    modules: @nuxt/ui; icon clientBundle
-  app/
-    components/                     moved from app/ (+ new AppShell.vue)
-    composables/  utils/  types/  assets/
-    pages/                          moved (index, camera, gallery, downloads, settings)
-    app.config.ts                   moved
-
-app/                              root Tauri app, now thin
-  app.vue                           unchanged
-  layouts/default.vue               <AppShell><slot /></AppShell>
+nuxt.config.ts                    UNCHANGED — the repo root is the layer
+app/                              UNCHANGED except for one extraction:
+  components/AppShell.vue           NEW — the dashboard shell, formerly the
+                                    body of layouts/default.vue
+  layouts/default.vue               now <AppShell><slot /></AppShell>
+  components/ composables/ utils/   stay exactly where they are
+  types/ assets/ pages/ workers/    stay exactly where they are
 
 docs/site/                        NEW — the docs site
-  nuxt.config.ts                    extends ../../layers/camera
+  nuxt.config.ts                    extends ["../.."]; ssr: true; baseURL
   content/                          index.md + 4 doc pages
   app/
-    layouts/default.vue             docs chrome (header, sidebar, TOC, footer)
+    layouts/default.vue             docs chrome — shadows the app's for docs pages
     layouts/demo.vue                <AppShell> + persistent "simulated camera" banner
     components/content/Demo.vue     MDC block for inline live components
     mocks/mockClient.ts             the fake camera
@@ -71,13 +76,14 @@ docs/site/                        NEW — the docs site
 ## Step 1 — Transport seam
 
 Isolated, independently verifiable, contains no demo code. This step must land
-and be verified before any file moves.
+and be verified against a real camera session before the docs site is built on
+top of it.
 
 The codebase already uses an injectable-singleton pattern in
 `app/utils/cameraHealth.ts:20-41`. This follows it exactly:
 
 ```ts
-// layers/camera/app/utils/transport.ts
+// app/utils/transport.ts
 export interface CameraTransport {
   readonly available: boolean;
   connect(host: string): Promise<CameraInfo>;
@@ -153,20 +159,37 @@ registry test runs under the existing node project unchanged.
 against `luna_mock_server/` — connect, list media, download, delete — before
 Step 2 begins.
 
-## Step 2 — Layer extraction
+## Step 2 — Consume the app as a layer
 
-Pure file moves. No logic edits. Two decisions worth recording:
+**No files move.** `docs/site/nuxt.config.ts` declares `extends: ["../.."]` and
+inherits the desktop app's components, composables, utils, types and pages
+directly. The root's `ssr: false` and Tauri-specific Vite settings are overridden
+by the child config, which sets `ssr: true`.
 
-**Layouts.** `app/layouts/default.vue`'s body becomes
-`layers/camera/app/components/AppShell.vue`. Each consumer then writes its own
-three-line layout wrapping it. This avoids relying on layout-name precedence
-between layer and project, which would otherwise make the layer's `default`
-layout hijack every docs page.
+Three consequences, all handled from the docs side:
 
-**Routes.** The layer owns `pages/`, so the root app keeps `/`, `/camera`,
-`/gallery`, `/downloads`, `/settings` exactly as now. The docs site adds a
-`pages:extend` hook re-prefixing layer-sourced routes (detected by file path)
-to `/demo/*`, so they cannot collide with docs routes.
+**Layouts.** The app's `layouts/default.vue` would otherwise become the docs
+site's default layout too. The docs site defines its own `app/layouts/default.vue`,
+and project-level layouts take precedence over layer-level ones, so docs pages get
+docs chrome. Demo pages opt into `layouts/demo.vue` instead.
+
+**The shell.** A layout cannot be imported by name from another app, so the
+sidebar shell must be reachable as a component. This is the **only** change to
+`app/`: the body of `layouts/default.vue` moves into
+`app/components/AppShell.vue`, and the layout becomes
+`<AppShell><slot /></AppShell>`. Two files, no behaviour change, and the desktop
+app renders identically.
+
+**Routes.** The app's `pages/` are inherited, so `/`, `/camera`, `/gallery`,
+`/downloads`, `/settings` would collide with docs routes. The docs site adds a
+`pages:extend` hook re-prefixing layer-sourced routes (detected by file path) to
+`/demo/*` and stamping `meta.layout = "demo"` on them. The desktop app is
+unaffected — it keeps those routes at the root.
+
+**Risk.** Extending the repo root is less conventional than a dedicated layer
+directory, and dependency resolution for a nested `docs/site` package is a known
+friction point with Nuxt layers. If it fights, the fallback is a Bun workspace so
+dependencies hoist — not a file move.
 
 ## Step 3 — Docs site and SEO
 
