@@ -7,6 +7,7 @@ import { mountComposable } from "./harness";
 describe("useCamera", () => {
   beforeEach(() => {
     localStorage.clear();
+    clearNuxtState(["camera-host"], { reset: true });
   });
 
   afterEach(() => {
