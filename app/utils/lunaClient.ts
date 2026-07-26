@@ -203,10 +203,10 @@ export const lunaClient = {
     return items;
   },
 
-  /** Replaces the standalone `cameraFetch` export; health reporting included. */
+  /** Health reporting included. */
   fetch: cameraFetch,
 
-  /** Replaces the standalone `probeCamera` export; bypasses health reporting. */
+  /** Bypasses health reporting. */
   probe: probeCamera,
 
   /**

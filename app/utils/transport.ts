@@ -18,6 +18,12 @@ export interface CameraTransport {
   liveViewStop(): Promise<void>;
   liveViewStats(): Promise<LiveViewStats>;
   probeOscPreview(host: string): Promise<string | null>;
+  /**
+   * Implementations own health reporting for their own transport: nothing
+   * outside a `fetch` implementation calls `reportCameraSuccess` or
+   * `reportCameraFailure` on its behalf, so a mock that implements `fetch`
+   * without reporting leaves the health watchdog armed but permanently deaf.
+   */
   fetch(url: string, init?: RequestInit): Promise<Response>;
   probe(host: string): Promise<boolean>;
   onDisconnect(handler: () => void): Promise<() => void>;
@@ -26,6 +32,14 @@ export interface CameraTransport {
 /**
  * The real client is the default, so the desktop app behaves identically
  * whether or not anything ever calls `setCameraTransport`.
+ *
+ * This is process-global, not request-scoped: under SSR every concurrent
+ * request reads and writes the same `current`. A consuming app that runs
+ * `ssr: true` (unlike this desktop app, which is `ssr: false`) must install
+ * its transport from a client-only plugin, never from server-side code —
+ * otherwise one request's transport leaks into another's. Note that the
+ * composables reading this store their own data in `useState`, which IS
+ * request-scoped, so the two layers do not share the same lifetime.
  */
 let current: CameraTransport = lunaClient;
 
