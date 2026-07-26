@@ -1,6 +1,10 @@
 <script setup lang="ts">
 useSeoMeta({
-  title: "Luna Ultra Desktop",
+  // No `title` here: `site.name` is already "Luna Ultra Desktop" and the
+  // `%s | %siteName` title template appends it, so setting an identical
+  // page title doubled up to "Luna Ultra Desktop | Luna Ultra Desktop" in
+  // both <title> and og:title. Omitting it lets the template's default
+  // (siteName alone, no separator) stand for the homepage.
   description:
     "A desktop companion for the Insta360 Luna Ultra. Live viewfinder, camera control, gallery, and watermarked downloads on macOS, Windows and Linux.",
   // A plain static asset, not `defineOgImageComponent()` — see the long

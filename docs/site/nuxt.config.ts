@@ -115,6 +115,19 @@ export default defineNuxtConfig({
 
   modules: ["@nuxt/content", "@nuxtjs/seo"],
 
+  // `nuxt-schema-org` (bundled by `@nuxtjs/seo`) auto-injects its own
+  // `<script type="application/ld+json">` on every route regardless of
+  // whether a page ever calls `useSchemaOrg()`/`defineSoftwareApp()`. Per
+  // the long comment in `app/components/JsonLd.vue`, that integration is
+  // broken by a duplicate `@unhead/vue` v2/v3 install and always renders an
+  // *empty* ld+json tag — invalid JSON shipped on every page, and the only
+  // structured-data tag at all on the four /docs/* pages (which don't use
+  // `JsonLd.vue`). Disabling the module's own injection here removes the
+  // empty tag everywhere; the homepage's real `SoftwareApplication` graph
+  // still ships via the hand-rolled `JsonLd.vue`/`useHead()` path, which is
+  // unaffected by this flag.
+  schemaOrg: false,
+
   sitemap: {
     // /demo/* is client-rendered app chrome inherited from the desktop-app
     // layer, not prose — keep it out of search results. There is no
@@ -289,6 +302,19 @@ export default defineNuxtConfig({
   site: {
     url: "https://ripwords.github.io",
     name: "Luna Ultra Desktop",
+    // GitHub Pages serves every generated route as `<path>/index.html`, so
+    // the canonical, non-redirecting URL for e.g. `/docs/install` always
+    // carries a trailing slash — a bare `/docs/install` 301s there. Without
+    // this, both the canonical `<link>` tag and every sitemap `<loc>` were
+    // emitted without the slash, pointing crawlers at a redirect instead of
+    // the final URL. This flag (consumed by `site-config-stack`'s URL
+    // builder, shared by `@nuxtjs/seo`'s canonical resolver and
+    // `@nuxtjs/sitemap`) appends it consistently. `app/pages/docs/[...slug].vue`
+    // separately strips the trailing slash before its content-collection
+    // lookup — that normalisation is unaffected by this flag (it runs on
+    // the incoming request path, not on generated canonical/sitemap URLs),
+    // so pages keep resolving correctly.
+    trailingSlash: true,
   },
 
   // @nuxt/robots (bundled by @nuxtjs/seo) refuses to emit a robots.txt for
