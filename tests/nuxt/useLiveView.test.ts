@@ -11,21 +11,24 @@ describe("useLiveView", () => {
 
   afterEach(() => {
     resetCameraTransport();
-    clearNuxtState([
-      "camera-status",
-      "camera-info",
-      "camera-library",
-      "camera-error",
-      "camera-library-loading",
-      "camera-want-connection",
-      "camera-retry-attempt",
-      "liveview-active",
-      "liveview-starting",
-      "liveview-transport",
-      "liveview-url",
-      "liveview-error",
-      "liveview-diagnostics",
-    ]);
+    clearNuxtState(
+      [
+        "camera-status",
+        "camera-info",
+        "camera-library",
+        "camera-error",
+        "camera-library-loading",
+        "camera-want-connection",
+        "camera-retry-attempt",
+        "liveview-active",
+        "liveview-starting",
+        "liveview-transport",
+        "liveview-url",
+        "liveview-error",
+        "liveview-diagnostics",
+      ],
+      { reset: true },
+    );
   });
 
   it("prefers an OSC MJPEG preview when the camera offers one", async () => {

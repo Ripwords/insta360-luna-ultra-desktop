@@ -12,15 +12,18 @@ describe("useCamera", () => {
 
   afterEach(() => {
     resetCameraTransport();
-    clearNuxtState([
-      "camera-status",
-      "camera-info",
-      "camera-library",
-      "camera-error",
-      "camera-library-loading",
-      "camera-want-connection",
-      "camera-retry-attempt",
-    ]);
+    clearNuxtState(
+      [
+        "camera-status",
+        "camera-info",
+        "camera-library",
+        "camera-error",
+        "camera-library-loading",
+        "camera-want-connection",
+        "camera-retry-attempt",
+      ],
+      { reset: true },
+    );
   });
 
   it("connects through the active transport and loads the library", async () => {

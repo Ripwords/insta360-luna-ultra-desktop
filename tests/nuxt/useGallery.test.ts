@@ -12,20 +12,23 @@ describe("useGallery", () => {
 
   afterEach(() => {
     resetCameraTransport();
-    clearNuxtState([
-      "camera-status",
-      "camera-info",
-      "camera-library",
-      "camera-error",
-      "camera-library-loading",
-      "camera-want-connection",
-      "camera-retry-attempt",
-      "gallery-filter",
-      "gallery-storage",
-      "gallery-thumb-size",
-      "gallery-selected",
-      "gallery-anchor",
-    ]);
+    clearNuxtState(
+      [
+        "camera-status",
+        "camera-info",
+        "camera-library",
+        "camera-error",
+        "camera-library-loading",
+        "camera-want-connection",
+        "camera-retry-attempt",
+        "gallery-filter",
+        "gallery-storage",
+        "gallery-thumb-size",
+        "gallery-selected",
+        "gallery-anchor",
+      ],
+      { reset: true },
+    );
   });
 
   it("deletes through the transport using camera paths", async () => {
