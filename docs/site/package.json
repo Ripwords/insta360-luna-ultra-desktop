@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@nuxt/content": "^3.9.0",
+    "@nuxt/kit": "^4.5.0",
     "@nuxtjs/seo": "^3.2.2",
     "nuxt": "^4.5.0"
   }
