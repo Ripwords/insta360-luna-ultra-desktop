@@ -276,15 +276,19 @@ export default defineNuxtConfig({
 
   app: {
     baseURL,
-    // Without an explicit tag, browsers request the origin-root
-    // `/favicon.ico` by default, which 404s on a GitHub Pages project site
-    // (the file only exists under the base path). `public/favicon.ico` is
-    // already present in this app's output — it's inherited from the
-    // layer's own `public/` dir via `extends` above, same as every other
-    // layer asset — so this just has to point at it through `baseURL`
-    // rather than relying on the browser's un-prefixed default guess.
+    // Every icon here is derived from the desktop app's own `app-icon.png` by
+    // `scripts/make-icons.mjs`, so the site's mark can never drift from the
+    // app it documents.
+    //
+    // All hrefs go through `baseURL`: without an explicit tag a browser
+    // requests the origin-root `/favicon.ico`, which 404s on a GitHub Pages
+    // project site where the file only exists under the base path.
     head: {
-      link: [{ rel: "icon", type: "image/x-icon", href: `${baseURL}favicon.ico` }],
+      link: [
+        { rel: "icon", type: "image/png", sizes: "32x32", href: `${baseURL}favicon-32.png` },
+        { rel: "icon", type: "image/png", sizes: "64x64", href: `${baseURL}favicon-64.png` },
+        { rel: "apple-touch-icon", sizes: "180x180", href: `${baseURL}apple-touch-icon.png` },
+      ],
     },
   },
 

@@ -46,3 +46,10 @@ docs/site/public/demo/fixtures
 
 # Synced from docs/FEATURES.md at build time; never hand-edit or commit
 docs/site/content/docs/4.feature-status.md
+
+# Derived from app-icon.png by docs/site/scripts/make-icons.mjs at build time
+docs/site/public/favicon-32.png
+docs/site/public/favicon-64.png
+docs/site/public/apple-touch-icon.png
+docs/site/public/icon-192.png
+docs/site/public/icon-512.png

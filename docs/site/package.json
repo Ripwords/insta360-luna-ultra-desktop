@@ -5,9 +5,10 @@
   "scripts": {
     "sync:features": "node scripts/sync-features.mjs",
     "fixtures": "node scripts/make-fixtures.mjs",
-    "dev": "node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && nuxt dev",
-    "generate": "node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && nuxt generate",
-    "preview": "nuxt preview"
+    "dev": "node scripts/make-icons.mjs && node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && nuxt dev",
+    "generate": "node scripts/make-icons.mjs && node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && nuxt generate",
+    "preview": "nuxt preview",
+    "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {
     "@nuxt/content": "^3.9.0",
