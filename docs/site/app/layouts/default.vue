@@ -5,6 +5,34 @@ const { data: navigation } = await useAsyncData("docs-navigation", () =>
   queryCollectionNavigation("docs"),
 );
 
+/**
+ * Search is deferred until someone actually opens it, and this matters more
+ * than it looks. Resolving a content query on a statically-hosted site means
+ * Nuxt Content spins up its client-side SQLite: measured on this build, an
+ * 800 KB `sqlite3.wasm` plus the 21 KB gzipped index dump. `server: false`
+ * alone keeps that out of the prerendered HTML, but `useLazyAsyncData` still
+ * fires on mount, so every docs page would pay ~820 KB post-hydration for a
+ * feature most visitors never touch — on a site whose entire purpose is
+ * ranking prose.
+ *
+ * `immediate: false` plus the watcher below ties the cost to intent: nothing
+ * loads until the user opens search (button or Cmd/Ctrl+K), and `status` makes
+ * that one-off load legible rather than looking like a broken empty result.
+ */
+const { open: searchOpen } = useContentSearch();
+const {
+  data: searchFiles,
+  status: searchStatus,
+  execute: loadSearchIndex,
+} = useLazyAsyncData("docs-search", () => queryCollectionSearchSections("docs"), {
+  server: false,
+  immediate: false,
+});
+
+watch(searchOpen, (isOpen) => {
+  if (isOpen && searchStatus.value === "idle") void loadSearchIndex();
+});
+
 const baseURL = useRuntimeConfig().app.baseURL;
 
 /**
@@ -56,6 +84,13 @@ const isDark = computed({
     <UNavigationMenu :items="links" variant="link" />
 
     <template #right>
+      <UContentSearchButton
+        :collapsed="false"
+        variant="outline"
+        class="hidden w-44 justify-between sm:flex"
+      />
+      <UContentSearchButton :collapsed="true" variant="ghost" class="sm:hidden" />
+
       <UButton
         :icon="isDark ? 'i-lucide-moon' : 'i-lucide-sun'"
         color="neutral"
@@ -76,9 +111,22 @@ const isDark = computed({
     </template>
 
     <template #body>
+      <UContentSearchButton :collapsed="false" variant="outline" class="mb-4 w-full" />
       <UNavigationMenu :items="links" orientation="vertical" class="-mx-2.5" />
     </template>
   </UHeader>
+
+  <!--
+    Renders nothing until opened. `UContentSearchButton` above and this share
+    `open` through Nuxt UI's `useContentSearch()` shared composable, so they do
+    not need to be siblings or pass state. Cmd/Ctrl+K is bound by the component.
+  -->
+  <UContentSearch
+    :files="searchFiles ?? []"
+    :navigation="(navigation as ContentNavigationItem[] | undefined) ?? []"
+    :search-status="searchStatus === 'pending' ? 'loading' : undefined"
+    :fuse="{ resultLimit: 40 }"
+  />
 
   <UMain>
     <UContainer>
