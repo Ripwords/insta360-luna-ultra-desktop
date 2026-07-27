@@ -7,9 +7,7 @@ import { FIXTURE_PATHS } from "./fixtures";
  */
 export const PRESETS: Record<string, Partial<MockState>> = {
   default: { connected: true },
-  empty: { connected: true, paths: [] },
   selection: { connected: true, paths: FIXTURE_PATHS.slice(0, 6) },
-  disconnected: { connected: false, paths: [] },
 };
 
 export function presetOrDefault(name?: string): Partial<MockState> {
