@@ -848,19 +848,27 @@ const src = computed(() => {
 </script>
 
 <template>
-  <div class="my-6 overflow-hidden rounded-xl border border-default">
-    <div class="flex items-center gap-1.5 border-b border-default bg-elevated px-3 py-2">
-      <span class="size-2.5 rounded-full bg-error/60" />
-      <span class="size-2.5 rounded-full bg-warning/60" />
-      <span class="size-2.5 rounded-full bg-success/60" />
-      <span class="ml-2 text-xs text-muted">Simulated camera</span>
+  <div class="my-8 overflow-hidden rounded-xl bg-default shadow-2xl ring-1 ring-default">
+    <!-- macOS window chrome: traffic lights left, title centred, content below. -->
+    <div class="relative flex h-9 items-center border-b border-default bg-elevated px-3.5">
+      <div class="flex items-center gap-2">
+        <span class="size-3 rounded-full bg-[#ff5f57]" />
+        <span class="size-3 rounded-full bg-[#febc2e]" />
+        <span class="size-3 rounded-full bg-[#28c840]" />
+      </div>
+
+      <span
+        class="pointer-events-none absolute inset-x-0 text-center text-[13px] font-medium text-muted"
+      >
+        Luna Ultra Desktop — simulated camera
+      </span>
     </div>
 
     <ClientOnly>
       <iframe
         :src
         :style="{ height: `${height}px` }"
-        class="w-full border-0"
+        class="block w-full border-0 bg-default"
         loading="lazy"
         title="Luna Ultra Desktop demo"
       />
@@ -873,6 +881,24 @@ const src = computed(() => {
   </div>
 </template>
 ```
+
+**The window chrome is a requirement, not decoration.** The demo must read as a
+desktop application window rather than as part of the documentation page — it is
+how a reader tells "this is the app" from "this is the website", and it carries
+the simulated-camera disclosure in its title bar.
+
+Get the details right, because a not-quite-macOS window looks worse than none:
+
+- Traffic lights are **12px, in the order red / amber / green**, at the exact
+  macOS colours above (`#ff5f57`, `#febc2e`, `#28c840`), left-aligned with ~8px
+  spacing. Do not substitute theme colours — these are recognisable constants.
+- The title is **centred over the full width**, not positioned after the lights;
+  that is why it is absolutely positioned with `pointer-events-none`.
+- The title bar is ~36px tall with a hairline bottom border.
+- The window has a **pronounced shadow and rounded corners**, and the content is
+  clipped by `overflow-hidden` so the iframe's square corners never poke out.
+- It must look correct in **both light and dark themes** — check both. The
+  traffic lights stay the same in both; the bar and border follow the theme.
 
 **A note on the approach.** This embeds the demo route in an `<iframe>` rather than mounting the app's components directly into the prose. Direct mounting is the more elegant idea, but the app's screens assume they own the page: they mount a `UDashboardGroup` shell, register global state, and drive the router. Two of those on one page fight each other. The iframe gives each embed a clean document while still running the real components from the layer, and it keeps `preset` and `component` meaningful as query parameters. **If you can make direct mounting work cleanly, prefer it** — but do not ship a half-working version, and say which you did in your report.
 
@@ -900,6 +926,7 @@ bun run docs:generate
 Serve statically and confirm:
 
 - [ ] The embed on `/docs/using-the-app` renders and is interactive.
+- [ ] The macOS window chrome is correct: 12px traffic lights in red/amber/green order at the exact macOS colours, centred title, hairline border, pronounced shadow, rounded corners with no square iframe corners poking out. **Check in both light and dark themes.**
 - [ ] The landing page's embed loads lazily and does not block first paint.
 - [ ] Docs pages still prerender as static HTML — view source and confirm the prose is present in the served HTML, not injected by JS.
 - [ ] `sitemap.xml` still excludes `/demo/`, and demo pages still carry `noindex`.
