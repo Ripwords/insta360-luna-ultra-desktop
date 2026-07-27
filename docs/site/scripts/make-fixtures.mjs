@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -7,6 +8,8 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(here, "../public/demo/fixtures");
+const selfPath = fileURLToPath(import.meta.url);
+const manifestPath = resolve(outDir, ".fixtures-manifest.json");
 
 /**
  * Fixtures are generated rather than sourced from a stock library: it is
@@ -33,6 +36,47 @@ const VIDEOS = [
   { name: "VID_20260718_143355_00_001.mp4", seconds: 6, hue: 200 },
   { name: "VID_20260717_100210_00_002.mp4", seconds: 4, hue: 30 },
 ];
+
+const EXPECTED_OUTPUTS = [
+  ...PHOTOS.map((p) => p.name),
+  ...VIDEOS.map((v) => v.name),
+  ...VIDEOS.map((v) => v.name.replace(/^VID_/, "LRV_").replace(/\.mp4$/, ".lrv")),
+  "liveview.264",
+  "sizes.json",
+];
+
+/**
+ * Every parameter this script can vary lives in its own source (the PHOTOS/
+ * VIDEOS tables above, the filter builders below, the live-view invocation),
+ * so hashing the file itself — rather than hand-maintaining a list of "the
+ * inputs that matter" — is what a changed parameter can't accidentally slip
+ * past. Regeneration is otherwise unconditional (14 fixtures, every run),
+ * which measured at 46.6s real / 324s CPU of a 69s `docs:generate` and is
+ * paid again on every CI deploy on top of that.
+ */
+async function scriptHash() {
+  const source = await readFile(selfPath, "utf8");
+  return createHash("sha256").update(source).digest("hex");
+}
+
+/** True only if every expected output already exists and was built from this exact script. */
+async function isUpToDate(hash) {
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  } catch {
+    return false; // missing or unreadable manifest — no prior run, or a partial one
+  }
+  if (manifest.hash !== hash) return false;
+  for (const name of EXPECTED_OUTPUTS) {
+    try {
+      await stat(resolve(outDir, name));
+    } catch {
+      return false; // a partial output directory (e.g. an interrupted prior run)
+    }
+  }
+  return true;
+}
 
 /** Gradient + vignette reads as an abstract photograph rather than a test card. */
 function photoFilter(w, h, hue) {
@@ -151,4 +195,13 @@ async function generate() {
   console.log(`generated ${Object.keys(sizes).length} fixtures in ${outDir}`);
 }
 
-await generate();
+const hash = await scriptHash();
+if (await isUpToDate(hash)) {
+  console.log(`fixtures already up to date, skipping regeneration (${outDir})`);
+} else {
+  await generate();
+  // Written only after generate() succeeds, so a run that fails partway
+  // leaves no manifest (or a stale one) behind and the next run redoes the
+  // whole thing rather than trusting a half-built directory.
+  await writeFile(manifestPath, JSON.stringify({ hash }, null, 2));
+}
