@@ -1,5 +1,6 @@
 import { setCameraTransport } from "#layer/utils/transport";
 import { createMockTransport } from "../mocks/mockClient";
+import { presetOrDefault } from "../mocks/presets";
 
 /**
  * Client-only by necessity, not preference. The transport registry is a
@@ -46,10 +47,20 @@ export default defineNuxtPlugin(() => {
     return route.path === "/demo" || route.path.startsWith("/demo/");
   }
 
+  /**
+   * `::demo{preset="..."}` (Task 6) round-trips its preset through this query
+   * param so an embed opens already in the situation its prose describes,
+   * rather than always in the same freshly-connected state.
+   */
+  function queryPreset(): string | undefined {
+    const value = route.query.preset;
+    return typeof value === "string" ? value : undefined;
+  }
+
   function registerIfOnDemo(): void {
     if (registered || !isDemoRoute()) return;
     registered = true;
-    setCameraTransport(createMockTransport());
+    setCameraTransport(createMockTransport(presetOrDefault(queryPreset())));
     remountKey.value += 1;
   }
 

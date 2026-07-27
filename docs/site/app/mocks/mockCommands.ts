@@ -17,9 +17,26 @@ const asStringArray = (value: ProtoObject[string]): string[] =>
  * keys them the same way — otherwise a setting changed in one mode would
  * wrongly appear in another and the demo would teach the wrong model.
  */
+/**
+ * The pro bar's chips read "Auto"/"—" until something has been written for
+ * the current mode, which is a fine empty state on real hardware but reads
+ * as an unconfigured demo. Seeding the default video mode with a few settled
+ * choices — mirroring exactly what a real write would have left behind —
+ * makes the embed look like a camera someone has actually been shooting
+ * with. Deliberately partial: only the fields the pro bar visibly renders
+ * as a placeholder when unset (see CameraProBar.vue's `chips` computed).
+ */
+const SEEDED_MODE = "FUNCTION_MODE_NORMAL_VIDEO";
+const SEEDED_OPTIONS: ProtoObject = {
+  color_mode: "COLOR_MODE_NORMAL",
+  white_balance: "WB_5000K",
+  white_balance_value: 5000,
+  gamma_mode: "FILTER_LEICA_NATURAL",
+};
+
 export function createCommandChannel() {
   const options: ProtoObject = {};
-  const perMode = new Map<string, ProtoObject>();
+  const perMode = new Map<string, ProtoObject>([[SEEDED_MODE, { ...SEEDED_OPTIONS }]]);
   let recording = false;
   let recordingStartedAt = 0;
 
