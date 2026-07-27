@@ -24,20 +24,6 @@ export default defineNuxtConfig({
   // repo — see task-1-report.md for the full trace.
   extends: ["../../"],
 
-  alias: {
-    // Cross-layer `~/...` imports don't work: `~` always resolves against
-    // *this app's own* srcDir (docs/site/app), never the layer's, for both
-    // types and values. `#layer` points at the layer's srcDir directly, and
-    // Nuxt writes it into the generated tsconfig `paths`, so
-    // `import { getCameraTransport } from "#layer/utils/transport"` and
-    // `import type { CameraTransport } from "#layer/utils/transport"` both
-    // resolve and typecheck. Auto-import still covers plain, unqualified
-    // references (as CameraStatusChip's own auto-registration does); this
-    // alias is for the cases — like an explicit type import — that
-    // auto-import doesn't reach.
-    "#layer": fileURLToPath(new URL("../../app", import.meta.url)),
-  },
-
   // Nuxt's `css` config array is not layer-aware: the layer's own
   // `css: ["~/assets/css/main.css"]` entry merges verbatim into this app's
   // css list (`@nuxt/schema`'s `$resolve` for `css` only filters to
@@ -82,6 +68,12 @@ export default defineNuxtConfig({
       // index survives into `pages`, so the loop above never sees the
       // layer's Connect page and has nothing to rename. Re-add it here,
       // pointing straight at the layer's file, so `/demo` still resolves.
+      //
+      // No `robots` here unlike the loop above: `layout: "demo"` alone is
+      // enough, since it's `app/layouts/demo.vue`'s own `useSeoMeta({ robots:
+      // "noindex, nofollow" })` that actually emits the tag (verified there —
+      // `nuxt-seo-utils` does not read `page.meta.robots` despite being
+      // documented to).
       pages.push({
         name: "demo",
         path: "/demo",
@@ -132,8 +124,11 @@ export default defineNuxtConfig({
     // /demo/* is client-rendered app chrome inherited from the desktop-app
     // layer, not prose — keep it out of search results. There is no
     // robots.txt for a project-page baseURL (see the `robots` config below),
-    // so this exclusion plus the per-route `noindex` meta tag set in the
-    // `pages:extend` hook above is what actually keeps /demo/* out.
+    // so this exclusion plus `app/layouts/demo.vue`'s own noindex
+    // `useSeoMeta()` call is what actually keeps /demo/* out (not the
+    // `robots` field set on layer pages in the `pages:extend` hook above —
+    // see that hook's comment on the pushed `/demo` entry: `nuxt-seo-utils`
+    // does not read `page.meta.robots`, despite being documented to).
     //
     // Both a bare and a baseURL-prefixed form are listed because by the time
     // `@nuxtjs/sitemap`'s exclude filter runs, each candidate URL has already
@@ -224,25 +219,22 @@ export default defineNuxtConfig({
     // the crawler that produced this bug.
   },
 
-  // This config is inert in practice — kept only because the task brief
-  // calls for it and because `defineOgImageComponent()` (the composable that
-  // would actually consume it) still typechecks and auto-imports correctly,
-  // so nothing here signals that it doesn't work.
-  //
-  // `ogImage.defaults` only supplies fallback props for a page that calls
-  // `defineOgImage()`/`defineOgImageComponent()`; it never injects a tag by
-  // itself. Actually calling `defineOgImageComponent("NuxtSeo", {...})` (as
-  // this config anticipates) fails the entire `nuxt generate` outright with
-  // "[400] Invalid island request hash" while satori tries to render the
-  // `NuxtSeo` template through Nuxt's component-islands machinery — this is
-  // a real version incompatibility, not a config mistake: Nuxt 4.5.0 added a
-  // `source` field to the tuple `getIslandHash()` hashes
+  // No `ogImage` config here — `defineOgImageComponent()` (the composable an
+  // `ogImage.defaults` block would feed) still typechecks and auto-imports
+  // correctly, so nothing here signals that it doesn't work, but actually
+  // calling `defineOgImageComponent("NuxtSeo", {...})` fails the entire
+  // `nuxt generate` outright with "[400] Invalid island request hash" while
+  // satori tries to render the `NuxtSeo` template through Nuxt's
+  // component-islands machinery — this is a real version incompatibility,
+  // not a config mistake: Nuxt 4.5.0 added a `source` field to the tuple
+  // `getIslandHash()` hashes
   // (`@nuxt/nitro-server/dist/runtime/nuxt/src/app/island-hash.mjs`, tagged
-  // "@since 4.5.0"), but `nuxt-og-image@5.1.13` declares a peer dependency
-  // on `nuxt@^4.2.2` and pre-dates that change, so the island URL it builds
-  // (and hashes) for the OG-image render request no longer matches what
-  // Nuxt's own island endpoint recomputes and expects on arrival — every
-  // request 400s.
+  // "@since 4.5.0"), but `nuxt-og-image@5.1.13` declares `nuxt@^4.2.2` as a
+  // devDependency (its real peer dependencies are `@unhead/vue@^2.0.5` and
+  // `unstorage@^1.15.0` — `nuxt` itself is not one) and pre-dates that
+  // change, so the island URL it builds (and hashes) for the OG-image
+  // render request no longer matches what Nuxt's own island endpoint
+  // recomputes and expects on arrival — every request 400s.
   //
   // There's no reasonable in-repo fix for a hash-algorithm mismatch between
   // an installed app framework version and a SEO module that hasn't caught
@@ -252,15 +244,6 @@ export default defineNuxtConfig({
   // `app/pages/docs/[...slug].vue`) pointing at `public/og.png` — a real
   // file that ships in the output, satisfying "every page has a working
   // og:image" without going through the broken dynamic renderer at all.
-  ogImage: {
-    defaults: {
-      component: "NuxtSeo",
-      props: {
-        title: "Luna Ultra Desktop",
-        description: "A desktop companion for the Insta360 Luna Ultra.",
-      },
-    },
-  },
 
   // Without this, @nuxt/content's build-time database probes for a driver
   // and — since `nuxt dev` runs under a Node subprocess even when launched
@@ -280,6 +263,16 @@ export default defineNuxtConfig({
 
   app: {
     baseURL,
+    // Without an explicit tag, browsers request the origin-root
+    // `/favicon.ico` by default, which 404s on a GitHub Pages project site
+    // (the file only exists under the base path). `public/favicon.ico` is
+    // already present in this app's output — it's inherited from the
+    // layer's own `public/` dir via `extends` above, same as every other
+    // layer asset — so this just has to point at it through `baseURL`
+    // rather than relying on the browser's un-prefixed default guess.
+    head: {
+      link: [{ rel: "icon", type: "image/x-icon", href: `${baseURL}favicon.ico` }],
+    },
   },
 
   // Nitro is supposed to auto-detect GitHub Actions (via the `GITHUB_ACTIONS`
