@@ -84,7 +84,10 @@ async function generate() {
       out,
     ]);
     // The camera pairs each clip with a low-res .lrv proxy; the gallery uses it
-    // for thumbnails, and buildMediaItems drops the standalone proxy.
+    // for thumbnails, and buildMediaItems drops the standalone proxy. Pairing
+    // is keyed strictly on `entry.extension === "lrv"` (see lunaIndex.ts), so
+    // the proxy needs a real .lrv extension, not just a renamed prefix —
+    // ffmpeg can't infer the muxer from that extension, so pass -f mp4.
     await run("ffmpeg", [
       "-y",
       "-i",
@@ -97,7 +100,9 @@ async function generate() {
       "yuv420p",
       "-preset",
       "veryfast",
-      resolve(outDir, v.name.replace(/^VID_/, "LRV_")),
+      "-f",
+      "mp4",
+      resolve(outDir, v.name.replace(/^VID_/, "LRV_").replace(/\.mp4$/, ".lrv")),
     ]);
   }
 
@@ -138,7 +143,7 @@ async function generate() {
   for (const name of [
     ...PHOTOS.map((p) => p.name),
     ...VIDEOS.map((v) => v.name),
-    ...VIDEOS.map((v) => v.name.replace(/^VID_/, "LRV_")),
+    ...VIDEOS.map((v) => v.name.replace(/^VID_/, "LRV_").replace(/\.mp4$/, ".lrv")),
   ]) {
     sizes[name] = (await stat(resolve(outDir, name))).size;
   }
