@@ -17,7 +17,7 @@
 - Vue conventions, **not lint-enforced, apply by hand**: prop shorthand (`:foo`, not `:foo="foo"`); `useTemplateRef()` rather than a manually typed ref bound to `ref="..."`; destructuring defaults on `defineProps`, never `withDefaults()`.
 - **Exactly one change to `app/` is permitted in this entire plan**: Task 1's `AppShell.vue` extraction. Every other task must leave `git diff --stat -- app/` empty. This is an explicit project decision — the desktop app is not modified for the docs site's benefit.
 - Desktop app baseline, checked every task: `bun run test` → node 19 files/289 tests + nuxt 4 files/12 tests, `bun run typecheck`, `bun run lint`.
-- **Cross-layer imports use the `#layer` alias, never `~/`.** `~/utils/foo` does not resolve from `docs/site` for values *or* types.
+- **Cross-layer imports use the `#layer` alias, never `~/`.** `~/utils/foo` does not resolve from `docs/site` for values _or_ types.
 - **Nothing transitively imported by a `*.worker.ts` may use a `~/` specifier** — Vite's isolated worker sub-build resolves the layer's `~` against the consuming app's srcDir.
 - The site is served at `https://ripwords.github.io/insta360-luna-ultra-desktop/`; `app.baseURL` is `/insta360-luna-ultra-desktop/` and `site.url` is origin-only.
 - **Never verify deploy-facing behaviour with `nuxt preview`** — it runs a Nitro server GitHub Pages does not have, and has already masked two defects on this project. Serve `docs/site/.output/public` with a plain static server (`python3 -m http.server`, which reproduces GitHub Pages' trailing-slash 301) rooted so the site sits under the base path.
@@ -38,18 +38,18 @@ Prerequisites (merged): the transport seam plan, and the docs site plan.
 
 **Created:**
 
-| File | Responsibility |
-| --- | --- |
-| `app/components/AppShell.vue` | The dashboard shell, moved out of `layouts/default.vue`. **The only `app/` change.** |
-| `docs/site/app/layouts/demo.vue` | `<AppShell>` plus the persistent simulated-camera badge. |
-| `docs/site/scripts/make-fixtures.mjs` | Deterministic ffmpeg fixture generation. |
-| `docs/site/public/demo/fixtures/**` | Generated media (git-ignored; built on demand). |
-| `docs/site/app/mocks/fixtures.ts` | The fixture manifest: camera paths, sizes, timestamps. |
-| `docs/site/app/mocks/mockClient.ts` | `MockCameraTransport` — media, session, delete. |
-| `docs/site/app/mocks/mockCommands.ts` | The protobuf command channel: settings + capture state. |
-| `docs/site/app/mocks/presets.ts` | Named seed states for inline demo embeds. |
-| `docs/site/app/plugins/mock-transport.client.ts` | Registers the mock. **Client-only, non-negotiable.** |
-| `docs/site/app/components/content/Demo.vue` | MDC block embedding a screen or a single component. |
+| File                                             | Responsibility                                                                                                                                     |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/components/AppShell.vue`                    | The dashboard shell, moved out of `layouts/default.vue`. **The only `app/` change.**                                                               |
+| `docs/site/app/layouts/demo.vue`                 | `<AppShell>` plus the persistent simulated-camera badge. **May already exist** — extend it, do not overwrite (it carries the `/demo/*` `noindex`). |
+| `docs/site/scripts/make-fixtures.mjs`            | Deterministic ffmpeg fixture generation.                                                                                                           |
+| `docs/site/public/demo/fixtures/**`              | Generated media (git-ignored; built on demand).                                                                                                    |
+| `docs/site/app/mocks/fixtures.ts`                | The fixture manifest: camera paths, sizes, timestamps.                                                                                             |
+| `docs/site/app/mocks/mockClient.ts`              | `MockCameraTransport` — media, session, delete.                                                                                                    |
+| `docs/site/app/mocks/mockCommands.ts`            | The protobuf command channel: settings + capture state.                                                                                            |
+| `docs/site/app/mocks/presets.ts`                 | Named seed states for inline demo embeds.                                                                                                          |
+| `docs/site/app/plugins/mock-transport.client.ts` | Registers the mock. **Client-only, non-negotiable.**                                                                                               |
+| `docs/site/app/components/content/Demo.vue`      | MDC block embedding a screen or a single component.                                                                                                |
 
 **Modified:** `app/layouts/default.vue` (becomes three lines), `docs/site/nuxt.config.ts` (fixture prebuild), `.gitignore`.
 
@@ -103,7 +103,11 @@ Confirm the sidebar, nav, status chip and update banner all render as before, an
 
 - [ ] **Step 4: Build the demo layout**
 
-Create `docs/site/app/layouts/demo.vue`. The badge must be visible on every demo screen and must not be dismissible:
+**`docs/site/app/layouts/demo.vue` may already exist** — the docs-site plan's SEO
+task created a minimal version of it to carry the `noindex` meta for `/demo/*`
+routes. **Read it first and extend it**; do not overwrite it, or you will drop
+the `noindex` and silently start indexing the demo. The result should carry both
+the existing SEO meta and the shell + badge below:
 
 ```vue
 <script setup lang="ts">
@@ -225,25 +229,51 @@ async function generate() {
     // ffmpeg's lavfi source builds the image entirely in-filter; -frames:v 1
     // takes a single frame out of the synthetic stream.
     await run("ffmpeg", [
-      "-y", "-f", "lavfi",
-      "-i", photoFilter(p.w, p.h, p.hue),
-      "-frames:v", "1", "-q:v", "4", out,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      photoFilter(p.w, p.h, p.hue),
+      "-frames:v",
+      "1",
+      "-q:v",
+      "4",
+      out,
     ]);
   }
 
   for (const v of VIDEOS) {
     const out = resolve(outDir, v.name);
     await run("ffmpeg", [
-      "-y", "-f", "lavfi",
-      "-i", `color=c=black:s=1920x1080:d=${v.seconds}:r=30`,
-      "-vf", `geq=r='128+100*sin(2*PI*(X/W+T/4+${v.hue / 360}))':g='128+90*sin(2*PI*(Y/H+T/6))':b='150+80*sin(2*PI*((X+Y)/(W+H)-T/8))',vignette=PI/4`,
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", out,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=black:s=1920x1080:d=${v.seconds}:r=30`,
+      "-vf",
+      `geq=r='128+100*sin(2*PI*(X/W+T/4+${v.hue / 360}))':g='128+90*sin(2*PI*(Y/H+T/6))':b='150+80*sin(2*PI*((X+Y)/(W+H)-T/8))',vignette=PI/4`,
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-preset",
+      "veryfast",
+      out,
     ]);
     // The camera pairs each clip with a low-res .lrv proxy; the gallery uses it
     // for thumbnails, and buildMediaItems drops the standalone proxy.
     await run("ffmpeg", [
-      "-y", "-i", out, "-vf", "scale=640:-2",
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
+      "-y",
+      "-i",
+      out,
+      "-vf",
+      "scale=640:-2",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-preset",
+      "veryfast",
       resolve(outDir, v.name.replace(/^VID_/, "LRV_")),
     ]);
   }
@@ -252,12 +282,28 @@ async function generate() {
   // real preview resolution. LiveView.vue's annexb path fetches this and feeds
   // it to WebCodecs, exercising splitNalUnits/drainAccessUnits for real.
   await run("ffmpeg", [
-    "-y", "-f", "lavfi",
-    "-i", "color=c=black:s=1280x960:d=30:r=30",
-    "-vf", "geq=r='120+90*sin(2*PI*(X/W+T/5))':g='120+80*sin(2*PI*(Y/H-T/7))':b='140+70*sin(2*PI*((X-Y)/(W+H)+T/9))',vignette=PI/5,drawtext=text='SIMULATED PREVIEW':fontsize=48:fontcolor=white@0.55:x=(w-text_w)/2:y=h-120",
-    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-profile:v", "baseline",
-    "-g", "30", "-bf", "0", "-preset", "veryfast",
-    "-f", "h264", resolve(outDir, "liveview.264"),
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=black:s=1280x960:d=30:r=30",
+    "-vf",
+    "geq=r='120+90*sin(2*PI*(X/W+T/5))':g='120+80*sin(2*PI*(Y/H-T/7))':b='140+70*sin(2*PI*((X-Y)/(W+H)+T/9))',vignette=PI/5,drawtext=text='SIMULATED PREVIEW':fontsize=48:fontcolor=white@0.55:x=(w-text_w)/2:y=h-120",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    "-profile:v",
+    "baseline",
+    "-g",
+    "30",
+    "-bf",
+    "0",
+    "-preset",
+    "veryfast",
+    "-f",
+    "h264",
+    resolve(outDir, "liveview.264"),
   ]);
 
   // Record real byte sizes so the mock reports what the gallery actually serves.
@@ -776,7 +822,12 @@ Create `docs/site/app/components/content/Demo.vue`. It must be client-only — i
 
 ```vue
 <script setup lang="ts">
-const { screen, component, preset, height = 520 } = defineProps<{
+const {
+  screen,
+  component,
+  preset,
+  height = 520,
+} = defineProps<{
   screen?: string;
   component?: string;
   preset?: string;
