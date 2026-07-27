@@ -1,4 +1,4 @@
-import { drawWatermark } from "~/utils/watermark";
+import { drawWatermark, watermarkAssetUrl } from "~/utils/watermark";
 import type { WatermarkSettings } from "~/utils/watermark";
 import { WATERMARK_JPEG_QUALITY } from "~/utils/watermarkCompose";
 import type { WatermarkRequest, WatermarkResponse } from "~/workers/watermark.worker";
@@ -80,7 +80,15 @@ function requestFromWorker(active: Worker, blob: Blob, position: WatermarkSettin
   return new Promise<Blob>((resolve, reject) => {
     const id = nextRequestId++;
     pending.set(id, { resolve, reject });
-    const request: WatermarkRequest = { id, blob, position, quality: WATERMARK_JPEG_QUALITY };
+    // Resolved here on the main thread: the worker cannot call
+    // useRuntimeConfig() itself, so the URL travels in the message payload.
+    const request: WatermarkRequest = {
+      id,
+      blob,
+      position,
+      quality: WATERMARK_JPEG_QUALITY,
+      markUrl: watermarkAssetUrl(),
+    };
     active.postMessage(request);
   });
 }

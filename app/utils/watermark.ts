@@ -19,8 +19,15 @@ export interface WatermarkRect {
   height: number;
 }
 
-/** Official watermark asset (ic_watermark_luna_ultra_image.png), 1399 x 252 */
-export const WATERMARK_ASSET_URL = "/watermark/ic_watermark_luna_ultra_image.png";
+/**
+ * Official watermark asset (ic_watermark_luna_ultra_image.png), 1399 x 252.
+ * Root-relative in the desktop app; base-prefixed wherever the app is served
+ * under a subpath. Read the base URL at call time, not module-eval time, so
+ * it always reflects the current runtime config.
+ */
+export function watermarkAssetUrl(): string {
+  return `${useRuntimeConfig().app.baseURL}watermark/ic_watermark_luna_ultra_image.png`;
+}
 export const WATERMARK_ASSET_RATIO = 252 / 1399;
 
 export const WATERMARK_POSITIONS: WatermarkPosition[] = [
@@ -85,7 +92,7 @@ export function loadWatermarkAsset(): Promise<HTMLImageElement> {
       assetPromise = null;
       reject(new Error("Watermark asset failed to load"));
     };
-    image.src = WATERMARK_ASSET_URL;
+    image.src = watermarkAssetUrl();
   });
   return assetPromise;
 }

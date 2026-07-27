@@ -6,8 +6,20 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
-/** Official Insta360 Luna Ultra scan dropped into public/ */
-const STL_URL = "/Insta360+LunaUltra.stl";
+/**
+ * Official Insta360 Luna Ultra scan dropped into public/.
+ * Root-relative in the desktop app; base-prefixed wherever the app is served
+ * under a subpath. Resolved at call time rather than module-eval time so it
+ * always reflects the current runtime config.
+ */
+function stlUrl(): string {
+  return `${useRuntimeConfig().app.baseURL}Insta360+LunaUltra.stl`;
+}
+
+/** Optional textured glTF at public/models/luna-ultra.glb, same base-path rules. */
+function gltfFallbackUrl(): string {
+  return `${useRuntimeConfig().app.baseURL}models/luna-ultra.glb`;
+}
 
 const {
   colorway = "auto",
@@ -135,7 +147,7 @@ onMounted(async () => {
   let model: THREE.Object3D;
   try {
     // The official hi-fi scan (binary STL, geometry only) with the colorway material
-    const geometry = await new STLLoader().loadAsync(STL_URL);
+    const geometry = await new STLLoader().loadAsync(stlUrl());
     geometry.rotateX(-Math.PI / 2);
     bodyMaterial = new THREE.MeshStandardMaterial(BODY_COLORS[resolvedColorway.value]);
     model = new THREE.Mesh(geometry, bodyMaterial);
@@ -144,7 +156,7 @@ onMounted(async () => {
   } catch {
     try {
       // Optional textured glTF at public/models/luna-ultra.glb takes this path
-      const gltf = await new GLTFLoader().loadAsync("/models/luna-ultra.glb");
+      const gltf = await new GLTFLoader().loadAsync(gltfFallbackUrl());
       model = gltf.scene;
       fitToView(model);
       emit("ready", "gltf");

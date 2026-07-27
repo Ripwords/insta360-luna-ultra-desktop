@@ -1,5 +1,4 @@
 /// <reference lib="webworker" />
-import { WATERMARK_ASSET_URL } from "../utils/watermark";
 import type { WatermarkPosition } from "../utils/watermark";
 import { composeWatermarked } from "../utils/watermarkCompose";
 
@@ -8,6 +7,11 @@ export interface WatermarkRequest {
   blob: Blob;
   position: WatermarkPosition;
   quality: number;
+  /**
+   * Resolved on the main thread (in watermarkClient.ts) against
+   * useRuntimeConfig().app.baseURL, which this worker cannot call itself.
+   */
+  markUrl: string;
 }
 
 export interface WatermarkResponse {
@@ -25,9 +29,9 @@ const scope = self as unknown as DedicatedWorkerGlobalScope;
  */
 let markPromise: Promise<ImageBitmap> | null = null;
 
-function watermarkBitmap(): Promise<ImageBitmap> {
+function watermarkBitmap(markUrl: string): Promise<ImageBitmap> {
   markPromise ??= (async () => {
-    const response = await fetch(WATERMARK_ASSET_URL);
+    const response = await fetch(markUrl);
     if (!response.ok) throw new Error(`watermark asset ${response.status}`);
     return await createImageBitmap(await response.blob());
   })().catch((cause: unknown) => {
@@ -40,10 +44,10 @@ function watermarkBitmap(): Promise<ImageBitmap> {
 }
 
 scope.onmessage = async (event: MessageEvent<WatermarkRequest>) => {
-  const { id, blob, position, quality } = event.data;
+  const { id, blob, position, quality, markUrl } = event.data;
   let source: ImageBitmap | null = null;
   try {
-    const [decoded, mark] = await Promise.all([createImageBitmap(blob), watermarkBitmap()]);
+    const [decoded, mark] = await Promise.all([createImageBitmap(blob), watermarkBitmap(markUrl)]);
     source = decoded;
     const out = await composeWatermarked(decoded, mark, position, quality);
     scope.postMessage({ id, blob: out } satisfies WatermarkResponse);
