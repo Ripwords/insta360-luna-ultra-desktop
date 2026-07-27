@@ -5,8 +5,9 @@
   "scripts": {
     "sync:features": "node scripts/sync-features.mjs",
     "fixtures": "node scripts/make-fixtures.mjs",
-    "dev": "node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && nuxt dev",
-    "generate": "node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && nuxt generate && node scripts/strip-desktop-assets.mjs",
+    "decimate:stl": "node scripts/decimate-stl.mjs",
+    "dev": "node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && node scripts/decimate-stl.mjs && nuxt dev",
+    "generate": "node scripts/make-fixtures.mjs && node scripts/sync-features.mjs && node scripts/decimate-stl.mjs && nuxt generate && node scripts/strip-desktop-assets.mjs",
     "preview": "nuxt preview"
   },
   "dependencies": {

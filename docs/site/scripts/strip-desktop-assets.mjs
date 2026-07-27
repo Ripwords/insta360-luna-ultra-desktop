@@ -5,16 +5,20 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const outputPublic = resolve(here, "../.output/public");
 
-// `LunaModel.vue` (inherited from the desktop-app layer's `/demo/*` pages)
-// requests this file at a root-absolute `/Insta360+LunaUltra.stl`, which
-// 404s under this site's `/insta360-luna-ultra-desktop/` base path — the 3D
-// view already falls back to its procedural placeholder mesh, so the file
-// never actually loads for a visitor. `nuxt generate` still copies it into
-// the output because it lives in the layer's `public/` (correctly, since it
-// IS load-bearing for the real desktop app), and Nuxt merges every layer's
-// `public/` verbatim. At ~59 MB it's most of a 66 MB static site, so delete
-// the dead copy from the generated artifact post-build rather than editing
-// the desktop app's `public/` (which would break the real app).
+// The desktop-app layer's `public/Insta360+LunaUltra.stl` is the official
+// hi-fi scan at ~58 MB — most of a 66 MB static site. `scripts/decimate-stl.mjs`
+// (run earlier in `dev`/`generate`) writes a <4 MB stand-in to this app's own
+// `docs/site/public/Insta360+LunaUltra.stl`, which wins the same-path merge
+// (a project's own `public/` takes precedence over an extended layer's), so
+// `nuxt generate` should already emit only the small copy.
+//
+// This is a defensive backstop, not the primary mechanism: if that merge
+// precedence ever changes, or the decimation step is skipped/fails silently,
+// the huge original could still end up in the output. Only delete a file
+// that's actually big enough to be the undecimated original — deleting
+// unconditionally here previously stripped the *decimated* file too (it
+// matches the same path), leaving the docs site with no model at all.
+const MAX_DECIMATED_BYTES = 8 * 1024 * 1024;
 const deadAssets = ["Insta360+LunaUltra.stl"];
 
 for (const asset of deadAssets) {
@@ -28,8 +32,15 @@ for (const asset of deadAssets) {
     continue;
   }
 
+  if (size <= MAX_DECIMATED_BYTES) {
+    console.log(
+      `[strip-desktop-assets] ${asset} is ${(size / 1024 / 1024).toFixed(2)} MB (already decimated), keeping`,
+    );
+    continue;
+  }
+
   await rm(target);
   console.log(
-    `[strip-desktop-assets] removed ${asset} (${(size / 1024 / 1024).toFixed(1)} MB) from .output/public`,
+    `[strip-desktop-assets] removed ${asset} (${(size / 1024 / 1024).toFixed(1)} MB, undecimated original) from .output/public`,
   );
 }

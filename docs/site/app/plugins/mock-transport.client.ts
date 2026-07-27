@@ -28,11 +28,40 @@ import { createMockTransport } from "../mocks/mockClient";
  * `app.vue`'s `<NuxtPage :key>`) remounts the current page fresh against the
  * now-registered mock, as an ordinary client-side render rather than a
  * hydration reconciliation, so the first paint still ends up fully correct.
+ *
+ * Scoped to /demo routes only: registering (and bumping the remount key)
+ * unconditionally on every route bought docs pages a forced full remount for
+ * a problem only /demo has. A visitor can also arrive at /demo via client-side
+ * navigation from a docs page well after `onNuxtReady` has already fired for
+ * the docs page it started on — the route watcher below covers that case by
+ * registering lazily the first time the route becomes /demo, rather than
+ * only checking once at startup.
  */
 export default defineNuxtPlugin(() => {
-  onNuxtReady(() => {
+  const route = useRoute();
+  const remountKey = useState("demo-remount-key", () => 0);
+  let registered = false;
+
+  function isDemoRoute(): boolean {
+    return route.path === "/demo" || route.path.startsWith("/demo/");
+  }
+
+  function registerIfOnDemo(): void {
+    if (registered || !isDemoRoute()) return;
+    registered = true;
     setCameraTransport(createMockTransport());
-    const remountKey = useState("demo-remount-key", () => 0);
     remountKey.value += 1;
+  }
+
+  onNuxtReady(() => {
+    registerIfOnDemo();
+    if (registered) return;
+    const stop = watch(
+      () => route.path,
+      () => {
+        registerIfOnDemo();
+        if (registered) stop();
+      },
+    );
   });
 });
