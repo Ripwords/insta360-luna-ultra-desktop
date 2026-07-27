@@ -1,5 +1,5 @@
 import { setCameraTransport } from "#layer/utils/transport";
-import { createMockTransport } from "../mocks/mockClient";
+import { createMockTransport, type MockState } from "../mocks/mockClient";
 import { presetOrDefault } from "../mocks/presets";
 
 /**
@@ -48,6 +48,18 @@ export default defineNuxtPlugin(() => {
   }
 
   /**
+   * The bare Connect screen. Nitro's trailing-slash normalization means
+   * `route.path` is actually `"/demo/"`, not `"/demo"`, once this is running
+   * against the generated static site — verified empirically (a plain
+   * `=== "/demo"` check silently never matched, and the "always excluded"
+   * route below auto-connected anyway). Checking both forms keeps this
+   * correct regardless of which one a given environment produces.
+   */
+  function isBareConnectRoute(): boolean {
+    return route.path === "/demo" || route.path === "/demo/";
+  }
+
+  /**
    * `::demo{preset="..."}` (Task 6) round-trips its preset through this query
    * param so an embed opens already in the situation its prose describes,
    * rather than always in the same freshly-connected state.
@@ -57,11 +69,50 @@ export default defineNuxtPlugin(() => {
     return typeof value === "string" ? value : undefined;
   }
 
+  /**
+   * `useCamera()`'s `status` starts `"disconnected"` and only a user-driven
+   * `connect()` ever flips it — the mock's own seed `connected: true` isn't
+   * enough by itself, since nothing reads `MockState.connected` until
+   * something calls `status()`/`probe()`, and the app never polls those on
+   * mount. Left alone, every embed opened "connected" via a preset still
+   * renders gallery.vue's/camera.vue's "No camera connected" empty state.
+   *
+   * `/demo` itself (the bare Connect screen) is deliberately excluded: its
+   * whole purpose is to demonstrate the connect flow, so it must keep
+   * showing a real, clickable Connect button rather than being connected
+   * out from under the reader. Every other `/demo/*` screen has no Connect
+   * button of its own — an embed pointed at one has no way to reach a
+   * connected state except this — so those auto-connect whenever the
+   * resolved preset seeds `connected: true` (the default for every preset
+   * currently defined; only a future disconnected-by-design preset would
+   * skip this).
+   *
+   * Ordering matters: `setCameraTransport` above must run first, since
+   * `connect()` calls `getCameraTransport().available` — connecting before
+   * registration would hit the real (unregistered) transport and fail with
+   * "Camera control requires the desktop app." `connect()` itself is async
+   * (the mock adds a 600ms delay so its own loading state is visible) but is
+   * not awaited here: it self-guards on `isConnected`/`isBusy`, so firing it
+   * and moving on is safe, and there's nothing after it in this function to
+   * sequence against.
+   *
+   * No double-connect risk from a reader manually connecting afterwards:
+   * this only ever runs once per page load (guarded by `registered` above),
+   * and it never runs on `/demo`, the only route with a Connect button to
+   * click.
+   */
+  function connectIfSeededConnected(seed: Partial<MockState>): void {
+    if (isBareConnectRoute() || !seed.connected) return;
+    void useCamera().connect();
+  }
+
   function registerIfOnDemo(): void {
     if (registered || !isDemoRoute()) return;
     registered = true;
-    setCameraTransport(createMockTransport(presetOrDefault(queryPreset())));
+    const seed = presetOrDefault(queryPreset());
+    setCameraTransport(createMockTransport(seed));
     remountKey.value += 1;
+    connectIfSeededConnected(seed);
   }
 
   onNuxtReady(() => {
