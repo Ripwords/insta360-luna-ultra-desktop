@@ -24,6 +24,19 @@ export default defineNuxtConfig({
   // repo — see task-1-report.md for the full trace.
   extends: ["../../"],
 
+  alias: {
+    // Cross-layer `~/...` imports don't work: `~` always resolves against
+    // *this app's own* srcDir (docs/site/app), never the layer's, for both
+    // types and values. `#layer` points at the layer's srcDir directly, and
+    // Nuxt writes it into the generated tsconfig `paths`, so
+    // `import { setCameraTransport } from "#layer/utils/transport"` and
+    // `import type { CameraTransport } from "#layer/utils/transport"` both
+    // resolve and typecheck. Auto-import still covers plain, unqualified
+    // references; this alias is for the cases — like an explicit type
+    // import in the mock transport — that auto-import doesn't reach.
+    "#layer": fileURLToPath(new URL("../../app", import.meta.url)),
+  },
+
   // Nuxt's `css` config array is not layer-aware: the layer's own
   // `css: ["~/assets/css/main.css"]` entry merges verbatim into this app's
   // css list (`@nuxt/schema`'s `$resolve` for `css` only filters to
