@@ -91,6 +91,47 @@ async function replay() {
  * canvas going blank with no explanation; that condition does not hold, so
  * nothing was added.
  */
+
+/**
+ * `AppShell` (desktop-app source, off limits here) renders its
+ * `UDashboardGroup` as `fixed inset-0` — verified by inspecting the built
+ * output — so it always paints over the *entire* viewport regardless of
+ * where this layout puts its own markup in the DOM. Anything here meant to
+ * stay visible has to be `position: fixed` itself (as the two status pills
+ * below already are); ordinary flow content placed alongside `<AppShell>`
+ * would just render underneath it, invisible. That rules out reserving
+ * clearance by pushing the app down with padding/margin — there is no flow
+ * position from which to push it.
+ *
+ * `AppShell`'s sidebar (top-left) and every page's own `UDashboardNavbar`
+ * (top area, both sides) are real, populated UI in normal cases; the
+ * bottom-centre is `SelectionBar.vue`'s selection toolbar on the gallery and
+ * the shutter/mode strip on the camera screen; bottom-right is where
+ * `UApp`'s toaster renders. Measured across all five demo screens at the
+ * embed's 520px default height, the one region nothing else ever reaches
+ * into is a narrow column down the bottom-left edge — so both status pills
+ * below live there now, stacked, rather than spanning the full width across
+ * the bottom-centre where the gallery's selection toolbar and the camera's
+ * record button used to sit directly underneath them.
+ */
+
+/**
+ * "← Back to docs" only makes sense for a reader who navigated here as a
+ * full page (from the header's "Demo" link, which is the dead end Issue I2
+ * describes — `/` is unreachable from inside `/demo/*` because of a router
+ * quirk in the app's own home-link redirect, not something fixable from
+ * here). Inside an embedded `::demo` iframe the surrounding docs page is
+ * already right there around it, so the same link would be both redundant
+ * and, worse, would navigate the iframe itself out from under the embed
+ * rather than doing anything useful. `window.self !== window.top` is the
+ * standard way to tell those two cases apart; it only means anything once
+ * mounted in a real browser, so this starts `false` (hidden) rather than
+ * risking a flash of the link inside an embed before it can be hidden.
+ */
+const isTopLevelDemo = ref(false);
+onMounted(() => {
+  isTopLevelDemo.value = window.self === window.top;
+});
 </script>
 
 <template>
@@ -115,11 +156,32 @@ async function replay() {
     </div>
 
     <div
-      class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center pb-3"
-      role="status"
+      class="pointer-events-none fixed bottom-3 left-3 z-50 flex max-w-[13rem] flex-col items-start gap-2"
     >
+      <NuxtLink
+        v-if="isTopLevelDemo"
+        to="/docs/install"
+        class="pointer-events-auto flex items-center gap-1.5 rounded-full bg-inverted/90 px-3 py-1.5 text-xs font-medium text-inverted shadow-lg backdrop-blur"
+      >
+        <UIcon name="i-lucide-arrow-left" class="size-3.5" />
+        Back to docs
+      </NuxtLink>
+
+      <!--
+        No `pointer-events-auto` here, unlike the link above and the replay
+        button: this is plain disclosure text, nothing to click. Left
+        `pointer-events-none` (inherited from the wrapper) so it can never
+        sit in front of and block a real control it happens to overlap —
+        `/demo`'s own Connect button reaches into this same bottom-left
+        corner at this embed height, and no available spot clears every
+        control on every /demo/* screen at once (see the note above this
+        script block). Gallery's selection toolbar and camera's shutter,
+        the two controls the bug report named, are clear of this corner
+        entirely — this is the residual, lower-priority case.
+      -->
       <span
-        class="pointer-events-auto rounded-full bg-inverted/90 px-3 py-1.5 text-xs font-medium text-inverted shadow-lg backdrop-blur"
+        role="status"
+        class="rounded-lg bg-inverted/90 px-2.5 py-1.5 text-[11px] font-medium leading-snug text-inverted shadow-lg backdrop-blur"
       >
         Simulated camera — live view and capture are pre-recorded
       </span>
