@@ -1,6 +1,7 @@
 import type { CameraInfo, LiveViewStats, MediaItem } from "#layer/types/media";
 import type { CameraTransport } from "#layer/utils/transport";
 import { buildMediaItems, entriesFromPaths } from "#layer/utils/lunaIndex";
+import { createCommandChannel } from "./mockCommands";
 import { FIXTURE_PATHS, FIXTURE_SIZES, fixtureUrl } from "./fixtures";
 
 export interface MockState {
@@ -25,6 +26,7 @@ export function createMockTransport(seed: Partial<MockState> = {}): CameraTransp
     paths: seed.paths ?? [...FIXTURE_PATHS],
     connected: seed.connected ?? false,
   };
+  const command = createCommandChannel();
 
   return {
     get available() {
@@ -68,10 +70,7 @@ export function createMockTransport(seed: Partial<MockState> = {}): CameraTransp
       state.paths = state.paths.filter((path) => !removing.has(path));
     },
 
-    async command(): Promise<Uint8Array> {
-      // Task 4 replaces this with the real command state machine.
-      return new Uint8Array(0);
-    },
+    command,
 
     async liveViewStart(): Promise<{ url: string; port: number }> {
       // Task 5 points this at the generated Annex-B fixture.
