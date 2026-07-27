@@ -20,6 +20,8 @@
 
 Connect over Wi-Fi to drive the camera from a live viewfinder, browse its media library, batch-download photos and videos with the official Luna Ultra watermark, delete files, and explore the camera as an interactive 3D model. Native desktop app for macOS, Windows, and Linux, with signed auto-updates.
 
+Docs: https://ripwords.github.io/insta360-luna-ultra-desktop/
+
 <p align="center">
   <img src="screenshots/02-gallery.png" alt="Gallery" width="49%" />
   <img src="screenshots/08-camera.png" alt="Camera control" width="49%" />
