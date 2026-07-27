@@ -17,5 +17,20 @@ useSeoMeta({
 </script>
 
 <template>
-  <slot />
+  <div class="relative">
+    <AppShell>
+      <slot />
+    </AppShell>
+
+    <div
+      class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center pb-3"
+      role="status"
+    >
+      <span
+        class="pointer-events-auto rounded-full bg-inverted/90 px-3 py-1.5 text-xs font-medium text-inverted shadow-lg backdrop-blur"
+      >
+        Simulated camera — live view and capture are pre-recorded
+      </span>
+    </div>
+  </div>
 </template>
