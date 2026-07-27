@@ -8,9 +8,9 @@
 // silently matched nothing, so those pages rendered with no Nuxt layout
 // wrapper at all (their header/chrome comes from the page component itself,
 // e.g. `UDashboardPanel`). Adding this file both gives `layout: "demo"`
-// something real to resolve to (a plain passthrough, so it changes nothing
-// visually) and is where the robots tag actually gets set, per the task
-// brief's documented fallback for exactly this situation.
+// something real to resolve to (this app's own macOS window chrome, see the
+// template below) and is where the robots tag actually gets set, per the
+// task brief's documented fallback for exactly this situation.
 useSeoMeta({
   robots: "noindex, nofollow",
 });
@@ -94,39 +94,26 @@ async function replay() {
 
 /**
  * `AppShell` (desktop-app source, off limits here) renders its
- * `UDashboardGroup` as `fixed inset-0` — verified by inspecting the built
- * output — so it always paints over the *entire* viewport regardless of
- * where this layout puts its own markup in the DOM. Anything here meant to
- * stay visible has to be `position: fixed` itself (as the two status pills
- * below already are); ordinary flow content placed alongside `<AppShell>`
- * would just render underneath it, invisible. That rules out reserving
- * clearance by pushing the app down with padding/margin — there is no flow
- * position from which to push it.
+ * `UDashboardGroup` as `fixed inset-0`, so left alone it always paints over
+ * the entire *browser viewport*, not just whatever box this layout puts it
+ * in. That's exactly right for the embedded case (the iframe's own document
+ * has no chrome of its own — `Demo.vue` draws a macOS window *around* the
+ * iframe from outside it), but wrong for a top-level `/demo/*` visit, where
+ * the whole point is for `AppShell` to sit inside a macOS window on the
+ * page, not fill the browser tab.
  *
- * `AppShell`'s sidebar (top-left) and every page's own `UDashboardNavbar`
- * (top area, both sides) are real, populated UI in normal cases; the
- * bottom-centre is `SelectionBar.vue`'s selection toolbar on the gallery and
- * the shutter/mode strip on the camera screen; bottom-right is where
- * `UApp`'s toaster renders. Measured across all five demo screens at the
- * embed's 520px default height, the one region nothing else ever reaches
- * into is a narrow column down the bottom-left edge — so both status pills
- * below live there now, stacked, rather than spanning the full width across
- * the bottom-centre where the gallery's selection toolbar and the camera's
- * record button used to sit directly underneath them.
- */
-
-/**
- * "← Back to docs" only makes sense for a reader who navigated here as a
- * full page (from the header's "Demo" link, which is the dead end Issue I2
- * describes — `/` is unreachable from inside `/demo/*` because of a router
- * quirk in the app's own home-link redirect, not something fixable from
- * here). Inside an embedded `::demo` iframe the surrounding docs page is
- * already right there around it, so the same link would be both redundant
- * and, worse, would navigate the iframe itself out from under the embed
- * rather than doing anything useful. `window.self !== window.top` is the
- * standard way to tell those two cases apart; it only means anything once
- * mounted in a real browser, so this starts `false` (hidden) rather than
- * risking a flash of the link inside an embed before it can be hidden.
+ * The fix is the `[transform:translateZ(0)]` on the content wrapper below:
+ * any transform, on any ancestor, makes that ancestor the containing block
+ * for `position: fixed` descendants instead of the viewport (CSS Transforms
+ * §renders "if the transform property is anything other than none, it
+ * establishes a new containing block"). `AppShell`'s `fixed inset-0`, and
+ * this layout's own `fixed` status pills below, all resolve against that
+ * wrapper's box instead of the real viewport once it has a transform — so
+ * they fill and stay clipped to the window, not the page. The wrapper needs
+ * a *definite* height for that to size correctly (an auto-height box whose
+ * only children are fixed/out-of-flow would collapse to zero), which is why
+ * it's a `flex-1` row of a flex column whose total height is set explicitly
+ * on the window frame around it, not derived from content.
  */
 const isTopLevelDemo = ref(false);
 onMounted(() => {
@@ -135,7 +122,95 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="relative">
+  <div
+    v-if="isTopLevelDemo"
+    class="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,var(--ui-bg-elevated)_0%,var(--ui-bg)_65%)] p-4 sm:p-8"
+  >
+    <!--
+      macOS window chrome for a top-level /demo/* visit — the same look
+      `Demo.vue` draws around its embedded iframe (traffic lights, 11px
+      radius, 36px title bar, hardcoded hairline), reused here rather than
+      re-derived so the two never drift apart. `Demo.vue` keeps drawing its
+      own copy for the embedded case; that iframe's *inner* document (this
+      same layout, `v-else` below) draws none, so exactly one window frame
+      is ever on screen in either context.
+
+      Height is `min(46rem, 100dvh - 2rem)`: capped so the window doesn't
+      loom on a tall monitor, but always clears a phone-sized viewport with
+      a small margin either way.
+    -->
+    <div
+      class="relative flex h-[min(46rem,calc(100dvh-2rem))] w-full max-w-5xl flex-col overflow-hidden rounded-[11px] bg-default shadow-2xl ring-1 ring-default"
+    >
+      <div
+        class="relative flex h-9 shrink-0 items-center border-b border-black/10 bg-elevated px-3.5 dark:border-white/10"
+      >
+        <div class="flex items-center gap-2">
+          <span class="size-3 rounded-full bg-[#ff5f57]" />
+          <span class="size-3 rounded-full bg-[#febc2e]" />
+          <span class="size-3 rounded-full bg-[#28c840]" />
+        </div>
+
+        <!--
+          The disclosure: a top-level visit has no surrounding docs page to
+          carry it (unlike the embedded case, where `Demo.vue`'s own title
+          bar — outside the iframe — says the same thing regardless of which
+          /demo/* screen the iframe is currently showing), so the title bar
+          here is the one honesty surface every top-level screen shares.
+        -->
+        <span
+          class="pointer-events-none absolute inset-x-0 text-center text-[13px] font-medium text-muted"
+        >
+          Luna Ultra Desktop — simulated camera
+        </span>
+      </div>
+
+      <div class="relative min-h-0 flex-1 [transform:translateZ(0)]">
+        <AppShell>
+          <slot />
+        </AppShell>
+
+        <div
+          v-if="streamEnded"
+          class="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4"
+          role="status"
+        >
+          <button
+            type="button"
+            class="pointer-events-auto flex items-center gap-1.5 rounded-full bg-inverted/90 px-3 py-1.5 text-xs font-medium text-inverted shadow-lg backdrop-blur"
+            @click="replay"
+          >
+            <UIcon name="i-lucide-refresh-cw" class="size-3.5" />
+            Live view clip ended — replay
+          </button>
+        </div>
+
+        <!--
+          Only ever shown top-level: inside an embedded iframe this would
+          both be redundant (the surrounding docs page is already right
+          there) and actively wrong (it would navigate the iframe itself out
+          from under the embed rather than doing anything useful).
+        -->
+        <NuxtLink
+          to="/docs/install"
+          class="pointer-events-auto fixed bottom-3 left-3 z-50 flex items-center gap-1.5 rounded-full bg-inverted/90 px-3 py-1.5 text-xs font-medium text-inverted shadow-lg backdrop-blur"
+        >
+          <UIcon name="i-lucide-arrow-left" class="size-3.5" />
+          Back to docs
+        </NuxtLink>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    Embedded case: `Demo.vue` already draws the window frame and its
+    disclosure-carrying title bar from outside this iframe, so this half
+    stays exactly the plain, chrome-free passthrough it always was —
+    `AppShell` filling the iframe's own real viewport via its own
+    `fixed inset-0`, no transform-containment needed because there's no
+    surrounding page backdrop to clip it away from here.
+  -->
+  <div v-else class="relative">
     <AppShell>
       <slot />
     </AppShell>
@@ -153,38 +228,6 @@ onMounted(() => {
         <UIcon name="i-lucide-refresh-cw" class="size-3.5" />
         Live view clip ended — replay
       </button>
-    </div>
-
-    <div
-      class="pointer-events-none fixed bottom-3 left-3 z-50 flex max-w-[13rem] flex-col items-start gap-2"
-    >
-      <NuxtLink
-        v-if="isTopLevelDemo"
-        to="/docs/install"
-        class="pointer-events-auto flex items-center gap-1.5 rounded-full bg-inverted/90 px-3 py-1.5 text-xs font-medium text-inverted shadow-lg backdrop-blur"
-      >
-        <UIcon name="i-lucide-arrow-left" class="size-3.5" />
-        Back to docs
-      </NuxtLink>
-
-      <!--
-        No `pointer-events-auto` here, unlike the link above and the replay
-        button: this is plain disclosure text, nothing to click. Left
-        `pointer-events-none` (inherited from the wrapper) so it can never
-        sit in front of and block a real control it happens to overlap —
-        `/demo`'s own Connect button reaches into this same bottom-left
-        corner at this embed height, and no available spot clears every
-        control on every /demo/* screen at once (see the note above this
-        script block). Gallery's selection toolbar and camera's shutter,
-        the two controls the bug report named, are clear of this corner
-        entirely — this is the residual, lower-priority case.
-      -->
-      <span
-        role="status"
-        class="rounded-lg bg-inverted/90 px-2.5 py-1.5 text-[11px] font-medium leading-snug text-inverted shadow-lg backdrop-blur"
-      >
-        Simulated camera — live view and capture are pre-recorded
-      </span>
     </div>
   </div>
 </template>
