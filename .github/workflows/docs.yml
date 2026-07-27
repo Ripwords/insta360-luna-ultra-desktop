@@ -26,6 +26,23 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Install ffmpeg
+        # docs:generate's fixture step (scripts/make-fixtures.mjs) shells out
+        # to ffmpeg to synthesize the demo's sample photos, clips and the
+        # live-view Annex-B stream, and the generated fixtures are gitignored
+        # (no committed fallback), so the build hard-depends on ffmpeg being
+        # on PATH. Ubuntu's apt package is built with libfreetype, which the
+        # live-view fixture's `drawtext` filter (the "SIMULATED PREVIEW"
+        # caption) needs — verified below rather than assumed, since a
+        # freetype-less ffmpeg build fails that filter at run time, not at
+        # install time.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -filters | grep -q drawtext || {
+            echo "::error::installed ffmpeg has no drawtext filter (needs libfreetype)"
+            exit 1
+          }
       - run: bun install --frozen-lockfile
       - name: Build the docs site
         run: bun --cwd=docs/site run generate
