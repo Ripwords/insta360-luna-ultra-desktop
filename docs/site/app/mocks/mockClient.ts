@@ -27,6 +27,8 @@ export function createMockTransport(seed: Partial<MockState> = {}): CameraTransp
     connected: seed.connected ?? false,
   };
   const command = createCommandChannel();
+  /** 0 while live view is stopped; the start time otherwise, so stats can be derived from elapsed wall-clock time. */
+  let liveViewStartedAt = 0;
 
   return {
     get available() {
@@ -73,14 +75,28 @@ export function createMockTransport(seed: Partial<MockState> = {}): CameraTransp
     command,
 
     async liveViewStart(): Promise<{ url: string; port: number }> {
-      // Task 5 points this at the generated Annex-B fixture.
-      throw new Error("Live view is not wired up yet.");
+      await delay(500);
+      liveViewStartedAt = Date.now();
+      // A plain static file: LiveView.vue's annexb path fetches this with an
+      // ordinary `fetch` and feeds the body to WebCodecs, so this is real
+      // decoding, not a simulated readout.
+      return { url: fixtureUrl("liveview.264"), port: 0 };
     },
 
-    async liveViewStop(): Promise<void> {},
+    async liveViewStop(): Promise<void> {
+      liveViewStartedAt = 0;
+    },
 
     async liveViewStats(): Promise<LiveViewStats> {
-      return { bytes: 0, frames: 0, firstBytesHex: "", seconds: 0 };
+      const seconds = liveViewStartedAt ? (Date.now() - liveViewStartedAt) / 1000 : 0;
+      // Non-zero bytes matter: useLiveView surfaces an error if a stream
+      // reports zero bytes after its first-byte timeout.
+      return {
+        bytes: Math.round(seconds * 240_000),
+        frames: Math.round(seconds * 30),
+        firstBytesHex: "00000001",
+        seconds,
+      };
     },
 
     async probeOscPreview(): Promise<string | null> {
