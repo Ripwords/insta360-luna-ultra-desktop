@@ -15,7 +15,7 @@
 - **Never use `any`.** `as unknown as X` only when strictly necessary. `as never` is banned.
 - `oxlint --deny-warnings` — warnings are failures. The pre-commit hook runs `oxfmt` + `oxlint --fix` on staged files. Never `git commit --no-verify`.
 - Vue conventions, **not lint-enforced, apply by hand**: prop shorthand (`:foo`, not `:foo="foo"`); `useTemplateRef()` rather than a manually typed ref bound to `ref="..."`; destructuring defaults on `defineProps`, never `withDefaults()`.
-- **Exactly one change to `app/` is permitted in this entire plan**: Task 1's `AppShell.vue` extraction. Every other task must leave `git diff --stat -- app/` empty. This is an explicit project decision — the desktop app is not modified for the docs site's benefit.
+- **Two changes to `app/` are permitted in this plan**: Task 1's `AppShell.vue` extraction, and Task 7's base-aware asset URLs (an explicit, recorded exception — see that task for why no docs-site-only fix exists). Every other task must leave `git diff --stat -- app/` empty. This is an explicit project decision — the desktop app is not modified for the docs site's benefit.
 - Desktop app baseline, checked every task: `bun run test` → node 19 files/289 tests + nuxt 4 files/12 tests, `bun run typecheck`, `bun run lint`.
 - **Cross-layer imports use the `#layer` alias, never `~/`.** `~/utils/foo` does not resolve from `docs/site` for values _or_ types.
 - **Nothing transitively imported by a `*.worker.ts` may use a `~/` specifier** — Vite's isolated worker sub-build resolves the layer's `~` against the consuming app's srcDir.
@@ -937,6 +937,97 @@ Serve statically and confirm:
 ```bash
 git add docs/site
 git commit -m "feat(demo): embed live demos inline in the documentation"
+```
+
+---
+
+### Task 7: Base-aware asset URLs and the real 3D model
+
+**Files:**
+
+- Modify: `app/components/LunaModel.vue` (asset URL only), `app/utils/watermark.ts` (asset URL only)
+- Create: `docs/site/scripts/decimate-stl.mjs`
+- Modify: `docs/site/package.json`, `docs/site/app/app.vue`, `docs/site/app/plugins/mock-transport.client.ts`
+
+**Interfaces:**
+
+- Consumes: the mock transport from Task 3.
+- Produces: working watermarked downloads and the real camera scan in the demo. Nothing depends on this task.
+
+**This task spends a second, deliberate `app/` change.** The original budget allowed one (Task 1's `AppShell`). This is an explicit, recorded exception, granted because three separate user-visible defects share one root cause and none can be fixed from `docs/site`:
+
+| Asset | Hardcoded at | Symptom |
+| --- | --- | --- |
+| Camera scan | `app/components/LunaModel.vue:10` | 404 → the 3D showpiece renders a **procedural placeholder, not the Luna Ultra** |
+| glTF fallback | `app/components/LunaModel.vue:147` | 404 → no second chance at the real model |
+| Watermark PNG | `app/utils/watermark.ts:23` | 404, swallowed silently → **downloads are not watermarked** |
+
+Each is a root-absolute URL (`/Insta360+…`), which resolves at the *origin* root and therefore breaks under any non-root base path. This is a latent correctness bug in the app itself, not docs-specific behaviour: the fix makes the app respect its own configured base URL, and adds no docs-site concepts to `app/`. The desktop app is `baseURL: "/"`, so its behaviour is unchanged.
+
+- [ ] **Step 1: Make the three asset URLs base-aware**
+
+In `app/utils/watermark.ts`, replace the constant with a function so the base path is read at call time rather than module-eval time:
+
+```ts
+/** Root-relative in the desktop app; base-prefixed wherever the app is served under a subpath. */
+export function watermarkAssetUrl(): string {
+  return `${useRuntimeConfig().app.baseURL}watermark/ic_watermark_luna_ultra_image.png`;
+}
+```
+
+Update the single consumer at `app/utils/watermark.ts:88` (`image.src = ...`). **Check whether `WATERMARK_ASSET_URL` is referenced anywhere else** (`grep -rn WATERMARK_ASSET_URL app tests`) — including the watermark worker, which cannot call `useRuntimeConfig()`. If the worker needs it, pass the resolved URL in the message payload from `watermarkClient.ts` rather than importing the constant into worker scope. Remember: nothing reachable from a `*.worker.ts` may use a `~/` import either.
+
+In `app/components/LunaModel.vue`, do the same for both model URLs — the STL at line 10 and the glTF fallback at line 147.
+
+- [ ] **Step 2: Verify the desktop app is unaffected**
+
+```bash
+bun run test && bun run typecheck && bun run lint
+bun run dev
+```
+
+The desktop app's `baseURL` is `/`, so every URL must come out byte-identical to before. Confirm the 3D model still loads on the Connect screen and a watermarked download still works. **This is the check that justifies the exception** — if desktop behaviour changes at all, stop.
+
+- [ ] **Step 3: Decimate the camera scan**
+
+`public/Insta360+LunaUltra.stl` is 58 MB — far too large to serve to a web visitor, which is why the docs build strips it. Reduce it instead. Binary STL is a trivial format: an 80-byte header, a `uint32` triangle count, then 50 bytes per triangle (12 floats + 2 padding bytes), so this needs no dependencies.
+
+Create `docs/site/scripts/decimate-stl.mjs` implementing **vertex clustering**: snap each vertex to a uniform grid, drop triangles that become degenerate (two or more corners landing in the same cell), deduplicate identical triangles, and write a new binary STL. Choose the grid size to land the output **under ~4 MB** while keeping the silhouette recognisable — start around a 512³ grid over the model's bounding box and adjust.
+
+Write the result to `docs/site/public/Insta360+LunaUltra.stl` so it is served at the docs site's own base path, and chain the script into `docs/site/package.json`'s `dev` and `generate` alongside the existing prebuild steps. Keep `strip-desktop-assets.mjs` removing the 58 MB copy inherited from the layer — the decimated one must win.
+
+Report the triangle count before and after, and the final file size.
+
+- [ ] **Step 4: Confirm the real model renders**
+
+Build, serve statically under the base path, and load `/demo` in a real browser. Confirm:
+
+- [ ] The camera renders as the **actual Luna Ultra scan** — a gimbal camera — not the procedural placeholder box. Compare against `app-icon.png` and the screenshots in `screenshots/` to be sure.
+- [ ] Orbit controls work and the model is correctly oriented and framed.
+- [ ] No `Insta360+LunaUltra.stl` or `models/luna-ultra.glb` 404 remains in the console.
+- [ ] The colorway still follows the theme (black in dark, white in light).
+
+- [ ] **Step 5: Confirm the watermark actually composites**
+
+Download a photo from `/demo/gallery` with watermarking enabled. **Open the downloaded file** and confirm the Luna Ultra watermark is visibly composited onto the image, positioned per the aspect-ratio layout table. Check the network tab shows the watermark PNG returning 200 rather than 404.
+
+Note that `renderWatermarked()` fails silently by design, so "the download completed" proves nothing — you must look at the pixels.
+
+- [ ] **Step 6: Scope the demo remount to `/demo`**
+
+Task 3's review found that the `NuxtPage` remount key in `docs/site/app/app.vue` and the unconditional client plugin fire on **every** route, so docs pages take a forced full remount for a problem only `/demo` has. No live regression today, but any future docs page holding local UI state (a copy-button "copied!" flag, a collapsible) would silently lose it.
+
+Guard both: register the mock and apply the remount key only when the route is under `/demo`. Then confirm on `/docs/install` that the page's own `<h1>` no longer detaches and reattaches after load, while `/demo` still works exactly as before.
+
+- [ ] **Step 7: Commit**
+
+Commit the `app/` change separately from the docs-site changes, so the exception is easy to review and revert:
+
+```bash
+git add app
+git commit -m "fix(assets): resolve model and watermark URLs against the app base URL"
+git add docs/site
+git commit -m "feat(demo): serve a decimated camera scan and scope the demo remount"
 ```
 
 ---
