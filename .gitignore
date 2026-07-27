@@ -40,5 +40,9 @@ docs/site/.nuxt
 docs/site/.output
 docs/site/.data
 
+# Generated media fixtures for the interactive demo (reproducible via
+# `bun run docs:generate` / docs/site/scripts/make-fixtures.mjs)
+docs/site/public/demo/fixtures
+
 # Synced from docs/FEATURES.md at build time; never hand-edit or commit
 docs/site/content/docs/4.feature-status.md
