@@ -184,7 +184,9 @@ export function buildMediaItems(
  * Build raw entries from GET_FILE_LIST paths. Firmware 1.0.238+ disabled the
  * HTTP directory autoindex, so files are enumerated over the control session
  * instead; each file stays fetchable by its URL while the session is held.
- * Size isn't reported here — it's resolved lazily when a file is downloaded.
+ * Size isn't reported by GET_FILE_LIST, so entries start at 0 and stay there
+ * until the file is downloaded: `useDownloads` measures the transferred blob
+ * and writes the byte count back onto the library item.
  */
 export function entriesFromPaths(paths: string[], urlFor: (path: string) => string): RawEntry[] {
   const entries: RawEntry[] = [];

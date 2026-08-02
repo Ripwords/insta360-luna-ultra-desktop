@@ -171,6 +171,10 @@ describe("GET_FILE_LIST path listing (firmware 1.0.238+)", () => {
     expect(dng.previewUrl).toBe("http://192.168.42.1/DCIM/Camera01/IMG_20260724_134210_135.jpg");
   });
 
+  it("leaves size at 0 for a download to measure and fill in", () => {
+    expect(items.every((i) => i.size === 0)).toBe(true);
+  });
+
   it("parses the capture time from the filename", () => {
     const vid = items.find((i) => i.ext === "mp4")!;
     expect(vid.takenAt).toBe(new Date(2026, 6, 24, 18, 20, 11).getTime());
