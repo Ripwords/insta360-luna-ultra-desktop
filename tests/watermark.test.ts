@@ -3,10 +3,14 @@ import {
   DEFAULT_WATERMARK,
   WATERMARK_ASSET_RATIO,
   WATERMARK_POSITIONS,
+  canWatermark,
   nearestAspect,
+  watermarkNote,
   watermarkRect,
+  watermarkScope,
 } from "~/utils/watermark";
 import { LUNA_WATERMARK_LAYOUT } from "~/utils/watermarkLayout";
+import { makeMediaItem } from "./helpers/media";
 
 describe("nearestAspect", () => {
   it("matches exact aspect ratios", () => {
@@ -62,5 +66,76 @@ describe("layout table", () => {
   it("defaults to the official bottom-left placement", () => {
     expect(DEFAULT_WATERMARK.position).toBe("bottom-left");
     expect(DEFAULT_WATERMARK.enabled).toBe(true);
+  });
+});
+
+describe("canWatermark", () => {
+  it("accepts renderable photos", () => {
+    expect(canWatermark(makeMediaItem({ ext: "jpg", renderable: true }))).toBe(true);
+  });
+
+  it("rejects RAW photos the canvas pipeline cannot decode", () => {
+    const dng = makeMediaItem({ name: "IMG_0001.dng", ext: "dng", renderable: false });
+    expect(canWatermark(dng)).toBe(false);
+  });
+
+  it("rejects RAW photos even when a sibling JPEG stands in for the preview", () => {
+    const dng = makeMediaItem({
+      name: "IMG_0001.dng",
+      ext: "dng",
+      renderable: false,
+      previewUrl: "http://127.0.0.1/DCIM/Camera01/IMG_0001.jpg",
+    });
+    expect(canWatermark(dng)).toBe(false);
+  });
+
+  it("rejects videos", () => {
+    expect(canWatermark(makeMediaItem({ type: "video", ext: "mp4" }))).toBe(false);
+  });
+});
+
+describe("watermarkScope", () => {
+  it("splits a mixed selection into watermarkable photos, raw photos and videos", () => {
+    const jpeg = makeMediaItem({ id: "jpg", name: "IMG_0001.jpg" });
+    const raw = makeMediaItem({ id: "dng", name: "IMG_0001.dng", ext: "dng", renderable: false });
+    const video = makeMediaItem({ id: "mp4", name: "VID_0001.mp4", type: "video", ext: "mp4" });
+
+    const scope = watermarkScope([jpeg, raw, video]);
+
+    expect(scope.watermarkable).toEqual([jpeg]);
+    expect(scope.raw).toEqual([raw]);
+    expect(scope.videos).toEqual([video]);
+  });
+
+  it("reports an empty scope for an empty selection", () => {
+    expect(watermarkScope([])).toEqual({ watermarkable: [], raw: [], videos: [] });
+  });
+});
+
+describe("watermarkNote", () => {
+  const jpeg = makeMediaItem({ id: "jpg", name: "IMG_0001.jpg" });
+  const raw = makeMediaItem({ id: "dng", name: "IMG_0001.dng", ext: "dng", renderable: false });
+  const video = makeMediaItem({ id: "mp4", name: "VID_0001.mp4", type: "video", ext: "mp4" });
+
+  it("promises the watermark without qualification when every photo is renderable", () => {
+    expect(watermarkNote(watermarkScope([jpeg]))).toBe("Watermark will be applied to photos.");
+  });
+
+  it("says RAW is left alone when the selection mixes JPEG and RAW", () => {
+    expect(watermarkNote(watermarkScope([jpeg, raw]))).toBe(
+      "Watermark will be applied to JPEG photos; RAW files are saved unmodified.",
+    );
+  });
+
+  it("promises nothing when the selection is RAW only", () => {
+    const note = watermarkNote(watermarkScope([raw]));
+    expect(note).toBe("RAW files are saved unmodified; watermarking applies to JPEG photos only.");
+    expect(note).not.toMatch(/will be applied/);
+  });
+
+  it("promises nothing when the selection is videos only", () => {
+    expect(watermarkNote(watermarkScope([video]))).toBe(
+      "Videos transfer untouched; watermarking applies to JPEG photos only.",
+    );
   });
 });

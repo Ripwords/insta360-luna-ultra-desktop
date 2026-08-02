@@ -1,4 +1,5 @@
 import type { DownloadEntry, MediaItem } from "~/types/media";
+import { canWatermark, watermarkNote, watermarkScope } from "~/utils/watermark";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
 import { getCameraTransport } from "~/utils/transport";
@@ -37,7 +38,9 @@ export function useDownloads() {
         // camera, not the size of what we are about to write to disk.
         recordSize(entry.item, blob.size);
         patch(entry.id, { progress: 70 });
-        if (entry.watermarked && entry.item.type === "photo") {
+        // Renderable photos only: RAW is `type: "photo"` too, but the canvas
+        // pipeline cannot decode it, so it saves unmodified (issue #2).
+        if (entry.watermarked && canWatermark(entry.item)) {
           blob = await renderWatermarked(blob, settings.value);
         }
         patch(entry.id, { progress: 90 });
@@ -93,9 +96,10 @@ export function useDownloads() {
       startedAt: stamp + index,
     }));
     queue.value = [...entries, ...queue.value];
+    const scope = watermarkScope(items);
     toast.add({
       title: `Downloading ${items.length} ${items.length === 1 ? "file" : "files"}`,
-      description: options.watermark ? "Watermark will be applied to photos" : undefined,
+      description: options.watermark ? watermarkNote(scope) : undefined,
       icon: "i-lucide-arrow-down-to-line",
     });
     if (!running.value) {

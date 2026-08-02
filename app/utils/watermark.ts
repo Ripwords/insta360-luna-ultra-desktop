@@ -1,3 +1,4 @@
+import type { MediaItem } from "~/types/media";
 import { LUNA_WATERMARK_LAYOUT } from "./watermarkLayout";
 
 export type WatermarkPosition =
@@ -42,6 +43,57 @@ export const DEFAULT_WATERMARK: WatermarkSettings = {
   enabled: true,
   position: "bottom-left",
 };
+
+/**
+ * Whether the watermark can be burned into this file at all.
+ *
+ * The pipeline is canvas-based — `createImageBitmap`, draw, re-encode to JPEG —
+ * so it only works on files the browser can decode. RAW (`.dng`) is
+ * `type: "photo"` but `renderable: false`: no engine decodes a raw Bayer frame,
+ * and watermarking one would mean demosaicing it into a JPEG, i.e. not
+ * returning the file the user asked for. Those save unmodified instead.
+ */
+export function canWatermark(item: MediaItem): boolean {
+  return item.type === "photo" && item.renderable;
+}
+
+/** A selection split by what watermarking can actually do to each file. */
+export interface WatermarkScope {
+  /** Renderable photos — the watermark is burned into these. */
+  watermarkable: MediaItem[];
+  /** RAW photos, saved byte-for-byte whatever the watermark setting says. */
+  raw: MediaItem[];
+  /** Videos, likewise untouched. */
+  videos: MediaItem[];
+}
+
+/** Split `items` so the UI can say honestly which files get a watermark. */
+export function watermarkScope(items: MediaItem[]): WatermarkScope {
+  const scope: WatermarkScope = { watermarkable: [], raw: [], videos: [] };
+  for (const item of items) {
+    if (item.type === "video") scope.videos.push(item);
+    else if (canWatermark(item)) scope.watermarkable.push(item);
+    else scope.raw.push(item);
+  }
+  return scope;
+}
+
+/**
+ * One honest sentence about what the watermark will do to this selection.
+ *
+ * Shared by the download modal and the queue toast so neither can drift into
+ * promising a watermark on files that will be saved untouched.
+ */
+export function watermarkNote(scope: WatermarkScope): string {
+  if (scope.watermarkable.length > 0) {
+    return scope.raw.length > 0
+      ? "Watermark will be applied to JPEG photos; RAW files are saved unmodified."
+      : "Watermark will be applied to photos.";
+  }
+  return scope.raw.length > 0
+    ? "RAW files are saved unmodified; watermarking applies to JPEG photos only."
+    : "Videos transfer untouched; watermarking applies to JPEG photos only.";
+}
 
 /** Snap an image to the closest aspect ratio in the official layout table. */
 export function nearestAspect(width: number, height: number): string {

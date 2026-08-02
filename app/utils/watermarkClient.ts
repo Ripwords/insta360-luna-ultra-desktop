@@ -15,7 +15,7 @@ import type { WatermarkRequest, WatermarkResponse } from "~/workers/watermark.wo
  * original main-thread path rather than failing the download.
  */
 
-/** Which route the last render actually took. */
+/** Which route the last render actually took; `passthrough` means "off". */
 export type WatermarkPath = "worker" | "main-thread" | "passthrough";
 
 let lastPath: WatermarkPath = "passthrough";
@@ -102,20 +102,30 @@ async function renderOnMainThread(blob: Blob, settings: WatermarkSettings): Prom
   const context = canvas.getContext("2d");
   if (!context) {
     bitmap.close();
-    return blob;
+    throw new Error("Canvas 2D context unavailable");
   }
   context.drawImage(bitmap, 0, 0);
   await drawWatermark(context, bitmap.width, bitmap.height, settings);
   bitmap.close();
-  return await new Promise<Blob>((resolve) => {
-    canvas.toBlob((out) => resolve(out ?? blob), "image/jpeg", WATERMARK_JPEG_QUALITY);
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (out) => (out ? resolve(out) : reject(new Error("Watermark encode produced no data"))),
+      "image/jpeg",
+      WATERMARK_JPEG_QUALITY,
+    );
   });
 }
 
 /**
  * Return `blob` with the watermark applied. Returns the original untouched
- * when watermarking is off — no point paying a re-encode to change nothing —
- * and on any rendering failure, so a download never fails over decoration.
+ * only when watermarking is off — no point paying a re-encode to change
+ * nothing.
+ *
+ * A failure in both render paths throws. It used to return the original blob,
+ * which meant a download the user asked to watermark could report success with
+ * an unwatermarked file on disk (issue #2, where RAW reached here at all).
+ * Callers must not send files `canWatermark()` rejects; anything else failing
+ * is a genuine render fault and a silent success would be a lie.
  */
 export async function renderWatermarked(blob: Blob, settings: WatermarkSettings): Promise<Blob> {
   if (!settings.enabled) {
@@ -134,12 +144,7 @@ export async function renderWatermarked(blob: Blob, settings: WatermarkSettings)
     }
   }
 
-  try {
-    const out = await renderOnMainThread(blob, settings);
-    lastPath = "main-thread";
-    return out;
-  } catch {
-    lastPath = "passthrough";
-    return blob;
-  }
+  const out = await renderOnMainThread(blob, settings);
+  lastPath = "main-thread";
+  return out;
 }
