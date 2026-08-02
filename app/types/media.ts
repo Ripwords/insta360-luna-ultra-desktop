@@ -17,7 +17,11 @@ export interface MediaItem {
   panoramic: boolean;
   /** Unix epoch ms of capture time (filename timestamp, else index column) */
   takenAt: number;
-  /** File size in bytes, parsed from the camera's index listing */
+  /**
+   * File size in bytes, parsed from the camera's index listing. 0 when the
+   * listing came from GET_FILE_LIST, which reports no size; a download
+   * measures the real count and writes it back here.
+   */
   size: number;
   /** Pixel dimensions are unknown until the file is decoded */
   width?: number;
