@@ -1,5 +1,6 @@
 import type { DownloadEntry, MediaItem } from "~/types/media";
 import { canWatermark, watermarkNote, watermarkScope } from "~/utils/watermark";
+import { cacheRawPreviewFromBlob, isRawPhoto } from "~/utils/rawPreviewCache";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
 import { getCameraTransport } from "~/utils/transport";
@@ -33,10 +34,11 @@ export function useDownloads() {
         const response = await getCameraTransport().fetch(entry.item.srcUrl);
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
         patch(entry.id, { progress: 45 });
-        let blob = await response.blob();
+        const source = await response.blob();
+        let blob = source;
         // Measured before the watermark pass: this is the file's size on the
         // camera, not the size of what we are about to write to disk.
-        recordSize(entry.item, blob.size);
+        recordSize(entry.item, source.size);
         patch(entry.id, { progress: 70 });
         // Renderable photos only: RAW is `type: "photo"` too, but the canvas
         // pipeline cannot decode it, so it saves unmodified (issue #2).
@@ -46,6 +48,7 @@ export function useDownloads() {
         patch(entry.id, { progress: 90 });
         const savedTo = await saveBlob(blob, entry.item.name);
         patch(entry.id, { status: "done", progress: 100, savedTo });
+        await seedRawPreview(entry.item, source);
       } catch (error) {
         patch(entry.id, {
           status: "error",
@@ -72,6 +75,27 @@ export function useDownloads() {
     item.size = size;
     const libraryItem = library.value.find((candidate) => candidate.id === item.id);
     if (libraryItem && libraryItem !== item) libraryItem.size = size;
+  }
+
+  /**
+   * Derive a RAW's preview from the bytes this transfer already pulled.
+   *
+   * A `.dng` is `renderable: false`, so every surface showing one — the
+   * Downloads row, the gallery tile — otherwise has nothing to display but a
+   * placeholder, and deriving it on demand would mean re-fetching tens of MB
+   * over the camera's Wi-Fi for a thumbnail. Seeding the shared media cache
+   * here makes that view free.
+   *
+   * Runs after the entry is marked done, and swallows failures: the file is
+   * already on disk, and a thumbnail is not worth failing a good download over.
+   */
+  async function seedRawPreview(item: MediaItem, source: Blob) {
+    if (!isRawPhoto(item)) return;
+    try {
+      await cacheRawPreviewFromBlob(item, source);
+    } catch {
+      // Cosmetic only — the download itself succeeded.
+    }
   }
 
   /**

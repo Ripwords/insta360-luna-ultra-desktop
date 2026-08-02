@@ -123,3 +123,16 @@ export function cachedMedia<T extends CachedMedia>(
 ): Promise<T | null> {
   return mediaCache.get(key, load);
 }
+
+/**
+ * Whether a derived artifact is already held. Lets a viewer render a cached
+ * preview without offering to fetch the (multi-MB) source behind it.
+ */
+export function hasCachedMedia(key: string): boolean {
+  return mediaCache.has(key);
+}
+
+/** Drop every entry. Intended for tests and teardown. */
+export function clearCachedMedia(): void {
+  mediaCache.clear();
+}

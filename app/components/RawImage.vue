@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { getCameraTransport } from "~/utils/transport";
 import { extractDngPreview } from "~/utils/dng";
-import { parseRawImageMeta, decodeRawPreview } from "~/utils/rawPreview";
+import { decodeRawToDataUrl } from "~/utils/rawCanvas";
 import { formatBytes } from "~/utils/media";
 import { withCameraSlot, CAMERA_PRIORITY } from "~/utils/cameraQueue";
-import { cachedMedia } from "~/utils/mediaCache";
+import { cachedMedia, hasCachedMedia } from "~/utils/mediaCache";
+import { rawPreviewKey } from "~/utils/rawPreviewCache";
 
 /**
  * Shows a RAW (e.g. DNG) file. Prefers an embedded preview JPEG; when the file
@@ -23,6 +24,7 @@ const {
   eager = false,
   prefer = "largest",
   maxBytes,
+  cacheOnly = false,
 } = defineProps<{
   src: string;
   ext: string;
@@ -31,6 +33,12 @@ const {
   prefer?: "largest" | "smallest";
   /** Range-limit the download; the preview must fall within these bytes */
   maxBytes?: number;
+  /**
+   * Show a preview only if one is already cached, never fetch to derive it.
+   * For lists where the source is a multi-MB file and a placeholder is a fairer
+   * trade than pulling it over the camera's Wi-Fi for a thumbnail.
+   */
+  cacheOnly?: boolean;
 }>();
 
 const el = useTemplateRef("el");
@@ -81,31 +89,6 @@ async function downloadBuffer(response: Response): Promise<ArrayBuffer> {
     offset += chunk.length;
   }
   return out.buffer;
-}
-
-/**
- * Render an uncompressed CFA RAW (e.g. Insta360 Luna DNG) to a preview JPEG
- * data URL via canvas. Synchronous encode (toDataURL) is used deliberately: it
- * can't leave us waiting on a canvas.toBlob callback that never fires. Returns
- * null when the file isn't a supported raw or the canvas is unavailable.
- */
-function decodeRawToDataUrl(buffer: ArrayBuffer): string | null {
-  try {
-    const meta = parseRawImageMeta(buffer);
-    if (!meta) return null;
-    const decoded = decodeRawPreview(buffer, meta, 1600);
-    if (!decoded) return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = decoded.width;
-    canvas.height = decoded.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.putImageData(new ImageData(decoded.data, decoded.width, decoded.height), 0, 0);
-    return canvas.toDataURL("image/jpeg", 0.9);
-  } catch {
-    // An allocation or canvas failure must read as decode-failed, not no-preview.
-    return null;
-  }
 }
 
 /**
@@ -175,9 +158,16 @@ async function load() {
   phase.value = "downloading";
   // Full-screen preview outranks grid thumbnails for the shared camera slots.
   const priority = maxBytes ? CAMERA_PRIORITY.THUMBNAIL : CAMERA_PRIORITY.PREVIEW;
-  // Key on everything that changes the derived output: a range-limited grid
-  // thumbnail and a full-file preview of one file are different artifacts.
-  const key = `raw:${src}:${maxBytes ?? "full"}:${prefer}`;
+  const key = rawPreviewKey(src, { maxBytes, prefer });
+
+  // Cache-only: a download may have seeded this preview from bytes it already
+  // held. If it didn't, fall back rather than pulling the source file.
+  if (cacheOnly && !hasCachedMedia(key)) {
+    reason.value = "no-preview";
+    state.value = "nopreview";
+    return;
+  }
+
   try {
     const result = await cachedMedia(key, () => fetchPreview(priority));
 

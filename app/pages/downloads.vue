@@ -66,9 +66,25 @@ const hasFinished = computed(() =>
               img-class="size-full object-cover"
             />
             <CameraImage
-              v-else
+              v-else-if="entry.item.renderable"
               :src="entry.item.srcUrl"
               :alt="entry.item.name"
+              img-class="size-full object-cover"
+            />
+            <!-- RAW with a sibling JPG (RAW+JPEG pair): show the JPG -->
+            <CameraImage
+              v-else-if="entry.item.previewUrl"
+              :src="entry.item.previewUrl"
+              :alt="entry.item.name"
+              img-class="size-full object-cover"
+            />
+            <!-- RAW: the transfer seeds a preview from the bytes it downloaded,
+                 so this reads the cache rather than re-fetching the file. -->
+            <RawImage
+              v-else
+              :src="entry.item.srcUrl"
+              :ext="entry.item.ext"
+              cache-only
               img-class="size-full object-cover"
             />
           </div>

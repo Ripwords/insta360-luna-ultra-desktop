@@ -1,6 +1,6 @@
 import { mockNuxtImport } from "@nuxt/test-utils/runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DownloadEntry } from "~/types/media";
+import type { DownloadEntry, MediaItem } from "~/types/media";
 import { resetCameraTransport, setCameraTransport } from "~/utils/transport";
 import { makeFakeTransport } from "../helpers/fakeTransport";
 import { makeMediaItem } from "../helpers/media";
@@ -23,8 +23,16 @@ const saveBlob = vi.hoisted(() =>
   vi.fn(async (_blob: Blob, fileName: string) => `Downloads/Luna Ultra/${fileName}`),
 );
 
+const cacheRawPreviewFromBlob = vi.hoisted(() =>
+  vi.fn(async (_item: MediaItem, _source: Blob): Promise<string | Blob | null> => null),
+);
+
 vi.mock("~/utils/watermarkClient", () => ({ renderWatermarked }));
 vi.mock("~/utils/saveFile", () => ({ saveBlob, isTauri: () => false }));
+vi.mock("~/utils/rawPreviewCache", async (importOriginal) => {
+  const original = await importOriginal<typeof import("~/utils/rawPreviewCache")>();
+  return { ...original, cacheRawPreviewFromBlob };
+});
 
 mockNuxtImport("useToast", () => () => ({
   add: vi.fn(),
@@ -55,6 +63,7 @@ describe("useDownloads", () => {
     localStorage.clear();
     renderWatermarked.mockClear();
     saveBlob.mockClear();
+    cacheRawPreviewFromBlob.mockClear();
     setCameraTransport(respondWith(CAMERA_BYTES));
   });
 
@@ -169,6 +178,43 @@ describe("useDownloads", () => {
     await settled(downloads.queue);
 
     expect(renderWatermarked).not.toHaveBeenCalled();
+  });
+
+  it("derives a RAW preview from the bytes it already downloaded", async () => {
+    const downloads = await mountComposable(() => useDownloads());
+    const item = makeMediaItem({ id: "dng", name: "IMG_0001.dng", ext: "dng", renderable: false });
+
+    downloads.enqueue([item], { watermark: false });
+    await settled(downloads.queue);
+
+    expect(cacheRawPreviewFromBlob).toHaveBeenCalledTimes(1);
+    const [seededItem, seededBlob] = cacheRawPreviewFromBlob.mock.calls[0]!;
+    expect(seededItem.id).toBe("dng");
+    // The camera's own bytes, not a re-fetch.
+    expect(seededBlob.size).toBe(CAMERA_BYTES);
+  });
+
+  it("does not derive a preview for a photo the browser can render", async () => {
+    const downloads = await mountComposable(() => useDownloads());
+
+    downloads.enqueue([makeMediaItem({ name: "IMG_0001.jpg" })], { watermark: false });
+    await settled(downloads.queue);
+
+    expect(cacheRawPreviewFromBlob).not.toHaveBeenCalled();
+  });
+
+  it("still completes the download when deriving the RAW preview fails", async () => {
+    cacheRawPreviewFromBlob.mockRejectedValueOnce(new Error("decode blew up"));
+    const downloads = await mountComposable(() => useDownloads());
+
+    downloads.enqueue(
+      [makeMediaItem({ id: "dng", name: "IMG_0001.dng", ext: "dng", renderable: false })],
+      { watermark: false },
+    );
+    await settled(downloads.queue);
+
+    expect(saveBlob).toHaveBeenCalledTimes(1);
+    expect(downloads.queue.value[0]?.status).toBe("done");
   });
 
   it("fails the download when watermarking a renderable photo throws", async () => {
