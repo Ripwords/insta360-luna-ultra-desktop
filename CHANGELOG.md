@@ -1,5 +1,125 @@
 # Changelog
 
+## v0.3.0...master
+
+[compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.0...master)
+
+### 🚀 Enhancements
+
+- **docs): add feature map detailing implementation status and WIP features fix(docs:** Update README for clarity on camera control features chore: update .gitignore to include .claude ([08bc1bc](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/08bc1bc))
+- **transport:** Add swappable CameraTransport registry ([9228054](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/9228054))
+- **docs:** Scaffold the docs site as a layer of the desktop app ([179e0fe](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/179e0fe))
+- **docs:** Add docs chrome and confine layer routes to /demo ([0477180](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/0477180))
+- **docs:** Add the documentation pages and content collection ([d28fbfc](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/d28fbfc))
+- **docs:** Add sitemap, canonicals, OG images and structured data ([5e24eb4](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/5e24eb4))
+- **demo:** Extract AppShell and add the demo layout ([3319561](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/3319561))
+- **demo:** Generate media fixtures with ffmpeg ([850c354](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/850c354))
+- **demo:** Add the mock camera transport ([74cb936](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/74cb936))
+- **demo:** Serve a decimated camera scan and scope the demo remount ([0b5f10a](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/0b5f10a))
+- **demo:** Answer the protobuf command channel ([e8676e6](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/e8676e6))
+- **demo:** Drive live view from an Annex-B fixture ([e8e7000](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/e8e7000))
+- **demo:** Embed live demos inline in the documentation ([de5c859](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/de5c859))
+- **docs:** Serve the original hi-fi STL scan instead of a decimated copy ([7d7eefd](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7d7eefd))
+- **demo:** Render /demo/* inside a macOS window on top-level visits ([f2d2bc3](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/f2d2bc3))
+- **docs:** Derive site icons from app-icon.png and balance the header ([f88b693](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/f88b693))
+- **docs:** Add content search, deferred until first open ([5b98fd7](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/5b98fd7))
+- **downloads:** Show RAW previews derived from the downloaded bytes ([d8d358e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/d8d358e))
+- **camera:** Add a live histogram overlay to the viewfinder ([06abc69](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/06abc69))
+
+### 🔥 Performance
+
+- **raw:** Decode Bayer previews with lookup tables ([a2cff28](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/a2cff28))
+- **live-view:** Split NAL units without per-unit allocation ([f85035c](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/f85035c))
+- **3d:** Gate the model render loop on visibility ([b65810c](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/b65810c))
+- **gallery:** Virtualize the media grid ([64e90e6](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/64e90e6))
+- **gallery:** Cache thumbnail priority scores per frame ([0e07384](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/0e07384))
+- **downloads:** Render the watermark in a worker ([cd6dbaa](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/cd6dbaa))
+- **docs:** Skip fixture regeneration when nothing changed ([a3e7464](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/a3e7464))
+
+### 🩹 Fixes
+
+- **deps:** Pin typescript back to ^5.9.0 for vue-tsc compat ([884da9a](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/884da9a))
+- **test:** Reset camera-host with reinit, not delete, before each useCamera test ([74c24af](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/74c24af))
+- **docs:** Pin hoisted linker, fix site.url, restore inherited routes ([7944540](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7944540))
+- **docs:** Synthesize /demo route and redirect layer's hardcoded links ([5361b0e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/5361b0e))
+- **docs:** Make redirect targets base-absolute ([b4d6f9d](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/b4d6f9d))
+- **docs:** Correct base path for repo rename and fix trailing-slash hydration ([4e5c35b](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/4e5c35b))
+- **docs:** Stop demo in-app navigation from doubling the base path ([467cae0](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/467cae0))
+- **docs:** Correct SEO metadata — empty JSON-LD, doubled title, trailing-slash canonicals ([463bb1d](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/463bb1d))
+- **docs:** Replace og.png placeholder with a real 1200x630 image ([0e3df30](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/0e3df30))
+- **docs:** Strip the dead 59 MB STL from the generated docs site ([99458c9](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/99458c9))
+- **docs:** Declare @nuxt/kit as an explicit dependency ([5c36cd8](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/5c36cd8))
+- **docs:** Add favicon link, remove dead config, fix stale comments ([793f15d](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/793f15d))
+- **demo:** Give LRV proxies a real .lrv extension ([50eba5c](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/50eba5c))
+- **assets:** Resolve model and watermark URLs against the app base URL ([e5c44bb](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/e5c44bb))
+- **demo:** Pace the live-view fixture with a service worker ([1d3d1cf](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/1d3d1cf))
+- **demo:** Auto-connect embeds whose preset seeds a connected camera ([2ed66cb](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/2ed66cb))
+- **demo:** Clear app controls from the disclosure banner, add a back-to-docs link ([2df59a5](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/2df59a5))
+- **demo:** Correct macOS window-chrome radius and dark-mode hairline ([d254665](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/d254665))
+- **demo:** Stop DashboardPanel's min-h-svh clipping camera's shutter ([1a2c827](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/1a2c827))
+- **downloads:** Record the transferred byte count so sizes aren't 0 B ([ee99a2c](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/ee99a2c))
+- **downloads:** Stop promising a watermark on RAW files ([8434d5f](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/8434d5f))
+
+### 💅 Refactors
+
+- **camera:** Read the camera through the transport registry ([e215212](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/e215212))
+- **camera:** Route gallery and live view through the transport ([5a51eda](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/5a51eda))
+- **camera:** Route every camera call through the transport ([0e87304](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/0e87304))
+- **transport:** Rename useCameraTransport to getCameraTransport ([5049c42](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/5049c42))
+
+### 📖 Documentation
+
+- Update feature status and descriptions in FEATURES.md ([51d1b27](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/51d1b27))
+- Add design spec for docs site and live component demo ([df60e0e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/df60e0e))
+- Unify README download badges into one graphite row ([869cfe9](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/869cfe9))
+- Link download badges straight to the latest installers ([e632874](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/e632874))
+- Add implementation plan for transport seam and camera layer ([d3bd5e1](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/d3bd5e1))
+- Refresh plan against the perf wave ([4f2a27a](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/4f2a27a))
+- Cancel the layers/camera move, extend the repo root instead ([d97e50e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/d97e50e))
+- Correct the plan goal after the layer move was cancelled ([55bb11f](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/55bb11f))
+- **transport:** Document SSR lifetime and health-reporting contract ([dcec175](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/dcec175))
+- Describe the transport seam and the two test projects ([93a1e32](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/93a1e32))
+- Add implementation plan for the docs site ([a7da714](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/a7da714))
+- Correct the base path and add a contribution-guide task ([fd453b6](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/fd453b6))
+- Update spec URLs for the repo rename ([59e9247](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/59e9247))
+- Add the interactive demo implementation plan ([f82e4b3](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/f82e4b3))
+- Add a contribution guide and GitHub issue/PR templates ([f84247a](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/f84247a))
+- Link the docs site from README ([dcbc60f](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/dcbc60f))
+- Specify macOS window chrome for the demo embeds ([10f853b](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/10f853b))
+- Commit Task 7 addendum to the interactive-demo plan ([0f1f3f2](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/0f1f3f2))
+
+### 📦 Build
+
+- Stamp the README download links at release time ([556aa81](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/556aa81))
+
+### 🏡 Chore
+
+- Code cleanup and convention enforcement ([2b9b8dc](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/2b9b8dc))
+- **lint:** Enforce the transport seam with no-restricted-imports ([09a26c3](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/09a26c3))
+- **demo:** Prune unused mock presets ([827eef2](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/827eef2))
+
+### ✅ Tests
+
+- Add Nuxt test environment for composables ([7596007](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7596007))
+- **nuxt:** Reinitialize cleared state instead of deleting it ([946e81c](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/946e81c))
+
+### 🎨 Styles
+
+- **docs:** Run oxfmt on interactive-demo plan ([4efc589](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/4efc589))
+
+### 🤖 CI
+
+- Bump actions/checkout to v5 ([bc1fe14](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/bc1fe14))
+- Bump actions/github-script to v8 ([4055501](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/4055501))
+- Split unit-test step into node and nuxt projects ([7da6012](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7da6012))
+- Build and deploy the docs site to GitHub Pages ([abc000b](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/abc000b))
+- **docs:** Drop redundant base-url env, add bunfig trigger, bump checkout ([70afd66](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/70afd66))
+- **docs:** Install ffmpeg before the docs build ([aee680e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/aee680e))
+
+### ❤️ Contributors
+
+- JJ <teohjjteoh@gmail.com>
+
 ## v0.2.4...master
 
 [compare changes](https://github.com/Ripwords/luna-ultra-desktop/compare/v0.2.4...master)

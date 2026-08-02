@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Luna Ultra Desktop",
   "mainBinaryName": "Luna Ultra Desktop",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "identifier": "com.ripwords.luna-ultra-desktop",
   "build": {
     "frontendDist": "../.output/public",
