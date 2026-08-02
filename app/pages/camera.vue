@@ -181,7 +181,7 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             class="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 via-black/30 to-transparent pb-8"
           >
             <div
-              class="flex items-start justify-between gap-4 p-4 pr-12 font-mono text-[11px] text-white/70"
+              class="flex items-start justify-between gap-4 p-4 pr-14 font-mono text-[11px] text-white/70"
             >
               <div class="flex items-center gap-3">
                 <!--
@@ -197,20 +197,28 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
                 <span v-if="storage" class="tracking-wider">{{ storage.toFixed(1) }} GB</span>
               </div>
 
-              <div class="flex items-center gap-3 text-right">
-                <span v-if="activeFilter" class="tracking-wider text-white">{{
-                  activeFilter
-                }}</span>
-                <span v-if="colorMode" class="tracking-wider">{{ colorMode }}</span>
-                <span v-if="resolution" class="tracking-wider">{{ resolution }}</span>
-                <span
-                  v-if="battery !== null"
-                  class="flex items-center gap-1 tabular-nums tracking-wider"
-                  :class="batteryClass"
-                >
-                  <UIcon name="i-lucide-battery" class="size-3.5" />
-                  {{ battery }}%
-                </span>
+              <!--
+                The readouts keep their single line; the histogram hangs below
+                them on the same right rail, clear of the zoom dial's column.
+              -->
+              <div class="flex flex-col items-end gap-2 text-right">
+                <div class="flex items-center gap-3">
+                  <span v-if="activeFilter" class="tracking-wider text-white">{{
+                    activeFilter
+                  }}</span>
+                  <span v-if="colorMode" class="tracking-wider">{{ colorMode }}</span>
+                  <span v-if="resolution" class="tracking-wider">{{ resolution }}</span>
+                  <span
+                    v-if="battery !== null"
+                    class="flex items-center gap-1 tabular-nums tracking-wider"
+                    :class="batteryClass"
+                  >
+                    <UIcon name="i-lucide-battery" class="size-3.5" />
+                    {{ battery }}%
+                  </span>
+                </div>
+
+                <CameraHistogram />
               </div>
             </div>
           </div>
