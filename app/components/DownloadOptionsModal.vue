@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import type { MediaItem } from "~/types/media";
+import { watermarkNote, watermarkScope } from "~/utils/watermark";
 
 const props = defineProps<{ items: MediaItem[] }>();
 
 const emit = defineEmits<{ close: [confirmed: boolean] }>();
 
-const photos = computed(() => props.items.filter((item) => item.type === "photo"));
-const videos = computed(() => props.items.filter((item) => item.type === "video"));
-const previewSrc = computed(() => photos.value[0]?.srcUrl);
+const scope = computed(() => watermarkScope(props.items));
+const note = computed(() => watermarkNote(scope.value));
+// Only a renderable photo can stand in for the watermark preview.
+const previewSrc = computed(() => scope.value.watermarkable[0]?.srcUrl);
 
 const summary = computed(() => {
+  const photos = scope.value.watermarkable.length + scope.value.raw.length;
+  const videos = scope.value.videos.length;
   const parts: string[] = [];
-  if (photos.value.length > 0)
-    parts.push(`${photos.value.length} ${photos.value.length === 1 ? "photo" : "photos"}`);
-  if (videos.value.length > 0)
-    parts.push(`${videos.value.length} ${videos.value.length === 1 ? "video" : "videos"}`);
+  if (photos > 0) parts.push(`${photos} ${photos === 1 ? "photo" : "photos"}`);
+  if (videos > 0) parts.push(`${videos} ${videos === 1 ? "video" : "videos"}`);
   return parts.join(" and ");
 });
 </script>
@@ -27,10 +29,12 @@ const summary = computed(() => {
     :ui="{ footer: 'justify-end' }"
   >
     <template #body>
-      <WatermarkSettingsForm v-if="photos.length > 0" :preview-src="previewSrc" />
-      <p v-else class="text-sm text-muted">
-        Videos transfer untouched. Watermarking currently applies to photos only.
-      </p>
+      <WatermarkSettingsForm
+        v-if="scope.watermarkable.length > 0"
+        :preview-src="previewSrc"
+        :note
+      />
+      <p v-else class="text-sm text-muted">{{ note }}</p>
     </template>
 
     <template #footer>

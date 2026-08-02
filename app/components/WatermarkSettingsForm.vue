@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { WATERMARK_POSITIONS, type WatermarkPosition } from "~/utils/watermark";
 
-defineProps<{ previewSrc?: string }>();
+const {
+  note = "The official watermark is rendered into JPEG photos. RAW files and videos transfer untouched.",
+} = defineProps<{ previewSrc?: string; note?: string }>();
 
 const { settings } = useWatermarkSettings();
 
@@ -24,11 +26,7 @@ const anchorClasses: Record<WatermarkPosition, string> = {
 
 <template>
   <div class="space-y-5">
-    <USwitch
-      v-model="settings.enabled"
-      label="Apply Luna Ultra watermark"
-      description="The official watermark is rendered into photos. Videos transfer untouched."
-    />
+    <USwitch v-model="settings.enabled" label="Apply Luna Ultra watermark" :description="note" />
 
     <div v-if="settings.enabled" class="grid grid-cols-[1fr_auto] items-start gap-4">
       <WatermarkCanvas :src="previewSrc" />

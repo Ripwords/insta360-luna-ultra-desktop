@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatBytes } from "~/utils/media";
+import { canWatermark } from "~/utils/watermark";
 
 useHead({ title: "Downloads" });
 
@@ -76,7 +77,7 @@ const hasFinished = computed(() =>
             <div class="flex items-center gap-2">
               <p class="truncate font-mono text-sm text-highlighted">{{ entry.item.name }}</p>
               <UBadge
-                v-if="entry.watermarked && entry.item.type === 'photo'"
+                v-if="entry.watermarked && canWatermark(entry.item)"
                 variant="subtle"
                 size="sm"
                 icon="i-lucide-stamp"

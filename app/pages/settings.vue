@@ -121,7 +121,7 @@ useHead({ title: "Settings" });
           <div class="space-y-1">
             <h2 class="text-sm font-semibold text-highlighted">Watermark</h2>
             <p class="text-sm text-muted">
-              Applied to photos as they download. Videos transfer untouched.
+              Applied to JPEG photos as they download. RAW files and videos transfer untouched.
             </p>
           </div>
 
