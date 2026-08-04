@@ -49,11 +49,11 @@ published API, and its failure mode is silent: it **accepts** a write,
 under the wrong name. Nothing errors. So a feature only ships here once it has
 been set from the app and confirmed on the camera's own screen.
 
-|                         |                                                                                                                                                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 🧪 **Built, gated off** | The full settings panel — stabilisation, format, capture timers, metering, bitrate, RAW (~30 controls), plus live-view diagnostics. Written and rendering, waiting on on-device verification.                            |
-| ○ **Known gaps**        | UltraPhoto capture mode, video watermarking, white-balance read-back, macOS notarization / Windows signing.                                                                                                              |
-| ⏸ **On hold**           | Gimbal pan/tilt, gimbal attitude/gyro, Colour Recovery, Deep Track, tap to focus. Heavily probed, nothing readable found yet — parked pending further experimentation, most likely by capturing the phone app's traffic. |
+|                         |                                                                                                                                                                                                                                                                                              |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🧪 **Built, gated off** | The full settings panel — stabilisation, format, capture timers, metering, bitrate, RAW (~30 controls), plus live-view diagnostics. Written and rendering, waiting on on-device verification.                                                                                                |
+| ○ **Known gaps**        | UltraPhoto capture mode, video watermarking, white-balance read-back, macOS notarization / Windows signing.                                                                                                                                                                                  |
+| ⏸ **On hold**           | Gimbal pan/tilt, gimbal attitude/gyro, Deep Track, tap to focus — each has a **named command** in the two thirds of the protocol this project cannot yet name ([protocol gap](docs/PROTOCOL-GAP.md)); parked on getting the numbers, not on finding a lever. Colour Recovery, still nothing. |
 
 **[→ Full feature map](docs/FEATURES.md)** — the same picture area by area, with
 the measured field numbers, the per-mode availability rules, what was already

@@ -11,22 +11,28 @@ back** a value that a stale enum renders under the wrong name. Nothing errors.
 So "the code sends it" is not evidence a feature works — only the camera's own
 screen is. Everything below is graded on that bar.
 
+That extraction is also **incomplete**, not just stale: it names 164 message
+codes where the current Insta360 app names 459. Two thirds of the control
+protocol has never been described here, and that is where every parked feature
+turns out to live — see [`PROTOCOL-GAP.md`](PROTOCOL-GAP.md).
+
 - **Measured against:** Insta360 Luna Ultra, firmware **v1.0.238** (Colour
   Recovery notes are from **v1.0.283**)
-- **Measurement tooling:** `scripts/probe-colorspace.mjs`
-- **Findings of record:** [`specs/2026-07-25-camera-protocol-calibration.md`](superpowers/specs/2026-07-25-camera-protocol-calibration.md)
+- **Measurement tooling:** `scripts/probe-colorspace.mjs`, `scripts/probe-codes.mjs`
+- **Findings of record:** [`specs/2026-07-25-camera-protocol-calibration.md`](superpowers/specs/2026-07-25-camera-protocol-calibration.md),
+  [`PROTOCOL-GAP.md`](PROTOCOL-GAP.md)
 - **Test suite:** 259 unit tests across 17 files, plus Rust protocol/integration tests
 
 ## Legend
 
-|     | Meaning                                                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| ✅  | **Shipping.** In the packaged release, verified on-device.                                                                                 |
-| 🧪  | **Dev-only.** Built, but behind a flag in `app/utils/features.ts` that is off in release builds.                                           |
-| 🚧  | **Partial.** Works, with a known limitation stated in the row.                                                                             |
-| ⏸   | **On hold.** Probed hard, nothing readable found yet — parked for further experimentation, see [On hold](#on-hold--no-readable-lever-yet). |
-| ⛔  | **Not on this camera.** Described by the extraction, does not exist on this firmware.                                                      |
-| ○   | **Not started.** Understood, not built.                                                                                                    |
+|     | Meaning                                                                                                                                                               |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ✅  | **Shipping.** In the packaged release, verified on-device.                                                                                                            |
+| 🧪  | **Dev-only.** Built, but behind a flag in `app/utils/features.ts` that is off in release builds.                                                                      |
+| 🚧  | **Partial.** Works, with a known limitation stated in the row.                                                                                                        |
+| ⏸   | **On hold.** A named command exists but its number does not, see [On hold](#on-hold--the-lever-has-a-name-not-a-number). One exception, Colour Recovery, has neither. |
+| ⛔  | **Not on this camera.** Described by the extraction, does not exist on this firmware.                                                                                 |
+| ○   | **Not started.** Understood, not built.                                                                                                                               |
 
 ---
 
@@ -179,31 +185,48 @@ time.
 
 ---
 
-## On hold — no readable lever yet
+## On hold — the lever has a name, not a number
 
 Five features were driven successfully; five are parked here. The split is not
 luck — it is the shape of what the control protocol exposes so far.
 
-**Everything reachable is a value the camera stores and reports. Nothing in this
-list is — yet.** Before spending a day on the next feature, ask which column it
-is in. These are not dead: each is waiting on a new angle of experimentation,
-not on a decision to stop.
+**Every one of these is a command, and we were looking in the options
+namespace.** That is the 2026-08-03 finding, and it retires the theory this
+section was built on. See [`PROTOCOL-GAP.md`](PROTOCOL-GAP.md): the current
+Insta360 app names **459** message codes to our schema's **164**, and each
+feature below has a dedicated command sitting in the 297 we could not name.
 
-| Feature                    | Status | What was tried                                                                                                                                                                                                                                                                 |
-| -------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Colour Recovery (v1.0.283) | ⏸      | Photography option types 1–400, device option types 1–400, all 11 named `PHONE_COMMAND_GET_*`, `GET_SUBMODE_OPTIONS` in 16 request shapes, unsolicited notifications. Nothing moves with the toggle. It visibly changes the preview, so it is real — just not observable here. |
-| Gimbal pan/tilt control    | ⏸      | `PTZ_CTRL` is option type 87 and the only pan/tilt name in the schema, but `Options` has **no field 87** — the type has a name and no payload, so it answers empty.                                                                                                            |
-| Gimbal attitude / gyro     | ⏸      | `PHONE_COMMAND_GET_GYRO` is fully defined and answers nothing to any of 20 request shapes. `NotificationCameraPostureUpdate` carries only ROTATE_0/90/180/270/UP/DOWN — "is it upside down", not an angle.                                                                     |
-| Deep Track                 | 🚧 ⏸   | Field 91 is real: toggling it on the camera drives a nested `state` 2 ↔ 5. But writes come back `differs`, and the value read on connect did not match the camera. Status we cannot interpret is not a control, so there isn't one.                                            |
-| Tap to focus               | ⏸      | No stored option corresponds to it.                                                                                                                                                                                                                                            |
+They stay parked because names are not numbers — the app is AppShield-packed, so
+the name → value mapping did not come out with the names. Nothing here is
+sendable until it does. But the reason each one failed is now known, and it was
+never "the protocol does not expose this."
 
-The next route to try for all of these is capturing the phone app's traffic
-(`scripts/decode-capture.mjs`) — those commands demonstrably exist, since the
-phone issues them; they just never touch anything readable from here yet.
+| Feature                    | Status | What was tried                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Colour Recovery (v1.0.283) | ⏸      | Photography option types 1–400, device option types 1–400, all 11 named `PHONE_COMMAND_GET_*`, `GET_SUBMODE_OPTIONS` in 16 request shapes, unsolicited notifications. Nothing moves with the toggle. It visibly changes the preview, so it is real — just not observable here. **No command named for it yet** — the only one of the five still without a candidate. |
+| Gimbal pan/tilt control    | ⏸      | `PTZ_CTRL` is option type 87 and the only pan/tilt name in the schema, but `Options` has **no field 87** — the type has a name and no payload, so it answers empty. **Because it was never an option:** `PHONE_COMMAND_GIMBAL_CONTROL` and `commands/gimbal_control.proto` exist, plus `GET`/`SET_PTZ_OPTION`.                                                       |
+| Gimbal attitude / gyro     | ⏸      | `PHONE_COMMAND_GET_GYRO` is fully defined and answers nothing to any of 20 request shapes. `NotificationCameraPostureUpdate` carries only ROTATE_0/90/180/270/UP/DOWN — "is it upside down", not an angle. **`gimbal_status.proto` and `CAMERA_NOTIFICATION_PTZ_STATE` are the real carriers** — see the 8302 capture below.                                         |
+| Deep Track                 | 🚧 ⏸   | Field 91 is real: toggling it on the camera drives a nested `state` 2 ↔ 5. But writes come back `differs`, and the value read on connect did not match the camera. Status we cannot interpret is not a control, so there isn't one. **Consistent:** field 91 mirrors status, and the control is `PHONE_COMMAND_OPEN_TRACKING_WITH_RECT` and its six siblings.        |
+| Tap to focus               | ⏸      | No stored option corresponds to it. **There isn't one:** `CAMERA_NOTIFICATION_FOCUS_STATE`, `notifications/focus_state.proto`, `af_lens_info.proto`.                                                                                                                                                                                                                 |
 
-**Deliberately not done:** command codes above 152 were never scanned. This
-firmware certainly has them, but an unnamed code could be a setter, a format or
-a reset, and a read-only probe has no business firing one blind.
+**Zoom is in the same shape** and is shipping anyway: it works through the
+`zoom_scale` option, while `PHONE_COMMAND_GET_ZOOM` / `SET_ZOOM` and a
+`CAMERA_NOTIFICATION_ZOOM` push exist and would remove the read-back guesswork.
+
+**The gimbal does talk on this channel** — measured 2026-08-03 with
+`node scripts/probe-codes.mjs listen`, which prints unsolicited frames while the
+camera is moved. Code **8302** fires an 18-byte, 9-varint message whose field 2
+and field 3 toggle 1 → 0 as the gimbal reaches its pan limits, in two clean
+per-direction clusters. Two other unnamed notifications appeared alongside it
+(8293 announcing a `RECORD_RESOLUTION` change, and 8298, 8317). Our schema's
+notification block stops at 8250, which is why none of this was ever seen.
+
+**Superseded:** "command codes above 152 were never scanned" was the standing
+note here, on the grounds that an unnamed code could be a setter or a reset. The
+scan is also pointless — `probe-codes.mjs calibrate` measured the camera
+answering an absent code, a bad payload and a valid-but-empty request with the
+same empty reply, so there is no oracle to scan with. Names have to come from
+outside the wire, and they now have.
 
 ---
 
@@ -233,7 +256,11 @@ It is one read-only pass that prints a paste-ready override block.
 1. **Verify the full settings panel section by section** and open `allSettings`.
    Stabilisation and Format are the highest-value rows.
 2. **Measure the UltraPhoto sub-mode value**, the last unmeasured capture mode.
-3. **Capture the phone app's traffic** — the only route left to gimbal control,
-   tap-to-focus and Colour Recovery.
+3. **Get the message-code numbers** — the last thing standing between here and
+   gimbal control, Deep Track and tap to focus, all three of which now have
+   named commands ([`PROTOCOL-GAP.md`](PROTOCOL-GAP.md)). Best target is the
+   camera's own firmware: no packer, and authoritative for this camera rather
+   than for the app's whole lineup. Failing that, a runtime dex dump from a real
+   Android device, or the iOS build.
 4. **Apple Developer ID signing + notarization**, which removes the `xattr` step
    from installation entirely.
