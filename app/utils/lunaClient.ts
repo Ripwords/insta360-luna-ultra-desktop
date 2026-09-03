@@ -209,6 +209,16 @@ export const lunaClient = {
   /** Bypasses health reporting. */
   probe: probeCamera,
 
+  /** See CameraTransport.beginTransfer. */
+  async beginTransfer(): Promise<void> {
+    await tauriInvoke("luna_transfer_started");
+  },
+
+  /** See CameraTransport.endTransfer. */
+  async endTransfer(): Promise<void> {
+    await tauriInvoke("luna_transfer_finished");
+  },
+
   /**
    * Subscribe to the Rust side's disconnect event. Returns an unlisten fn.
    * In a plain browser there is no event source, so this is a no-op — which is

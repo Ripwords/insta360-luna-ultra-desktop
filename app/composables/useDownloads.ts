@@ -30,8 +30,15 @@ export function useDownloads() {
         return;
       }
       patch(entry.id, { status: "downloading", progress: 4 });
+      const transport = getCameraTransport();
+      // Told to the keepalive loop so it tolerates a slower control-channel
+      // reply for as long as this transfer runs, rather than mistaking a
+      // camera that's busy serving a large file for one that's gone (issue:
+      // 8K video downloads getting silently killed mid-transfer). Bracketed
+      // with try/finally so a failed or aborted download still clears it.
+      await transport.beginTransfer?.();
       try {
-        const response = await getCameraTransport().fetch(entry.item.srcUrl);
+        const response = await transport.fetch(entry.item.srcUrl);
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
         patch(entry.id, { progress: 45 });
         const source = await response.blob();
@@ -54,6 +61,8 @@ export function useDownloads() {
           status: "error",
           error: error instanceof Error ? error.message : "Transfer failed",
         });
+      } finally {
+        await transport.endTransfer?.();
       }
     }
   }
