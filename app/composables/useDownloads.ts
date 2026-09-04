@@ -3,6 +3,7 @@ import { canWatermark, watermarkNote, watermarkScope } from "~/utils/watermark";
 import { cacheRawPreviewFromBlob, isRawPhoto } from "~/utils/rawPreviewCache";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
+import { streamCameraFileToDisk } from "~/utils/streamDownload";
 import { getCameraTransport } from "~/utils/transport";
 
 export function useDownloads() {
@@ -41,21 +42,45 @@ export function useDownloads() {
         const response = await transport.fetch(entry.item.srcUrl);
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
         patch(entry.id, { progress: 45 });
-        const source = await response.blob();
-        let blob = source;
-        // Measured before the watermark pass: this is the file's size on the
-        // camera, not the size of what we are about to write to disk.
-        recordSize(entry.item, source.size);
-        patch(entry.id, { progress: 70 });
-        // Renderable photos only: RAW is `type: "photo"` too, but the canvas
-        // pipeline cannot decode it, so it saves unmodified (issue #2).
-        if (entry.watermarked && canWatermark(entry.item)) {
-          blob = await renderWatermarked(blob, settings.value);
+
+        if (entry.item.type === "video") {
+          // Stream straight to disk rather than buffering the whole file in
+          // the webview's memory. A full-res 8K video can run several GB;
+          // `response.blob()` accumulates that into one in-memory buffer
+          // before returning it, which has been observed to crash the
+          // webview process outright (blank window, nothing on disk, no
+          // error — because nothing ever gets the chance to throw one).
+          // Videos are never watermarked (see docs/FEATURES.md) and have no
+          // RAW-preview step, so nothing downstream needs the bytes in
+          // memory here. See app/utils/streamDownload.ts for the mechanism.
+          const { savedTo, size } = await streamCameraFileToDisk(
+            response,
+            entry.item.name,
+            (written, total) => {
+              const knownTotal = total ?? Math.max(entry.item.size, written);
+              const fraction = knownTotal > 0 ? written / knownTotal : 0;
+              patch(entry.id, { progress: Math.min(95, 45 + Math.round(fraction * 50)) });
+            },
+          );
+          recordSize(entry.item, size);
+          patch(entry.id, { status: "done", progress: 100, savedTo });
+        } else {
+          const source = await response.blob();
+          let blob = source;
+          // Measured before the watermark pass: this is the file's size on
+          // the camera, not the size of what we are about to write to disk.
+          recordSize(entry.item, source.size);
+          patch(entry.id, { progress: 70 });
+          // Renderable photos only: RAW is `type: "photo"` too, but the canvas
+          // pipeline cannot decode it, so it saves unmodified (issue #2).
+          if (entry.watermarked && canWatermark(entry.item)) {
+            blob = await renderWatermarked(blob, settings.value);
+          }
+          patch(entry.id, { progress: 90 });
+          const savedTo = await saveBlob(blob, entry.item.name);
+          patch(entry.id, { status: "done", progress: 100, savedTo });
+          await seedRawPreview(entry.item, source);
         }
-        patch(entry.id, { progress: 90 });
-        const savedTo = await saveBlob(blob, entry.item.name);
-        patch(entry.id, { status: "done", progress: 100, savedTo });
-        await seedRawPreview(entry.item, source);
       } catch (error) {
         patch(entry.id, {
           status: "error",
