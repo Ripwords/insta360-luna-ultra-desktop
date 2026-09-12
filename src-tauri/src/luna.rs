@@ -61,7 +61,27 @@ const KEEPALIVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
 /// timeout here — rather than skipping the keepalive tick altogether — keeps
 /// sending the STREAM hello that keeps the HTTP index authorized, while
 /// tolerating a slow reply instead of misreading it as the camera vanishing.
-const KEEPALIVE_COMMAND_TIMEOUT_BUSY: Duration = Duration::from_secs(8);
+///
+/// 8s (the original value) was tuned against moderate-size clips and turned
+/// out not to be generous enough for a genuinely huge 8K file: on those, the
+/// camera's single CPU stays saturated serving the transfer for long enough
+/// that even this widened per-command window can be missed for two whole
+/// ticks in a row, tripping `luna://disconnected` — and killing the transfer
+/// — despite the camera and connection being completely fine. 25s gives a lot
+/// more slack for that case; see the failure-count widening below it for the
+/// other half of the fix.
+const KEEPALIVE_COMMAND_TIMEOUT_BUSY: Duration = Duration::from_secs(25);
+/// Consecutive keepalive-tick failures tolerated before declaring the camera
+/// gone while a transfer is active. Kept much higher than the idle threshold
+/// (2, below) for the same reason `KEEPALIVE_COMMAND_TIMEOUT_BUSY` is widened:
+/// a large transfer can starve the control channel for a while without the
+/// camera actually being gone, and giving up mid-transfer both aborts a
+/// download that may otherwise have finished fine and leaves a truncated file
+/// on disk. Worst case with both constants this is ~5 * 2 * 25s ≈ 250s of a
+/// totally unresponsive camera tolerated before disconnecting — high, but a
+/// false "still there" costs nothing beyond a few more keepalive ticks, while
+/// a false "gone" costs the whole in-flight transfer.
+const KEEPALIVE_FAILURE_THRESHOLD_BUSY: u8 = 5;
 
 /// Insta360's packet checksum, appended little-endian to every UCD2 FILE
 /// frame. A nonstandard CRC-32 variant (poly 0x04C11DB7): each input byte is
@@ -547,12 +567,20 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         loop {
             ticker.tick().await;
             let Some(session) = ka_session.upgrade() else { break };
+            let transfer_active = session.is_transfer_active();
             let hello = build_stream_hello(session.next_seq());
-            let cmd_timeout = if session.is_transfer_active() {
+            let cmd_timeout = if transfer_active {
                 KEEPALIVE_COMMAND_TIMEOUT_BUSY
             } else {
                 KEEPALIVE_COMMAND_TIMEOUT
             };
+            // Read once per tick, before the tick's own await points: whether a
+            // transfer was active when this tick *started* is what its timeout
+            // and failure budget should be judged against, even if the download
+            // finishes partway through (transfer_active flipping false mid-tick
+            // shouldn't suddenly make an already-in-flight slow reply count
+            // against the stricter idle threshold).
+            let failure_threshold = if transfer_active { KEEPALIVE_FAILURE_THRESHOLD_BUSY } else { 2 };
             let tick = async {
                 session.write(&hello).await?;
                 session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
@@ -563,7 +591,7 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
                 Ok(()) => failures = 0,
                 Err(_) => {
                     failures += 1;
-                    if failures >= 2 {
+                    if failures >= failure_threshold {
                         drop(session);
                         ka_state.lock().await.take();
                         let _ = ka_app.emit("luna://disconnected", ());
