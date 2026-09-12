@@ -57,9 +57,27 @@ export function useDownloads() {
             response,
             entry.item.name,
             (written, total) => {
-              const knownTotal = total ?? Math.max(entry.item.size, written);
-              const fraction = knownTotal > 0 ? written / knownTotal : 0;
-              patch(entry.id, { progress: Math.min(95, 45 + Math.round(fraction * 50)) });
+              // `entry.item.size` is only a real prior measurement, never a
+              // stand-in for "no total": on GET_FILE_LIST firmware it starts
+              // at 0 for every file until a download has measured it once
+              // (see lunaIndex.ts). Falling back to `written` itself here
+              // (as this used to) makes fraction = written / written = 1 on
+              // the very first chunk — a bar that hits ~95% instantly and
+              // never moves again, regardless of real progress.
+              const knownTotal = total ?? (entry.item.size > 0 ? entry.item.size : null);
+              if (knownTotal && knownTotal > 0) {
+                const fraction = Math.min(1, written / knownTotal);
+                patch(entry.id, {
+                  progress: Math.min(95, 45 + Math.round(fraction * 50)),
+                  bytesWritten: written,
+                });
+              } else {
+                // No content-length and no prior measurement: there is no
+                // number to show a meaningful percentage against, so render
+                // an indeterminate bar (UProgress treats null as such) and
+                // let the UI fall back to showing raw bytes transferred.
+                patch(entry.id, { progress: null, bytesWritten: written });
+              }
             },
           );
           recordSize(entry.item, size);
@@ -167,7 +185,7 @@ export function useDownloads() {
   }
 
   function retry(id: string) {
-    patch(id, { status: "queued", progress: 0, error: undefined });
+    patch(id, { status: "queued", progress: 0, bytesWritten: undefined, error: undefined });
     if (!running.value) {
       running.value = true;
       void processNext();
