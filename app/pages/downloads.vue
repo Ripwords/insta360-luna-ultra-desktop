@@ -128,7 +128,12 @@ const hasFinished = computed(() =>
             <p v-else-if="entry.status === 'error'" class="truncate text-xs text-error">
               {{ entry.error }}
             </p>
-            <UProgress v-else :model-value="entry.progress" size="sm" class="max-w-64" />
+            <template v-else>
+              <UProgress :model-value="entry.progress" size="sm" class="max-w-64" />
+              <p v-if="entry.bytesWritten" class="truncate text-xs text-muted tabular-nums">
+                {{ formatBytes(entry.bytesWritten) }} transferred
+              </p>
+            </template>
           </div>
 
           <div class="shrink-0">
