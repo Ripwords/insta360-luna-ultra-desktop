@@ -19,7 +19,16 @@ let consecutiveFailures = 0;
 let onDeadCallback: (() => void) | null = null;
 let probeCamera: (() => Promise<boolean>) | null = null;
 let probeInFlight = false;
+let transferDepth = 0;
 
+export function beginHealthTransfer(): void {
+  transferDepth += 1;
+  consecutiveFailures = 0;
+}
+
+export function endHealthTransfer(): void {
+  transferDepth = Math.max(0, transferDepth - 1);
+}
 /**
  * Start counting. Replaces any previous callback and resets the count.
  *
@@ -49,7 +58,7 @@ export function reportCameraSuccess(): void {
 export function reportCameraFailure(): void {
   // While a probe is open the verdict is already being decided; further
   // failures must not open a second one.
-  if (!onDeadCallback || probeInFlight) return;
+  if (!onDeadCallback || probeInFlight || transferDepth > 0) return;
   consecutiveFailures += 1;
   if (consecutiveFailures < FAILURE_THRESHOLD) return;
   void runProbe();

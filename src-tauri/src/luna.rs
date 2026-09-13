@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -49,6 +49,10 @@ const CODE_GET_CURRENT_CAPTURE_STATUS: u16 = 15;
 const CONTROL_PORT: u16 = 6666;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(1500);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(3);
+/// After a transfer ends, the camera can stay briefly sluggish (closing its
+/// HTTP connection, flushing to storage) before it answers normally again —
+/// keep tolerating slow keepalive replies for this long past the end too.
+const TRANSFER_GRACE_PERIOD: Duration = Duration::from_secs(90);
 /// Per-command timeout for the keepalive tick when nothing else is competing
 /// for the camera's attention.
 const KEEPALIVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
@@ -62,26 +66,7 @@ const KEEPALIVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
 /// sending the STREAM hello that keeps the HTTP index authorized, while
 /// tolerating a slow reply instead of misreading it as the camera vanishing.
 ///
-/// 8s (the original value) was tuned against moderate-size clips and turned
-/// out not to be generous enough for a genuinely huge 8K file: on those, the
-/// camera's single CPU stays saturated serving the transfer for long enough
-/// that even this widened per-command window can be missed for two whole
-/// ticks in a row, tripping `luna://disconnected` — and killing the transfer
-/// — despite the camera and connection being completely fine. 25s gives a lot
-/// more slack for that case; see the failure-count widening below it for the
-/// other half of the fix.
 const KEEPALIVE_COMMAND_TIMEOUT_BUSY: Duration = Duration::from_secs(25);
-/// Consecutive keepalive-tick failures tolerated before declaring the camera
-/// gone while a transfer is active. Kept much higher than the idle threshold
-/// (2, below) for the same reason `KEEPALIVE_COMMAND_TIMEOUT_BUSY` is widened:
-/// a large transfer can starve the control channel for a while without the
-/// camera actually being gone, and giving up mid-transfer both aborts a
-/// download that may otherwise have finished fine and leaves a truncated file
-/// on disk. Worst case with both constants this is ~5 * 2 * 25s ≈ 250s of a
-/// totally unresponsive camera tolerated before disconnecting — high, but a
-/// false "still there" costs nothing beyond a few more keepalive ticks, while
-/// a false "gone" costs the whole in-flight transfer.
-const KEEPALIVE_FAILURE_THRESHOLD_BUSY: u8 = 5;
 
 /// Insta360's packet checksum, appended little-endian to every UCD2 FILE
 /// frame. A nonstandard CRC-32 variant (poly 0x04C11DB7): each input byte is
@@ -352,6 +337,7 @@ pub(crate) struct Session {
     /// than a bool so an overlapping preview fetch can't prematurely clear a
     /// download's grace period (or vice versa).
     transfer_active: AtomicU32,
+    transfer_grace_until: StdMutex<Option<Instant>>,
 }
 
 impl Session {
@@ -374,13 +360,20 @@ impl Session {
     fn end_transfer(&self) {
         // Underflow would only happen if end fired without a matching begin;
         // saturating keeps a stray call from wrapping this negative forever.
-        let _ = self
+        let previous = self
             .transfer_active
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| Some(n.saturating_sub(1)));
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| Some(n.saturating_sub(1)))
+            .unwrap_or(0);
+        if previous <= 1 {
+            *self.transfer_grace_until.lock().unwrap() = Some(Instant::now() + TRANSFER_GRACE_PERIOD);
+        }
     }
 
     fn is_transfer_active(&self) -> bool {
-        self.transfer_active.load(Ordering::Relaxed) > 0
+        if self.transfer_active.load(Ordering::Relaxed) > 0 {
+            return true;
+        }
+        matches!(*self.transfer_grace_until.lock().unwrap(), Some(until) if Instant::now() < until)
     }
 
     async fn write(&self, packet: &[u8]) -> Result<(), String> {
@@ -489,6 +482,7 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         info: StdMutex::new(LunaDeviceInfo::default()),
         stream_tx: stream_tx.clone(),
         transfer_active: AtomicU32::new(0),
+        transfer_grace_until: StdMutex::new(None),
     });
 
     let reader_pending = pending;
@@ -580,7 +574,6 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
             // finishes partway through (transfer_active flipping false mid-tick
             // shouldn't suddenly make an already-in-flight slow reply count
             // against the stricter idle threshold).
-            let failure_threshold = if transfer_active { KEEPALIVE_FAILURE_THRESHOLD_BUSY } else { 2 };
             let tick = async {
                 session.write(&hello).await?;
                 session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
@@ -589,9 +582,10 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
             };
             match tick.await {
                 Ok(()) => failures = 0,
+                Err(_) if transfer_active => failures = 0,
                 Err(_) => {
                     failures += 1;
-                    if failures >= failure_threshold {
+                    if failures >= 2 {
                         drop(session);
                         ka_state.lock().await.take();
                         let _ = ka_app.emit("luna://disconnected", ());

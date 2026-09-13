@@ -5,7 +5,7 @@ import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
 import { streamCameraFileToDisk } from "~/utils/streamDownload";
 import { getCameraTransport } from "~/utils/transport";
-
+import { beginHealthTransfer, endHealthTransfer } from "~/utils/cameraHealth";
 export function useDownloads() {
   const queue = useState<DownloadEntry[]>("download-queue", () => []);
   const { library } = useCamera();
@@ -38,6 +38,7 @@ export function useDownloads() {
       // 8K video downloads getting silently killed mid-transfer). Bracketed
       // with try/finally so a failed or aborted download still clears it.
       await transport.beginTransfer?.();
+      beginHealthTransfer();
       try {
         const response = await transport.fetch(entry.item.srcUrl);
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
@@ -105,6 +106,7 @@ export function useDownloads() {
           error: error instanceof Error ? error.message : "Transfer failed",
         });
       } finally {
+        endHealthTransfer();
         await transport.endTransfer?.();
       }
     }
