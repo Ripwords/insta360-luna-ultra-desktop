@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.3.1...master
+
+[compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.1...master)
+
+### 🚀 Enhancements
+
+- **scripts:** Add probe-codes.mjs for message-code discovery ([cb663a7](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/cb663a7))
+- **camera:** Raise the zoom dial's cap to 15x ([7531a74](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7531a74))
+
+### 📖 Documentation
+
+- Map the two thirds of the control protocol we cannot name ([426d643](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/426d643))
+
+### ❤️ Contributors
+
+- JJ <teohjjteoh@gmail.com>
+
 ## v0.3.0...master
 
 [compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.0...master)
