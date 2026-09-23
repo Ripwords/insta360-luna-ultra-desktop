@@ -8,6 +8,8 @@ import {
   shutterSeconds,
   shutterSteps,
   visibleEnumNames,
+  ZOOM_MARKS,
+  ZOOM_MAX,
   zoomForFraction,
   zoomFraction,
   resolutionLabel,
@@ -152,7 +154,7 @@ describe("zoom", () => {
   it("labels each stop the way a lens is marked", () => {
     expect(zoomLabel(1)).toBe("1x");
     expect(zoomLabel(1.5)).toBe("1.5x");
-    expect(zoomLabel(12)).toBe("12x");
+    expect(zoomLabel(15)).toBe("15x");
   });
 
   it("shows one decimal while dragging, and drops it when whole", () => {
@@ -160,29 +162,33 @@ describe("zoom", () => {
     expect(zoomLabel(2.04)).toBe("2x");
   });
 
-  it("anchors the ends of the dial at 1x and 12x", () => {
+  it("anchors the ends of the dial at 1x and 15x", () => {
     expect(zoomForFraction(0)).toBe(1);
-    expect(zoomForFraction(1)).toBe(12);
+    expect(zoomForFraction(1)).toBe(15);
+  });
+
+  it("ends the dial on the last marked stop", () => {
+    expect(ZOOM_MARKS.at(-1)).toBe(ZOOM_MAX);
   });
 
   it("clamps a drag that runs past either end", () => {
     expect(zoomForFraction(-0.4)).toBe(1);
-    expect(zoomForFraction(1.7)).toBe(12);
+    expect(zoomForFraction(1.7)).toBe(15);
   });
 
   /**
    * Logarithmic, not linear: a lens barrel gives the wide end more travel
-   * because a step from 1x to 2x reframes far more than 11x to 12x. Linear
+   * because a step from 1x to 2x reframes far more than 14x to 15x. Linear
    * would make the useful range a sliver at the bottom of the dial.
    */
   it("gives the wide end more of the dial than the long end", () => {
     const wide = zoomFraction(2) - zoomFraction(1);
-    const long = zoomFraction(12) - zoomFraction(11);
+    const long = zoomFraction(15) - zoomFraction(14);
     expect(wide).toBeGreaterThan(long * 5);
   });
 
   it("puts the geometric middle at the dial's midpoint", () => {
-    expect(zoomForFraction(0.5)).toBeCloseTo(Math.sqrt(12), 1);
+    expect(zoomForFraction(0.5)).toBeCloseTo(Math.sqrt(15), 1);
   });
 
   /**
@@ -193,7 +199,7 @@ describe("zoom", () => {
    * actually display survives the trip unchanged.
    */
   it("round-trips a displayable zoom through its position and back", () => {
-    for (const scale of [1, 1.4, 2, 3.5, 6, 9.1, 12]) {
+    for (const scale of [1, 1.4, 2, 3.5, 6, 9.1, 12, 15]) {
       expect(zoomForFraction(zoomFraction(scale))).toBeCloseTo(scale, 1);
     }
   });

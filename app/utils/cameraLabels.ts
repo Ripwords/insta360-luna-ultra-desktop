@@ -137,18 +137,18 @@ export const isoSteps = (): WheelStep[] =>
   ISO_STEPS.map((value) => ({ value: String(value), label: isoLabel(value) }));
 
 /**
- * The zoom dial, 1x to 12x.
+ * The zoom dial, 1x to 15x — firmware 1.1.8 raised the camera's cap from 12x.
  *
  * `zoom_scale` is a double and the camera takes anything in range, so this is a
  * continuous control rather than a set of stops — the dial is dragged.
  *
  * Position maps to zoom logarithmically, the way a lens barrel is marked: going
- * 1x to 2x reframes the shot far more than 11x to 12x does, so the wide end
+ * 1x to 2x reframes the shot far more than 14x to 15x does, so the wide end
  * earns more travel. Linear would squeeze everything useful into a sliver at
  * the bottom of the dial.
  */
 export const ZOOM_MIN = 1;
-export const ZOOM_MAX = 12;
+export const ZOOM_MAX = 15;
 
 const ZOOM_RANGE = Math.log(ZOOM_MAX / ZOOM_MIN);
 
@@ -172,7 +172,7 @@ export function zoomForFraction(fraction: number): number {
 export const zoomLabel = (scale: number): string => `${Math.round(scale * 10) / 10}x`;
 
 /** Marked stops on the dial. Everything between them is a plain tick. */
-export const ZOOM_MARKS = [1, 2, 3, 5, 8, 12];
+export const ZOOM_MARKS = [1, 2, 3, 5, 8, 15];
 
 /**
  * Resolutions, split into the three things you actually choose between.

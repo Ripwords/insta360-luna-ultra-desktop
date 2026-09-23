@@ -92,7 +92,7 @@ back, and shows a per-field verdict: ✔ applied · ⇄ differs · ? assumed
 | WB                 | `white_balance` + `white_balance_value`  | 🚧     | Write works. Read-back is unreliable — the camera reports 10000K regardless — so the wheel tracks the last choice made.                                                                     |
 | Sharpness          | `sharpness`                              | ✅     | Note that a colour-mode change **rewrites** this, so colour writes force a full re-read.                                                                                                    |
 | Aspect (Pano only) | `pano_aspect` (field 98)                 | ✅     | 360=1, 2:1=4. Separated from three co-travelling fields with a negative control.                                                                                                            |
-| Zoom               | `zoom_scale`                             | ✅     | 1×–12×, mouse wheel over the picture or a drag dial. Blind throttled writes during the gesture, one verified write on release.                                                              |
+| Zoom               | `zoom_scale`                             | ✅     | 1×–15× (firmware 1.1.8+; earlier firmware caps at 12×), mouse wheel over the picture or a drag dial. Blind throttled writes during the gesture, one verified write on release.              |
 
 **Availability gating.** `$supported` cannot drive this UI — the camera lists an
 option type as supported anywhere it will merely _parse_ it, including modes
