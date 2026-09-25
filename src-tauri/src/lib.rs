@@ -15,6 +15,8 @@ pub fn run() {
       luna::luna_status,
       luna::luna_delete_files,
       luna::luna_command,
+      luna::luna_transfer_started,
+      luna::luna_transfer_finished,
       liveview::luna_liveview_start,
       liveview::luna_liveview_stop,
       liveview::luna_liveview_stats,

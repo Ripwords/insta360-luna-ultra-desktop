@@ -59,8 +59,28 @@ const hasFinished = computed(() =>
           class="flex items-center gap-4 rounded-xl border border-default bg-elevated/40 p-3"
         >
           <div class="size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+            <!--
+              A row that's actively transferring gets no live thumbnail: VideoThumb
+              is a real <video src="..."> hitting the camera's HTTP server directly
+              (bypassing streamDownload.ts entirely), with a full-file fallback for
+              moov-at-end clips — fetching metadata from one of those can force the
+              browser's media engine to buffer a large chunk of the very file this
+              row is already streaming to disk, fighting it for the camera's (by its
+              own admission, limited) HTTP connections and risking a webview crash
+              on an 8K file. A static icon costs nothing and there's nothing to
+              preview yet that the progress bar isn't already telling the user.
+            -->
+            <div
+              v-if="
+                entry.item.type === 'video' &&
+                (entry.status === 'queued' || entry.status === 'downloading')
+              "
+              class="flex size-full items-center justify-center"
+            >
+              <UIcon name="i-lucide-film" class="size-5 text-dimmed" />
+            </div>
             <VideoThumb
-              v-if="entry.item.type === 'video'"
+              v-else-if="entry.item.type === 'video'"
               :src="entry.item.srcUrl"
               :lrv="entry.item.lrvUrl"
               img-class="size-full object-cover"
@@ -108,7 +128,12 @@ const hasFinished = computed(() =>
             <p v-else-if="entry.status === 'error'" class="truncate text-xs text-error">
               {{ entry.error }}
             </p>
-            <UProgress v-else :model-value="entry.progress" size="sm" class="max-w-64" />
+            <template v-else>
+              <UProgress :model-value="entry.progress" size="sm" class="max-w-64" />
+              <p v-if="entry.bytesWritten" class="truncate text-xs text-muted tabular-nums">
+                {{ formatBytes(entry.bytesWritten) }} transferred
+              </p>
+            </template>
           </div>
 
           <div class="shrink-0">
@@ -126,8 +151,15 @@ const hasFinished = computed(() =>
               icon="i-lucide-rotate-cw"
               @click="retry(entry.id)"
             />
-            <span v-else class="font-mono text-xs text-muted tabular-nums"
+            <span
+              v-else-if="entry.progress !== null"
+              class="font-mono text-xs text-muted tabular-nums"
               >{{ entry.progress }}%</span
+            >
+            <span
+              v-else-if="entry.bytesWritten"
+              class="font-mono text-xs text-muted tabular-nums"
+              >{{ formatBytes(entry.bytesWritten) }}</span
             >
           </div>
         </div>

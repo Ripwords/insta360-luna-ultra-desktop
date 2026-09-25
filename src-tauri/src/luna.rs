@@ -6,9 +6,9 @@
 //!   (consumed from the frontend via the http plugin).
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -49,6 +49,24 @@ const CODE_GET_CURRENT_CAPTURE_STATUS: u16 = 15;
 const CONTROL_PORT: u16 = 6666;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(1500);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(3);
+/// After a transfer ends, the camera can stay briefly sluggish (closing its
+/// HTTP connection, flushing to storage) before it answers normally again —
+/// keep tolerating slow keepalive replies for this long past the end too.
+const TRANSFER_GRACE_PERIOD: Duration = Duration::from_secs(90);
+/// Per-command timeout for the keepalive tick when nothing else is competing
+/// for the camera's attention.
+const KEEPALIVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
+/// Per-command timeout used instead while a large HTTP transfer (e.g. an 8K
+/// video download) is known to be in flight. The camera's HTTP server is
+/// single-connection and low-capacity (see app/utils/cameraQueue.ts); while it
+/// is busy streaming a big file it can be too slow to also answer the control
+/// channel's lightweight status queries within the normal 2s window, even
+/// though the camera and connection are both perfectly healthy. Widening the
+/// timeout here — rather than skipping the keepalive tick altogether — keeps
+/// sending the STREAM hello that keeps the HTTP index authorized, while
+/// tolerating a slow reply instead of misreading it as the camera vanishing.
+///
+const KEEPALIVE_COMMAND_TIMEOUT_BUSY: Duration = Duration::from_secs(25);
 
 /// Insta360's packet checksum, appended little-endian to every UCD2 FILE
 /// frame. A nonstandard CRC-32 variant (poly 0x04C11DB7): each input byte is
@@ -314,6 +332,12 @@ pub(crate) struct Session {
     keepalive: StdMutex<Option<JoinHandle<()>>>,
     info: StdMutex<LunaDeviceInfo>,
     stream_tx: broadcast::Sender<Vec<u8>>,
+    /// Count of in-flight large HTTP transfers the frontend has told us about
+    /// via `luna_transfer_started`/`luna_transfer_finished`. A counter rather
+    /// than a bool so an overlapping preview fetch can't prematurely clear a
+    /// download's grace period (or vice versa).
+    transfer_active: AtomicU32,
+    transfer_grace_until: StdMutex<Option<Instant>>,
 }
 
 impl Session {
@@ -327,6 +351,29 @@ impl Session {
 
     fn device_info(&self) -> LunaDeviceInfo {
         self.info.lock().unwrap().clone()
+    }
+
+    fn begin_transfer(&self) {
+        self.transfer_active.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn end_transfer(&self) {
+        // Underflow would only happen if end fired without a matching begin;
+        // saturating keeps a stray call from wrapping this negative forever.
+        let previous = self
+            .transfer_active
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| Some(n.saturating_sub(1)))
+            .unwrap_or(0);
+        if previous <= 1 {
+            *self.transfer_grace_until.lock().unwrap() = Some(Instant::now() + TRANSFER_GRACE_PERIOD);
+        }
+    }
+
+    fn is_transfer_active(&self) -> bool {
+        if self.transfer_active.load(Ordering::Relaxed) > 0 {
+            return true;
+        }
+        matches!(*self.transfer_grace_until.lock().unwrap(), Some(until) if Instant::now() < until)
     }
 
     async fn write(&self, packet: &[u8]) -> Result<(), String> {
@@ -434,6 +481,8 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         keepalive: StdMutex::new(None),
         info: StdMutex::new(LunaDeviceInfo::default()),
         stream_tx: stream_tx.clone(),
+        transfer_active: AtomicU32::new(0),
+        transfer_grace_until: StdMutex::new(None),
     });
 
     let reader_pending = pending;
@@ -495,6 +544,12 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
 
     // Keepalive: hello + light status/options queries every 3s. Two straight
     // failures means the camera is gone: drop the session and tell the UI.
+    //
+    // While a large HTTP transfer is in flight (see `transfer_active`), the
+    // camera's single-connection HTTP server can be too busy to answer these
+    // promptly even though it and the connection are fine — widen the
+    // per-command timeout for the duration rather than misreading a slow
+    // reply as a dead camera (see KEEPALIVE_COMMAND_TIMEOUT_BUSY).
     let ka_state = Arc::clone(&state);
     let ka_session = Arc::downgrade(&session);
     let ka_app = app.clone();
@@ -506,19 +561,28 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         loop {
             ticker.tick().await;
             let Some(session) = ka_session.upgrade() else { break };
+            let transfer_active = session.is_transfer_active();
             let hello = build_stream_hello(session.next_seq());
+            let cmd_timeout = if transfer_active {
+                KEEPALIVE_COMMAND_TIMEOUT_BUSY
+            } else {
+                KEEPALIVE_COMMAND_TIMEOUT
+            };
+            // Read once per tick, before the tick's own await points: whether a
+            // transfer was active when this tick *started* is what its timeout
+            // and failure budget should be judged against, even if the download
+            // finishes partway through (transfer_active flipping false mid-tick
+            // shouldn't suddenly make an already-in-flight slow reply count
+            // against the stricter idle threshold).
             let tick = async {
                 session.write(&hello).await?;
-                session
-                    .send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], Duration::from_secs(2))
-                    .await?;
-                session
-                    .send_command(CODE_GET_OPTIONS, &small_options_body(), Duration::from_secs(2))
-                    .await?;
+                session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
+                session.send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout).await?;
                 Ok::<(), String>(())
             };
             match tick.await {
                 Ok(()) => failures = 0,
+                Err(_) if transfer_active => failures = 0,
                 Err(_) => {
                     failures += 1;
                     if failures >= 2 {
@@ -556,6 +620,29 @@ pub async fn luna_disconnect(state: State<'_, LunaState>) -> Result<(), String> 
 #[tauri::command]
 pub async fn luna_status(state: State<'_, LunaState>) -> Result<Option<LunaDeviceInfo>, String> {
     Ok(state.session.lock().await.as_ref().map(|session| session.device_info()))
+}
+
+/// Mark a large HTTP transfer as started, so the keepalive loop tolerates a
+/// slower control-channel reply for as long as it runs. A no-op (not an
+/// error) when there is no session, so a frontend caller never needs to treat
+/// "camera disconnected mid-download" as a reason to also fail this call.
+#[tauri::command]
+pub async fn luna_transfer_started(state: State<'_, LunaState>) -> Result<(), String> {
+    if let Some(session) = state.session.lock().await.as_ref() {
+        session.begin_transfer();
+    }
+    Ok(())
+}
+
+/// Pair with `luna_transfer_started`. Must be called exactly once per started
+/// transfer (a `finally`/`try...finally` on the frontend side), or the
+/// keepalive loop will keep granting the widened timeout forever.
+#[tauri::command]
+pub async fn luna_transfer_finished(state: State<'_, LunaState>) -> Result<(), String> {
+    if let Some(session) = state.session.lock().await.as_ref() {
+        session.end_transfer();
+    }
+    Ok(())
 }
 
 #[tauri::command]

@@ -3,8 +3,9 @@ import { canWatermark, watermarkNote, watermarkScope } from "~/utils/watermark";
 import { cacheRawPreviewFromBlob, isRawPhoto } from "~/utils/rawPreviewCache";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
+import { streamCameraFileToDisk } from "~/utils/streamDownload";
 import { getCameraTransport } from "~/utils/transport";
-
+import { beginHealthTransfer, endHealthTransfer } from "~/utils/cameraHealth";
 export function useDownloads() {
   const queue = useState<DownloadEntry[]>("download-queue", () => []);
   const { library } = useCamera();
@@ -30,30 +31,83 @@ export function useDownloads() {
         return;
       }
       patch(entry.id, { status: "downloading", progress: 4 });
+      const transport = getCameraTransport();
+      // Told to the keepalive loop so it tolerates a slower control-channel
+      // reply for as long as this transfer runs, rather than mistaking a
+      // camera that's busy serving a large file for one that's gone (issue:
+      // 8K video downloads getting silently killed mid-transfer). Bracketed
+      // with try/finally so a failed or aborted download still clears it.
+      await transport.beginTransfer?.();
+      beginHealthTransfer();
       try {
-        const response = await getCameraTransport().fetch(entry.item.srcUrl);
+        const response = await transport.fetch(entry.item.srcUrl);
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
         patch(entry.id, { progress: 45 });
-        const source = await response.blob();
-        let blob = source;
-        // Measured before the watermark pass: this is the file's size on the
-        // camera, not the size of what we are about to write to disk.
-        recordSize(entry.item, source.size);
-        patch(entry.id, { progress: 70 });
-        // Renderable photos only: RAW is `type: "photo"` too, but the canvas
-        // pipeline cannot decode it, so it saves unmodified (issue #2).
-        if (entry.watermarked && canWatermark(entry.item)) {
-          blob = await renderWatermarked(blob, settings.value);
+
+        if (entry.item.type === "video") {
+          // Stream straight to disk rather than buffering the whole file in
+          // the webview's memory. A full-res 8K video can run several GB;
+          // `response.blob()` accumulates that into one in-memory buffer
+          // before returning it, which has been observed to crash the
+          // webview process outright (blank window, nothing on disk, no
+          // error — because nothing ever gets the chance to throw one).
+          // Videos are never watermarked (see docs/FEATURES.md) and have no
+          // RAW-preview step, so nothing downstream needs the bytes in
+          // memory here. See app/utils/streamDownload.ts for the mechanism.
+          const { savedTo, size } = await streamCameraFileToDisk(
+            response,
+            entry.item.name,
+            (written, total) => {
+              // `entry.item.size` is only a real prior measurement, never a
+              // stand-in for "no total": on GET_FILE_LIST firmware it starts
+              // at 0 for every file until a download has measured it once
+              // (see lunaIndex.ts). Falling back to `written` itself here
+              // (as this used to) makes fraction = written / written = 1 on
+              // the very first chunk — a bar that hits ~95% instantly and
+              // never moves again, regardless of real progress.
+              const knownTotal = total ?? (entry.item.size > 0 ? entry.item.size : null);
+              if (knownTotal && knownTotal > 0) {
+                const fraction = Math.min(1, written / knownTotal);
+                patch(entry.id, {
+                  progress: Math.min(95, 45 + Math.round(fraction * 50)),
+                  bytesWritten: written,
+                });
+              } else {
+                // No content-length and no prior measurement: there is no
+                // number to show a meaningful percentage against, so render
+                // an indeterminate bar (UProgress treats null as such) and
+                // let the UI fall back to showing raw bytes transferred.
+                patch(entry.id, { progress: null, bytesWritten: written });
+              }
+            },
+          );
+          recordSize(entry.item, size);
+          patch(entry.id, { status: "done", progress: 100, savedTo });
+        } else {
+          const source = await response.blob();
+          let blob = source;
+          // Measured before the watermark pass: this is the file's size on
+          // the camera, not the size of what we are about to write to disk.
+          recordSize(entry.item, source.size);
+          patch(entry.id, { progress: 70 });
+          // Renderable photos only: RAW is `type: "photo"` too, but the canvas
+          // pipeline cannot decode it, so it saves unmodified (issue #2).
+          if (entry.watermarked && canWatermark(entry.item)) {
+            blob = await renderWatermarked(blob, settings.value);
+          }
+          patch(entry.id, { progress: 90 });
+          const savedTo = await saveBlob(blob, entry.item.name);
+          patch(entry.id, { status: "done", progress: 100, savedTo });
+          await seedRawPreview(entry.item, source);
         }
-        patch(entry.id, { progress: 90 });
-        const savedTo = await saveBlob(blob, entry.item.name);
-        patch(entry.id, { status: "done", progress: 100, savedTo });
-        await seedRawPreview(entry.item, source);
       } catch (error) {
         patch(entry.id, {
           status: "error",
           error: error instanceof Error ? error.message : "Transfer failed",
         });
+      } finally {
+        endHealthTransfer();
+        await transport.endTransfer?.();
       }
     }
   }
@@ -133,7 +187,7 @@ export function useDownloads() {
   }
 
   function retry(id: string) {
-    patch(id, { status: "queued", progress: 0, error: undefined });
+    patch(id, { status: "queued", progress: 0, bytesWritten: undefined, error: undefined });
     if (!running.value) {
       running.value = true;
       void processNext();

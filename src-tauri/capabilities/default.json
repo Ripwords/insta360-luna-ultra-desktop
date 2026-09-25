@@ -17,6 +17,14 @@
       "allow": [{ "path": "$DOWNLOAD/**" }]
     },
     {
+      "identifier": "fs:allow-create",
+      "allow": [{ "path": "$DOWNLOAD/**" }]
+    },
+    {
+      "identifier": "fs:allow-write",
+      "allow": [{ "path": "$DOWNLOAD/**" }]
+    },
+    {
       "identifier": "http:default",
       "allow": [{ "url": "http://**" }]
     }
