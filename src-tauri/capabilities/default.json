@@ -25,6 +25,14 @@
       "allow": [{ "path": "$DOWNLOAD/**" }]
     },
     {
+      "identifier": "fs:allow-rename",
+      "allow": [{ "path": "$DOWNLOAD/**" }]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [{ "path": "$DOWNLOAD/**" }]
+    },
+    {
       "identifier": "http:default",
       "allow": [{ "url": "http://**" }]
     }

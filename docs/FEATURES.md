@@ -163,14 +163,14 @@ time.
 
 ## Downloads & watermark
 
-| Feature                                          | Status | Notes                                                                                            |
-| ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------ |
-| Background download queue with per-file progress | ✅     |                                                                                                  |
-| Streamed straight to the Downloads folder        | ✅     |                                                                                                  |
-| Retry failed transfers, clear finished           | ✅     |                                                                                                  |
-| Official Luna Ultra watermark on photos          | ✅     | The genuine Insta360 asset, placed per the camera's real aspect-ratio layout table.              |
-| Watermark settings + reset                       | ✅     | Settings page.                                                                                   |
-| Watermark on video                               | ○      | Videos transfer untouched — this needs a re-encode, which is a different piece of work entirely. |
+| Feature                                          | Status | Notes                                                                                                   |
+| ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------- |
+| Background download queue with per-file progress | ✅     |                                                                                                         |
+| Streamed straight to the Downloads folder        | ✅     | Videos only, written as `<name>.part` and renamed when complete. Photos are buffered for the watermark. |
+| Retry failed transfers, clear finished           | ✅     | A transfer that receives nothing for 30 s fails with "The camera stopped sending data".                 |
+| Official Luna Ultra watermark on photos          | ✅     | The genuine Insta360 asset, placed per the camera's real aspect-ratio layout table.                     |
+| Watermark settings + reset                       | ✅     | Settings page.                                                                                          |
+| Watermark on video                               | ○      | Videos transfer untouched — this needs a re-encode, which is a different piece of work entirely.        |
 
 ## App shell
 

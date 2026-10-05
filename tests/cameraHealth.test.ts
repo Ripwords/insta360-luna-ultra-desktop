@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FAILURE_THRESHOLD,
   armCameraHealth,
+  beginHealthTransfer,
   disarmCameraHealth,
+  endHealthTransfer,
   reportCameraFailure,
   reportCameraSuccess,
 } from "~/utils/cameraHealth";
@@ -157,5 +159,50 @@ describe("cameraHealth", () => {
     release(false);
     await flush();
     expect(onDead).not.toHaveBeenCalled();
+  });
+
+  describe("during a transfer", () => {
+    it("ignores failures while a transfer is in flight", async () => {
+      const onDead = vi.fn();
+      armCameraHealth(onDead, deadProbe);
+      beginHealthTransfer();
+      for (let i = 0; i < FAILURE_THRESHOLD * 2; i++) reportCameraFailure();
+      await flush();
+      endHealthTransfer();
+      expect(onDead).not.toHaveBeenCalled();
+    });
+
+    it("counts failures again once the transfer ends", async () => {
+      const onDead = vi.fn();
+      armCameraHealth(onDead, deadProbe);
+      beginHealthTransfer();
+      endHealthTransfer();
+      for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
+      await flush();
+      expect(onDead).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays suppressed until every overlapping transfer has ended", async () => {
+      const onDead = vi.fn();
+      armCameraHealth(onDead, deadProbe);
+      beginHealthTransfer();
+      beginHealthTransfer();
+      endHealthTransfer();
+      for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
+      await flush();
+      expect(onDead).not.toHaveBeenCalled();
+      endHealthTransfer();
+    });
+
+    it("does not let a stray end push the count below zero", async () => {
+      const onDead = vi.fn();
+      armCameraHealth(onDead, deadProbe);
+      endHealthTransfer();
+      beginHealthTransfer();
+      endHealthTransfer();
+      for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
+      await flush();
+      expect(onDead).toHaveBeenCalledTimes(1);
+    });
   });
 });

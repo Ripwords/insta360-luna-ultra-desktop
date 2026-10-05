@@ -28,14 +28,12 @@ export interface CameraTransport {
   probe(host: string): Promise<boolean>;
   onDisconnect(handler: () => void): Promise<() => void>;
   /**
-   * Bracket a large HTTP transfer (a full-resolution photo or video
-   * download) so the control-channel keepalive can tolerate a slower reply
-   * for as long as it runs, instead of mistaking a busy camera for a dead
-   * one. Optional: implementations without a control-channel keepalive (the
-   * docs-site mock) have nothing to widen and may omit both.
+   * A download just received bytes from the camera. Fire-and-forget: the
+   * control-channel keepalive uses it to tell a camera busy serving a large
+   * file from one that has gone. Optional for transports with no keepalive
+   * (the docs-site mock).
    */
-  beginTransfer?(): Promise<void>;
-  endTransfer?(): Promise<void>;
+  noteTransferActivity?(): void;
 }
 
 /**

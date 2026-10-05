@@ -156,11 +156,6 @@ const hasFinished = computed(() =>
               class="font-mono text-xs text-muted tabular-nums"
               >{{ entry.progress }}%</span
             >
-            <span
-              v-else-if="entry.bytesWritten"
-              class="font-mono text-xs text-muted tabular-nums"
-              >{{ formatBytes(entry.bytesWritten) }}</span
-            >
           </div>
         </div>
       </div>

@@ -52,6 +52,10 @@ async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): 
   return invoke<T>(command, args);
 }
 
+/** The keepalive's tolerance window is far longer than this, so one IPC call per interval is plenty. */
+const TRANSFER_ACTIVITY_REPORT_MS = 2000;
+let lastTransferActivityReport = 0;
+
 /**
  * Fetch a camera URL. Uses the Tauri HTTP plugin (bypasses CORS/mixed-content)
  * when packaged. Every camera request flows through here, so this is also
@@ -209,14 +213,13 @@ export const lunaClient = {
   /** Bypasses health reporting. */
   probe: probeCamera,
 
-  /** See CameraTransport.beginTransfer. */
-  async beginTransfer(): Promise<void> {
-    await tauriInvoke("luna_transfer_started");
-  },
-
-  /** See CameraTransport.endTransfer. */
-  async endTransfer(): Promise<void> {
-    await tauriInvoke("luna_transfer_finished");
+  /** See CameraTransport.noteTransferActivity. */
+  noteTransferActivity(): void {
+    if (!isTauri()) return;
+    const now = Date.now();
+    if (now - lastTransferActivityReport < TRANSFER_ACTIVITY_REPORT_MS) return;
+    lastTransferActivityReport = now;
+    tauriInvoke("luna_transfer_activity").catch(() => {});
   },
 
   /**

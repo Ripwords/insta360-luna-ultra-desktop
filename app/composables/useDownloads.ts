@@ -3,9 +3,15 @@ import { canWatermark, watermarkNote, watermarkScope } from "~/utils/watermark";
 import { cacheRawPreviewFromBlob, isRawPhoto } from "~/utils/rawPreviewCache";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
-import { streamCameraFileToDisk } from "~/utils/streamDownload";
+import {
+  TRANSFER_STALL_MS,
+  readCameraBody,
+  streamCameraFileToDisk,
+  withStallTimeout,
+} from "~/utils/streamDownload";
 import { getCameraTransport } from "~/utils/transport";
 import { beginHealthTransfer, endHealthTransfer } from "~/utils/cameraHealth";
+
 export function useDownloads() {
   const queue = useState<DownloadEntry[]>("download-queue", () => []);
   const { library } = useCamera();
@@ -32,51 +38,41 @@ export function useDownloads() {
       }
       patch(entry.id, { status: "downloading", progress: 4 });
       const transport = getCameraTransport();
-      // Told to the keepalive loop so it tolerates a slower control-channel
-      // reply for as long as this transfer runs, rather than mistaking a
-      // camera that's busy serving a large file for one that's gone (issue:
-      // 8K video downloads getting silently killed mid-transfer). Bracketed
-      // with try/finally so a failed or aborted download still clears it.
-      await transport.beginTransfer?.();
+      const noteActivity = () => transport.noteTransferActivity?.();
+      // The camera's single HTTP connection is busy for the whole transfer, so
+      // other requests failing meanwhile say nothing about whether it is alive.
+      // Every transfer ends, at worst by stalling out, so this always unwinds.
       beginHealthTransfer();
       try {
-        const response = await transport.fetch(entry.item.srcUrl);
+        const controller = new AbortController();
+        const response = await withStallTimeout(
+          transport.fetch(entry.item.srcUrl, { signal: controller.signal }),
+          TRANSFER_STALL_MS,
+          () => controller.abort(),
+        );
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
-        patch(entry.id, { progress: 45 });
+        noteActivity();
 
         if (entry.item.type === "video") {
-          // Stream straight to disk rather than buffering the whole file in
-          // the webview's memory. A full-res 8K video can run several GB;
-          // `response.blob()` accumulates that into one in-memory buffer
-          // before returning it, which has been observed to crash the
-          // webview process outright (blank window, nothing on disk, no
-          // error — because nothing ever gets the chance to throw one).
-          // Videos are never watermarked (see docs/FEATURES.md) and have no
-          // RAW-preview step, so nothing downstream needs the bytes in
-          // memory here. See app/utils/streamDownload.ts for the mechanism.
+          // Streamed to disk: a multi-GB 8K video buffered in memory crashes
+          // the webview. Videos are never watermarked and have no RAW preview,
+          // so nothing downstream needs the bytes.
           const { savedTo, size } = await streamCameraFileToDisk(
             response,
             entry.item.name,
             (written, total) => {
-              // `entry.item.size` is only a real prior measurement, never a
-              // stand-in for "no total": on GET_FILE_LIST firmware it starts
-              // at 0 for every file until a download has measured it once
-              // (see lunaIndex.ts). Falling back to `written` itself here
-              // (as this used to) makes fraction = written / written = 1 on
-              // the very first chunk — a bar that hits ~95% instantly and
-              // never moves again, regardless of real progress.
+              noteActivity();
+              // `item.size` is 0 on GET_FILE_LIST firmware until a download has
+              // measured it (see lunaIndex.ts), so 0 means unknown, not empty.
               const knownTotal = total ?? (entry.item.size > 0 ? entry.item.size : null);
-              if (knownTotal && knownTotal > 0) {
+              if (knownTotal) {
                 const fraction = Math.min(1, written / knownTotal);
                 patch(entry.id, {
-                  progress: Math.min(95, 45 + Math.round(fraction * 50)),
+                  progress: Math.max(4, Math.min(95, Math.round(fraction * 95))),
                   bytesWritten: written,
                 });
               } else {
-                // No content-length and no prior measurement: there is no
-                // number to show a meaningful percentage against, so render
-                // an indeterminate bar (UProgress treats null as such) and
-                // let the UI fall back to showing raw bytes transferred.
+                // No total to measure against: an indeterminate bar plus bytes.
                 patch(entry.id, { progress: null, bytesWritten: written });
               }
             },
@@ -84,7 +80,8 @@ export function useDownloads() {
           recordSize(entry.item, size);
           patch(entry.id, { status: "done", progress: 100, savedTo });
         } else {
-          const source = await response.blob();
+          patch(entry.id, { progress: 45 });
+          const source = await readCameraBody(response, { onChunk: noteActivity });
           let blob = source;
           // Measured before the watermark pass: this is the file's size on
           // the camera, not the size of what we are about to write to disk.
@@ -107,7 +104,6 @@ export function useDownloads() {
         });
       } finally {
         endHealthTransfer();
-        await transport.endTransfer?.();
       }
     }
   }
