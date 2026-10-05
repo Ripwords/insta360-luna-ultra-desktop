@@ -50,6 +50,8 @@ async function forEachChunk(
   const reader = body.getReader();
   for (;;) {
     const { done, value } = await withStallTimeout(reader.read(), stallMs, () => {
+      // Frees the body, but plugin-http's in-flight read keeps the camera
+      // connection open until its next chunk arrives or TCP gives up.
       reader.cancel().catch(() => {});
     });
     if (done) return;

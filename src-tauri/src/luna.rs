@@ -662,8 +662,6 @@ mod tests {
         (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
     }
 
-    /// The mock server's second auth payload is a real captured frame:
-    /// GET_OPTIONS small with seq 0x10, request 1, including its CRC trailer.
     #[test]
     fn transfer_window_requires_recent_activity() {
         let now = Instant::now();
@@ -676,6 +674,8 @@ mod tests {
         );
     }
 
+    /// The mock server's second auth payload is a real captured frame:
+    /// GET_OPTIONS small with seq 0x10, request 1, including its CRC trailer.
     #[test]
     fn file_command_matches_captured_auth_frame() {
         let expected = hex("55434432010c04100f0000000800020100008000000830080f080b7c008e7c");
