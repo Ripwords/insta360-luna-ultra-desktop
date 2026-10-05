@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.2...master
+
+[compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.2...master)
+
+### 🩹 Fixes
+
+- **downloads:** Stream large videos to disk and keep the session alive during transfers ([#9](https://github.com/Ripwords/insta360-luna-ultra-desktop/pull/9))
+
+### ❤️ Contributors
+
+- David-ftx1 <solution.design@gmail.com>
+
 ## v0.3.1...master
 
 [compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.1...master)
