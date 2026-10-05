@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -49,6 +49,21 @@ const CODE_GET_CURRENT_CAPTURE_STATUS: u16 = 15;
 const CONTROL_PORT: u16 = 6666;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(1500);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(3);
+/// While the camera's single-connection HTTP server streams a large file it can
+/// be too busy to answer keepalive queries, so a failed tick within this long of
+/// the last bytes it delivered is not counted against it. Bounded by bytes, not
+/// by a begin/end pair, so a transfer that stalls or is never closed (webview
+/// reload) cannot hide a camera that has really gone. It also covers the
+/// sluggish spell right after a large file finishes.
+const TRANSFER_ACTIVITY_WINDOW: Duration = Duration::from_secs(90);
+const KEEPALIVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
+/// Slower ticks while a transfer is active give the busy camera fewer queries
+/// to queue. The ~9GB hardware run that validated this change used this value.
+const KEEPALIVE_COMMAND_TIMEOUT_BUSY: Duration = Duration::from_secs(25);
+
+fn within_transfer_window(last_activity: Option<Instant>, now: Instant) -> bool {
+    last_activity.is_some_and(|at| now.saturating_duration_since(at) < TRANSFER_ACTIVITY_WINDOW)
+}
 
 /// Insta360's packet checksum, appended little-endian to every UCD2 FILE
 /// frame. A nonstandard CRC-32 variant (poly 0x04C11DB7): each input byte is
@@ -314,6 +329,8 @@ pub(crate) struct Session {
     keepalive: StdMutex<Option<JoinHandle<()>>>,
     info: StdMutex<LunaDeviceInfo>,
     stream_tx: broadcast::Sender<Vec<u8>>,
+    /// When a download last received bytes, as reported by `luna_transfer_activity`.
+    last_transfer_activity: StdMutex<Option<Instant>>,
 }
 
 impl Session {
@@ -327,6 +344,14 @@ impl Session {
 
     fn device_info(&self) -> LunaDeviceInfo {
         self.info.lock().unwrap().clone()
+    }
+
+    fn note_transfer_activity(&self) {
+        *self.last_transfer_activity.lock().unwrap() = Some(Instant::now());
+    }
+
+    fn is_transfer_active(&self) -> bool {
+        within_transfer_window(*self.last_transfer_activity.lock().unwrap(), Instant::now())
     }
 
     async fn write(&self, packet: &[u8]) -> Result<(), String> {
@@ -434,6 +459,7 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         keepalive: StdMutex::new(None),
         info: StdMutex::new(LunaDeviceInfo::default()),
         stream_tx: stream_tx.clone(),
+        last_transfer_activity: StdMutex::new(None),
     });
 
     let reader_pending = pending;
@@ -495,6 +521,7 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
 
     // Keepalive: hello + light status/options queries every 3s. Two straight
     // failures means the camera is gone: drop the session and tell the UI.
+    // Failures inside TRANSFER_ACTIVITY_WINDOW don't count.
     let ka_state = Arc::clone(&state);
     let ka_session = Arc::downgrade(&session);
     let ka_app = app.clone();
@@ -506,19 +533,22 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         loop {
             ticker.tick().await;
             let Some(session) = ka_session.upgrade() else { break };
+            let transfer_active = session.is_transfer_active();
             let hello = build_stream_hello(session.next_seq());
+            let cmd_timeout = if transfer_active {
+                KEEPALIVE_COMMAND_TIMEOUT_BUSY
+            } else {
+                KEEPALIVE_COMMAND_TIMEOUT
+            };
             let tick = async {
                 session.write(&hello).await?;
-                session
-                    .send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], Duration::from_secs(2))
-                    .await?;
-                session
-                    .send_command(CODE_GET_OPTIONS, &small_options_body(), Duration::from_secs(2))
-                    .await?;
+                session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
+                session.send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout).await?;
                 Ok::<(), String>(())
             };
             match tick.await {
                 Ok(()) => failures = 0,
+                Err(_) if transfer_active => failures = 0,
                 Err(_) => {
                     failures += 1;
                     if failures >= 2 {
@@ -556,6 +586,15 @@ pub async fn luna_disconnect(state: State<'_, LunaState>) -> Result<(), String> 
 #[tauri::command]
 pub async fn luna_status(state: State<'_, LunaState>) -> Result<Option<LunaDeviceInfo>, String> {
     Ok(state.session.lock().await.as_ref().map(|session| session.device_info()))
+}
+
+/// The frontend received download bytes from the camera. A no-op without a session.
+#[tauri::command]
+pub async fn luna_transfer_activity(state: State<'_, LunaState>) -> Result<(), String> {
+    if let Some(session) = state.session.lock().await.as_ref() {
+        session.note_transfer_activity();
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -621,6 +660,18 @@ mod tests {
 
     fn hex(s: &str) -> Vec<u8> {
         (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+    }
+
+    #[test]
+    fn transfer_window_requires_recent_activity() {
+        let now = Instant::now();
+        assert!(!within_transfer_window(None, now), "no transfer has ever delivered bytes");
+        assert!(within_transfer_window(Some(now), now));
+        assert!(within_transfer_window(Some(now - TRANSFER_ACTIVITY_WINDOW / 2), now));
+        assert!(
+            !within_transfer_window(Some(now - TRANSFER_ACTIVITY_WINDOW), now),
+            "a transfer that stopped delivering bytes must not suppress the keepalive forever"
+        );
     }
 
     /// The mock server's second auth payload is a real captured frame:

@@ -3,7 +3,14 @@ import { canWatermark, watermarkNote, watermarkScope } from "~/utils/watermark";
 import { cacheRawPreviewFromBlob, isRawPhoto } from "~/utils/rawPreviewCache";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
+import {
+  TRANSFER_STALL_MS,
+  readCameraBody,
+  streamCameraFileToDisk,
+  withStallTimeout,
+} from "~/utils/streamDownload";
 import { getCameraTransport } from "~/utils/transport";
+import { beginHealthTransfer, endHealthTransfer } from "~/utils/cameraHealth";
 
 export function useDownloads() {
   const queue = useState<DownloadEntry[]>("download-queue", () => []);
@@ -30,30 +37,73 @@ export function useDownloads() {
         return;
       }
       patch(entry.id, { status: "downloading", progress: 4 });
+      const transport = getCameraTransport();
+      const noteActivity = () => transport.noteTransferActivity?.();
+      // The camera's single HTTP connection is busy for the whole transfer, so
+      // other requests failing meanwhile say nothing about whether it is alive.
+      // Every transfer ends, at worst by stalling out, so this always unwinds.
+      beginHealthTransfer();
       try {
-        const response = await getCameraTransport().fetch(entry.item.srcUrl);
+        const controller = new AbortController();
+        const response = await withStallTimeout(
+          transport.fetch(entry.item.srcUrl, { signal: controller.signal }),
+          TRANSFER_STALL_MS,
+          () => controller.abort(),
+        );
         if (!response.ok) throw new Error(`Camera transfer failed (${response.status})`);
-        patch(entry.id, { progress: 45 });
-        const source = await response.blob();
-        let blob = source;
-        // Measured before the watermark pass: this is the file's size on the
-        // camera, not the size of what we are about to write to disk.
-        recordSize(entry.item, source.size);
-        patch(entry.id, { progress: 70 });
-        // Renderable photos only: RAW is `type: "photo"` too, but the canvas
-        // pipeline cannot decode it, so it saves unmodified (issue #2).
-        if (entry.watermarked && canWatermark(entry.item)) {
-          blob = await renderWatermarked(blob, settings.value);
+        noteActivity();
+
+        if (entry.item.type === "video") {
+          // Streamed to disk: a multi-GB 8K video buffered in memory crashes
+          // the webview. Videos are never watermarked and have no RAW preview,
+          // so nothing downstream needs the bytes.
+          const { savedTo, size } = await streamCameraFileToDisk(
+            response,
+            entry.item.name,
+            (written, total) => {
+              noteActivity();
+              // `item.size` is 0 on GET_FILE_LIST firmware until a download has
+              // measured it (see lunaIndex.ts), so 0 means unknown, not empty.
+              const knownTotal = total ?? (entry.item.size > 0 ? entry.item.size : null);
+              if (knownTotal) {
+                const fraction = Math.min(1, written / knownTotal);
+                patch(entry.id, {
+                  progress: Math.max(4, Math.min(95, Math.round(fraction * 95))),
+                  bytesWritten: written,
+                });
+              } else {
+                // No total to measure against: an indeterminate bar plus bytes.
+                patch(entry.id, { progress: null, bytesWritten: written });
+              }
+            },
+          );
+          recordSize(entry.item, size);
+          patch(entry.id, { status: "done", progress: 100, savedTo });
+        } else {
+          patch(entry.id, { progress: 45 });
+          const source = await readCameraBody(response, { onChunk: noteActivity });
+          let blob = source;
+          // Measured before the watermark pass: this is the file's size on
+          // the camera, not the size of what we are about to write to disk.
+          recordSize(entry.item, source.size);
+          patch(entry.id, { progress: 70 });
+          // Renderable photos only: RAW is `type: "photo"` too, but the canvas
+          // pipeline cannot decode it, so it saves unmodified (issue #2).
+          if (entry.watermarked && canWatermark(entry.item)) {
+            blob = await renderWatermarked(blob, settings.value);
+          }
+          patch(entry.id, { progress: 90 });
+          const savedTo = await saveBlob(blob, entry.item.name);
+          patch(entry.id, { status: "done", progress: 100, savedTo });
+          await seedRawPreview(entry.item, source);
         }
-        patch(entry.id, { progress: 90 });
-        const savedTo = await saveBlob(blob, entry.item.name);
-        patch(entry.id, { status: "done", progress: 100, savedTo });
-        await seedRawPreview(entry.item, source);
       } catch (error) {
         patch(entry.id, {
           status: "error",
           error: error instanceof Error ? error.message : "Transfer failed",
         });
+      } finally {
+        endHealthTransfer();
       }
     }
   }
@@ -133,7 +183,7 @@ export function useDownloads() {
   }
 
   function retry(id: string) {
-    patch(id, { status: "queued", progress: 0, error: undefined });
+    patch(id, { status: "queued", progress: 0, bytesWritten: undefined, error: undefined });
     if (!running.value) {
       running.value = true;
       void processNext();

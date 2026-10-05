@@ -1,6 +1,12 @@
 import { mockNuxtImport } from "@nuxt/test-utils/runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DownloadEntry, MediaItem } from "~/types/media";
+import {
+  FAILURE_THRESHOLD,
+  armCameraHealth,
+  disarmCameraHealth,
+  reportCameraFailure,
+} from "~/utils/cameraHealth";
 import { resetCameraTransport, setCameraTransport } from "~/utils/transport";
 import { makeFakeTransport } from "../helpers/fakeTransport";
 import { makeMediaItem } from "../helpers/media";
@@ -227,5 +233,55 @@ describe("useDownloads", () => {
     expect(saveBlob).not.toHaveBeenCalled();
     expect(downloads.queue.value[0]?.status).toBe("error");
     expect(downloads.queue.value[0]?.error).toBe("watermark render failed");
+  });
+
+  it("tells the transport the camera is delivering bytes", async () => {
+    const transport = respondWith(CAMERA_BYTES);
+    transport.noteTransferActivity = vi.fn();
+    setCameraTransport(transport);
+    const downloads = await mountComposable(() => useDownloads());
+
+    downloads.enqueue([makeMediaItem({ name: "IMG_0001.jpg" })], { watermark: false });
+    await settled(downloads.queue);
+
+    expect(transport.noteTransferActivity).toHaveBeenCalled();
+  });
+
+  it("reports no activity for a camera that never answered", async () => {
+    const transport = makeFakeTransport({
+      fetch: vi.fn(async () => {
+        throw new Error("no route to host");
+      }),
+    });
+    transport.noteTransferActivity = vi.fn();
+    setCameraTransport(transport);
+    const downloads = await mountComposable(() => useDownloads());
+
+    downloads.enqueue([makeMediaItem({ name: "IMG_0001.jpg" })], { watermark: false });
+    await settled(downloads.queue);
+
+    expect(downloads.queue.value[0]?.status).toBe("error");
+    expect(transport.noteTransferActivity).not.toHaveBeenCalled();
+  });
+
+  it("restores the health watchdog after a failed transfer", async () => {
+    setCameraTransport(
+      makeFakeTransport({
+        fetch: vi.fn(async () => {
+          throw new Error("no route to host");
+        }),
+      }),
+    );
+    const onDead = vi.fn();
+    armCameraHealth(onDead, async () => false);
+    const downloads = await mountComposable(() => useDownloads());
+
+    downloads.enqueue([makeMediaItem({ name: "IMG_0001.jpg" })], { watermark: false });
+    await settled(downloads.queue);
+    for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onDead).toHaveBeenCalledTimes(1);
+    disarmCameraHealth();
   });
 });

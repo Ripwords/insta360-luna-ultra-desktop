@@ -27,6 +27,13 @@ export interface CameraTransport {
   fetch(url: string, init?: RequestInit): Promise<Response>;
   probe(host: string): Promise<boolean>;
   onDisconnect(handler: () => void): Promise<() => void>;
+  /**
+   * A download just received bytes from the camera. Fire-and-forget: the
+   * control-channel keepalive uses it to tell a camera busy serving a large
+   * file from one that has gone. Optional for transports with no keepalive
+   * (the docs-site mock).
+   */
+  noteTransferActivity?(): void;
 }
 
 /**

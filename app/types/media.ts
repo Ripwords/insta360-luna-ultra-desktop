@@ -64,7 +64,14 @@ export interface DownloadEntry {
   id: string;
   item: MediaItem;
   status: DownloadStatus;
-  progress: number;
+  /**
+   * 0-100, or null when there's no reliable total byte count to measure
+   * against (see `bytesWritten`) — null renders as an indeterminate bar
+   * rather than a fake percentage.
+   */
+  progress: number | null;
+  /** Raw bytes written so far. The only real progress signal once `progress` is null. */
+  bytesWritten?: number;
   watermarked: boolean;
   savedTo?: string;
   error?: string;

@@ -38,16 +38,16 @@ turns out to live — see [`PROTOCOL-GAP.md`](PROTOCOL-GAP.md).
 
 ## Connection & session
 
-| Feature                                             | Status | Notes                                                                                                                                |
-| --------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| TCP control handshake (port 6666, UCD2 framing)     | ✅     | Rust, `src-tauri/src/luna.rs`. Auth handshake + device info.                                                                         |
-| HTTP media index (port 80)                          | ✅     | A live control session is what unlocks it.                                                                                           |
-| File listing via `GET_FILE_LIST`                    | ✅     | Replaced HTML autoindex scraping, which firmware 1.0.238 dropped.                                                                    |
-| Auto-reconnect with backoff                         | ✅     | 1s → 2s → 5s → 10s → 15s, repeating; retries immediately on OS `online`.                                                             |
-| Health detector / forced disconnect                 | ✅     | 3 consecutive failed requests plus a failed probe drops the session and leaves it dropped.                                           |
-| Manual host override                                | ✅     | Persisted; accepts `host:port` for the mock server.                                                                                  |
-| Request queue with priority + concurrency cap       | ✅     | 4 slots, priority-ordered (thumbnail < listing < preview), pausable so a full-screen open is not queued behind a grid of thumbnails. |
-| Device readout (serial, firmware, storage, battery) | ✅     | Settings page + viewfinder HUD.                                                                                                      |
+| Feature                                             | Status | Notes                                                                                                                                 |
+| --------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| TCP control handshake (port 6666, UCD2 framing)     | ✅     | Rust, `src-tauri/src/luna.rs`. Auth handshake + device info.                                                                          |
+| HTTP media index (port 80)                          | ✅     | A live control session is what unlocks it.                                                                                            |
+| File listing via `GET_FILE_LIST`                    | ✅     | Replaced HTML autoindex scraping, which firmware 1.0.238 dropped.                                                                     |
+| Auto-reconnect with backoff                         | ✅     | 1s → 2s → 5s → 10s → 15s, repeating; retries immediately on OS `online`.                                                              |
+| Health detector / forced disconnect                 | ✅     | 3 consecutive failed requests plus a failed probe drops the session and leaves it dropped. Paused while a download is receiving data. |
+| Manual host override                                | ✅     | Persisted; accepts `host:port` for the mock server.                                                                                   |
+| Request queue with priority + concurrency cap       | ✅     | 4 slots, priority-ordered (thumbnail < listing < preview), pausable so a full-screen open is not queued behind a grid of thumbnails.  |
+| Device readout (serial, firmware, storage, battery) | ✅     | Settings page + viewfinder HUD.                                                                                                       |
 
 ## Live view
 
@@ -163,14 +163,14 @@ time.
 
 ## Downloads & watermark
 
-| Feature                                          | Status | Notes                                                                                            |
-| ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------ |
-| Background download queue with per-file progress | ✅     |                                                                                                  |
-| Streamed straight to the Downloads folder        | ✅     |                                                                                                  |
-| Retry failed transfers, clear finished           | ✅     |                                                                                                  |
-| Official Luna Ultra watermark on photos          | ✅     | The genuine Insta360 asset, placed per the camera's real aspect-ratio layout table.              |
-| Watermark settings + reset                       | ✅     | Settings page.                                                                                   |
-| Watermark on video                               | ○      | Videos transfer untouched — this needs a re-encode, which is a different piece of work entirely. |
+| Feature                                          | Status | Notes                                                                                                   |
+| ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------- |
+| Background download queue with per-file progress | ✅     |                                                                                                         |
+| Streamed straight to the Downloads folder        | ✅     | Videos only, written as `<name>.part` and renamed when complete. Photos are buffered for the watermark. |
+| Retry failed transfers, clear finished           | ✅     | A transfer that receives nothing for 30 s fails with "The camera stopped sending data".                 |
+| Official Luna Ultra watermark on photos          | ✅     | The genuine Insta360 asset, placed per the camera's real aspect-ratio layout table.                     |
+| Watermark settings + reset                       | ✅     | Settings page.                                                                                          |
+| Watermark on video                               | ○      | Videos transfer untouched — this needs a re-encode, which is a different piece of work entirely.        |
 
 ## App shell
 
