@@ -185,6 +185,7 @@ impl AccessUnitAssembler {
     }
 
     /// The codec, once a parameter set has identified it.
+    #[cfg(test)]
     pub fn codec(&self) -> Option<Codec> {
         self.codec
     }
@@ -250,6 +251,7 @@ impl AccessUnitAssembler {
     /// picture and the drop/discard flags are cleared, so the next `push`
     /// waits for a start code. The detected codec and the current parameter
     /// sets are kept.
+    #[cfg(test)]
     pub fn flush(&mut self) -> Vec<AccessUnit> {
         let mut out = Vec::new();
         if self.in_nal && !self.discarding_nal {
@@ -434,6 +436,8 @@ impl BitReader<'_> {
 
 /// Display size from an H.265 SPS NAL (2-byte header included, no start
 /// code), with the conformance window applied.
+// used by Task 8
+#[allow(dead_code)]
 pub fn hevc_dimensions(sps: &[u8]) -> Option<(u32, u32)> {
     let rbsp = unescape_rbsp(sps);
     let mut r = BitReader {

@@ -83,7 +83,7 @@ impl Relay {
     }
 
     #[cfg(test)]
-    fn push_au(&self, au: AccessUnit, _now: Instant) {
+    pub(crate) fn push_au(&self, au: AccessUnit, _now: Instant) {
         let mut state = self.lock();
         self.publish(&mut state, au);
     }
@@ -144,6 +144,8 @@ impl Relay {
         self.lock().params.clone()
     }
 
+    // used by Task 8
+    #[allow(dead_code)]
     pub fn last_video(&self) -> Option<Instant> {
         self.lock().last_video
     }
