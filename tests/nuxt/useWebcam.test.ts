@@ -3,7 +3,9 @@ import type { DownloadEntry, WebcamStatus } from "~/types/media";
 import { isCameraQueueHeld, setCameraQueueHeld } from "~/utils/cameraQueue";
 import { resetCameraTransport, setCameraTransport } from "~/utils/transport";
 import { makeFakeTransport } from "../helpers/fakeTransport";
-import { makeMediaItem } from "../helpers/media";
+import { makeDownloadEntry } from "../helpers/media";
+import { mountSuspended } from "@nuxt/test-utils/runtime";
+import { defineComponent } from "vue";
 import { mountComposable } from "./harness";
 
 const STREAMING: WebcamStatus = {
@@ -25,6 +27,28 @@ function setup(overrides: Parameters<typeof makeFakeTransport>[0] = {}) {
   });
   setCameraTransport(transport);
   return transport;
+}
+
+const STALLED: WebcamStatus = { ...STREAMING, state: "stalled" };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+/** Flip the camera's connection the way the auto-reconnect does. */
+async function reconnect() {
+  const status = useState<string>("camera-status");
+  status.value = "disconnected";
+  await nextTick();
+  status.value = "connected";
+  await nextTick();
+  await vi.advanceTimersByTimeAsync(0);
 }
 
 describe("useWebcam", () => {
@@ -81,9 +105,7 @@ describe("useWebcam", () => {
     }));
     await camera.connect();
     const queue = useState<DownloadEntry[]>("download-queue");
-    queue.value = [
-      { id: "a", item: makeMediaItem(), status: "queued", progress: 0 } as DownloadEntry,
-    ];
+    queue.value = [makeDownloadEntry({ id: "a" })];
     await webcam.turnOn();
 
     expect(webcam.error.value).toBe("Finish or cancel your downloads first.");
@@ -186,5 +208,147 @@ describe("useWebcam", () => {
 
     expect(webcam.enabled.value).toBe(false);
     expect(isCameraQueueHeld()).toBe(false);
+  });
+
+  it("discards a start that resolves after turn-off, and stops it on the camera", async () => {
+    const start = deferred<WebcamStatus>();
+    const transport = setup({ webcamStart: vi.fn(() => start.promise) });
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+
+    const turningOn = webcam.turnOn();
+    await webcam.turnOff();
+    start.resolve(STREAMING);
+    await turningOn;
+
+    expect(webcam.status.value).toBeNull();
+    expect(webcam.enabled.value).toBe(false);
+    expect(isCameraQueueHeld()).toBe(false);
+    // Once by turnOff, once more for the start that landed after it.
+    expect(transport.webcamStop).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(transport.webcamStatus).not.toHaveBeenCalled();
+  });
+
+  it("discards a reconnect start that resolves after turn-off", async () => {
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    const restart = deferred<WebcamStatus>();
+    vi.mocked(transport.webcamStart).mockImplementationOnce(() => restart.promise);
+    await reconnect();
+    await webcam.turnOff();
+    restart.resolve(STREAMING);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(webcam.status.value).toBeNull();
+    expect(transport.webcamStop).toHaveBeenCalledTimes(2);
+    const calls = vi.mocked(transport.webcamStatus).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(transport.webcamStatus).toHaveBeenCalledTimes(calls);
+  });
+
+  it("discards a poll result from before a turn-off and turn-on", async () => {
+    const stale = deferred<WebcamStatus>();
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    vi.mocked(transport.webcamStatus).mockImplementationOnce(() => stale.promise);
+    await vi.advanceTimersByTimeAsync(1000);
+    await webcam.turnOff();
+    await webcam.turnOn();
+    stale.resolve(STALLED);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(webcam.status.value).toEqual(STREAMING);
+    await webcam.turnOff();
+  });
+
+  it("keeps resuming on reconnect after the last caller unmounts", async () => {
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    const later = await mountSuspended(
+      defineComponent({
+        setup() {
+          useWebcam();
+          return () => null;
+        },
+      }),
+    );
+    later.unmount();
+    await reconnect();
+
+    expect(transport.webcamStart).toHaveBeenCalledTimes(2);
+    await webcam.turnOff();
+  });
+
+  it("reports a failed poll with its own message and clears it on the next success", async () => {
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    vi.mocked(transport.webcamStatus).mockImplementationOnce(async () => Promise.reject(null));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(webcam.error.value).toBe("Webcam status unavailable.");
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(webcam.error.value).toBeNull();
+    await webcam.turnOff();
+  });
+
+  it("starts once when turned on twice", async () => {
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await Promise.all([webcam.turnOn(), webcam.turnOn()]);
+
+    expect(transport.webcamStart).toHaveBeenCalledTimes(1);
+    expect(webcam.enabled.value).toBe(true);
+    await webcam.turnOff();
+  });
+
+  it("keeps webcam mode on and reports the error when a reconnect start fails", async () => {
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    vi.mocked(transport.webcamStart).mockImplementationOnce(async () =>
+      Promise.reject("camera is busy"),
+    );
+    await reconnect();
+
+    expect(webcam.error.value).toBe("camera is busy");
+    expect(webcam.enabled.value).toBe(true);
+    await webcam.turnOff();
   });
 });

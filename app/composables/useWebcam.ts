@@ -1,3 +1,4 @@
+import { effectScope } from "vue";
 import type { WebcamStatus } from "~/types/media";
 import { setCameraQueueHeld } from "~/utils/cameraQueue";
 import { errorMessage } from "~/utils/errorMessage";
@@ -5,6 +6,7 @@ import { getCameraTransport } from "~/utils/transport";
 
 const POLL_INTERVAL_MS = 1000;
 const START_FALLBACK = "Webcam mode could not start.";
+const POLL_FALLBACK = "Webcam status unavailable.";
 
 const STOPPED: WebcamStatus = {
   state: "stopped",
@@ -17,7 +19,13 @@ const STOPPED: WebcamStatus = {
 };
 
 let pollTimer: ReturnType<typeof setInterval> | undefined;
-let stopReconnectWatch: (() => void) | undefined;
+/**
+ * Bumped by every turn-on and turn-off. A start or poll that was in flight
+ * across a bump answers a question nobody is asking any more, so its result
+ * is dropped instead of overwriting the current state.
+ */
+let generation = 0;
+let reconnectWatchStarted = false;
 
 function stopPolling() {
   if (pollTimer !== undefined) clearInterval(pollTimer);
@@ -36,12 +44,15 @@ export function useWebcam() {
 
   async function poll() {
     if (!enabled.value || !isConnected.value) return;
+    const started = generation;
     try {
       const next = await getCameraTransport().webcamStatus();
       // A turn-off or disconnect may have landed while the call was in flight.
-      if (enabled.value && isConnected.value) status.value = next;
+      if (started !== generation || !enabled.value || !isConnected.value) return;
+      status.value = next;
+      error.value = null;
     } catch (cause) {
-      error.value = errorMessage(cause, START_FALLBACK);
+      if (started === generation) error.value = errorMessage(cause, POLL_FALLBACK);
     }
   }
 
@@ -50,8 +61,24 @@ export function useWebcam() {
     pollTimer = setInterval(() => void poll(), POLL_INTERVAL_MS);
   }
 
-  async function begin() {
-    status.value = await getCameraTransport().webcamStart();
+  /**
+   * Ask the camera to start streaming. Resolves false when the answer arrived
+   * after a turn-off or a newer turn-on, in which case nothing is written.
+   */
+  async function begin(): Promise<boolean> {
+    const started = generation;
+    const next = await getCameraTransport().webcamStart();
+    if (started !== generation) {
+      // Turned off mid-start: the camera is now streaming for nobody. If it
+      // was turned back on instead, the newer start owns the stream.
+      if (!enabled.value)
+        await getCameraTransport()
+          .webcamStop()
+          .catch(() => {});
+      return false;
+    }
+    status.value = next;
+    return true;
   }
 
   async function turnOn() {
@@ -60,13 +87,15 @@ export function useWebcam() {
       error.value = "Finish or cancel your downloads first.";
       return;
     }
+    const started = ++generation;
     error.value = null;
     enabled.value = true;
     try {
-      await begin();
+      if (!(await begin())) return;
       setCameraQueueHeld(true);
       startPolling();
     } catch (cause) {
+      if (started !== generation) return;
       enabled.value = false;
       setCameraQueueHeld(false);
       error.value = errorMessage(cause, START_FALLBACK);
@@ -74,6 +103,7 @@ export function useWebcam() {
   }
 
   async function turnOff() {
+    generation++;
     stopPolling();
     enabled.value = false;
     status.value = null;
@@ -89,21 +119,28 @@ export function useWebcam() {
     resumeDownloads();
   }
 
-  // Every component that calls useWebcam() would otherwise add its own
-  // watcher, and each would call webcamStart on reconnect. Keep exactly one.
-  stopReconnectWatch?.();
-  stopReconnectWatch = watch(isConnected, async (connected) => {
-    if (!enabled.value) return;
-    if (!connected) {
-      status.value = STOPPED;
-      return;
-    }
-    try {
-      await begin();
-    } catch (cause) {
-      error.value = errorMessage(cause, START_FALLBACK);
-    }
-  });
+  // One watcher for the whole app, in a detached scope: bound to a component,
+  // it would die with whichever page happened to create it, and webcam mode
+  // would silently stop resuming after a reconnect.
+  if (!reconnectWatchStarted) {
+    reconnectWatchStarted = true;
+    effectScope(true).run(() => {
+      const { isConnected: connectedNow } = useCamera();
+      watch(connectedNow, async (connected) => {
+        if (!enabled.value) return;
+        if (!connected) {
+          status.value = STOPPED;
+          return;
+        }
+        const started = generation;
+        try {
+          await begin();
+        } catch (cause) {
+          if (started === generation) error.value = errorMessage(cause, START_FALLBACK);
+        }
+      });
+    });
+  }
 
   return { enabled, status, error, blockedByDownloads, turnOn, turnOff };
 }

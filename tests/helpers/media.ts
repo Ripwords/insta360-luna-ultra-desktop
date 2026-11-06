@@ -1,4 +1,4 @@
-import type { MediaItem } from "~/types/media";
+import type { DownloadEntry, MediaItem } from "~/types/media";
 
 /** A complete, valid MediaItem. Override only the fields a test asserts on. */
 export function makeMediaItem(overrides: Partial<MediaItem> = {}): MediaItem {
@@ -16,6 +16,19 @@ export function makeMediaItem(overrides: Partial<MediaItem> = {}): MediaItem {
     size: 4_200_000,
     cameraPath,
     srcUrl: `http://127.0.0.1${cameraPath}`,
+    ...overrides,
+  };
+}
+
+/** A complete, valid DownloadEntry. Override only the fields a test asserts on. */
+export function makeDownloadEntry(overrides: Partial<DownloadEntry> = {}): DownloadEntry {
+  return {
+    id: "entry-1",
+    item: makeMediaItem(),
+    status: "queued",
+    progress: 0,
+    watermarked: false,
+    startedAt: 0,
     ...overrides,
   };
 }
