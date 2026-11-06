@@ -200,8 +200,8 @@ fn drain_frames(buffer: &mut Vec<u8>) -> Vec<Frame> {
                 .rev()
                 .find(|&n| buffer.ends_with(&UCD2_MAGIC[..n]))
                 .unwrap_or(0);
-            let drop = buffer.len() - keep;
-            buffer.drain(..drop);
+            let discard = buffer.len() - keep;
+            buffer.drain(..discard);
             break;
         };
         if start > 0 {
@@ -811,6 +811,18 @@ mod tests {
         let mut whole = stream.clone();
         let expected = drain_frames(&mut whole);
         assert_eq!(expected.len(), 3);
+        match &expected[0] {
+            Frame::File(response) => assert_eq!(response.request_id, 7),
+            other => panic!("expected a file response, got {other:?}"),
+        }
+        assert_eq!(expected[1], Frame::Stream);
+        match &expected[2] {
+            Frame::Media { substream, data } => {
+                assert_eq!(*substream, 0x20);
+                assert_eq!(data.len(), 100);
+            }
+            other => panic!("expected a media frame, got {other:?}"),
+        }
 
         for k in 0..stream.len() {
             let mut buffer = Vec::new();
@@ -821,6 +833,16 @@ mod tests {
             got.extend(drain_frames(&mut buffer));
             assert_eq!(got, expected, "split at {k}");
         }
+
+        // One byte per read: partial magic is retained repeatedly ("U", "UC", "UCD").
+        let mut buffer = Vec::new();
+        let mut got = Vec::new();
+        for byte in &stream {
+            buffer.push(*byte);
+            got.extend(drain_frames(&mut buffer));
+        }
+        assert_eq!(got, expected, "byte-at-a-time");
+        assert!(buffer.is_empty());
     }
 
     /// The existing FILE parsing must be untouched by the refactor.
