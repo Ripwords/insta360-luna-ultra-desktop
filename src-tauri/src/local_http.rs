@@ -17,8 +17,9 @@ const MAX_REQUEST: usize = 8 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Request {
-    /// A GET for this path (query and fragment stripped), with a valid Host.
-    Get(String),
+    /// A GET for this path (query and fragment stripped), with a valid Host,
+    /// and the request's `Origin` header if it sent exactly one.
+    Get(String, Option<String>),
     /// A well-formed request whose `Host` is missing or not ours.
     WrongHost,
     /// Not a GET, malformed, too long, or never completed.
@@ -75,10 +76,17 @@ fn parse(head: &[u8], port: u16) -> Request {
         (name == "127.0.0.1" || name.eq_ignore_ascii_case("localhost"))
             && host_port == port.to_string()
     };
+    let mut origins = head.split("\r\n").skip(1).filter_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.trim()
+            .eq_ignore_ascii_case("origin")
+            .then(|| value.trim().to_string())
+    });
+    let origin = origins.next().filter(|_| origins.next().is_none());
     match (hosts.next(), hosts.next()) {
         (Some(host), None) if ours(host) => {
             let path = target.split(['?', '#']).next().unwrap_or_default();
-            Request::Get(path.to_string())
+            Request::Get(path.to_string(), origin)
         }
         _ => Request::WrongHost,
     }
@@ -114,12 +122,23 @@ mod tests {
         ] {
             assert_eq!(
                 parse(&get(Some(host)), 49283),
-                Request::Get("/webcam.ts".into()),
+                Request::Get("/webcam.ts".into(), None),
                 "{host}"
             );
         }
         let lower = b"GET / HTTP/1.1\r\nhost: 127.0.0.1:7\r\n\r\n";
-        assert_eq!(parse(lower, 7), Request::Get("/".into()));
+        assert_eq!(parse(lower, 7), Request::Get("/".into(), None));
+    }
+
+    #[test]
+    fn the_origin_header_is_carried_through() {
+        let with = b"GET / HTTP/1.1\r\nHost: 127.0.0.1:7\r\norigin: tauri://localhost\r\n\r\n";
+        assert_eq!(
+            parse(with, 7),
+            Request::Get("/".into(), Some("tauri://localhost".into()))
+        );
+        let twice = b"GET / HTTP/1.1\r\nHost: 127.0.0.1:7\r\nOrigin: a\r\nOrigin: b\r\n\r\n";
+        assert_eq!(parse(twice, 7), Request::Get("/".into(), None));
     }
 
     #[test]
@@ -181,6 +200,6 @@ mod tests {
             client.write_all(second).await.unwrap();
         };
         let (request, ()) = tokio::join!(read_request(&mut socket, REQUEST_TIMEOUT), writer);
-        assert_eq!(request, Request::Get("/a".into()));
+        assert_eq!(request, Request::Get("/a".into(), None));
     }
 }

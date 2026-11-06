@@ -1,5 +1,6 @@
 import type { CameraInfo, CameraStatus, MediaItem } from "~/types/media";
 import { getCameraTransport } from "~/utils/transport";
+import { runBeforeCameraTeardown } from "~/utils/cameraTeardown";
 import { errorMessage } from "~/utils/errorMessage";
 import { armCameraHealth, disarmCameraHealth, FAILURE_THRESHOLD } from "~/utils/cameraHealth";
 
@@ -171,6 +172,8 @@ export function useCamera() {
   }
 
   async function disconnect() {
+    // Before the session goes: a STOP needs it to reach the camera.
+    await runBeforeCameraTeardown();
     wantConnection.value = false;
     await teardown();
     error.value = null;
@@ -182,6 +185,7 @@ export function useCamera() {
    * cannot immediately undo this. The user reconnects deliberately.
    */
   async function forceDisconnect() {
+    await runBeforeCameraTeardown();
     wantConnection.value = false;
     await teardown();
     error.value = `Lost contact with the camera. Disconnected after ${FAILURE_THRESHOLD} failed requests and a failed health check.`;

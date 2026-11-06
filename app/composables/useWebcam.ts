@@ -1,6 +1,7 @@
 import { effectScope } from "vue";
 import type { WebcamStatus } from "~/types/media";
 import { setCameraQueueHeld } from "~/utils/cameraQueue";
+import { setBeforeCameraTeardown } from "~/utils/cameraTeardown";
 import { errorMessage } from "~/utils/errorMessage";
 import { getCameraTransport } from "~/utils/transport";
 
@@ -26,6 +27,10 @@ let pollTimer: ReturnType<typeof setInterval> | undefined;
  */
 let generation = 0;
 let reconnectWatchStarted = false;
+/** True for a stream adopted after a reload, before the camera shows connected. */
+let adopted = false;
+/** True while a seed call is in flight, so two callers do not both ask. */
+let seeding = false;
 /** Generation of the poll in flight, so a slow camera never gets stacked calls. */
 let pollInFlight: number | null = null;
 
@@ -42,17 +47,21 @@ export function useWebcam() {
   const status = useState<WebcamStatus | null>("webcam-status", () => null);
   const error = useState<string | null>("webcam-error", () => null);
 
+  // Set on the first call so a webview reload does not forget a stream that
+  // Rust is still serving. Shared state, so the answer is asked for only once.
+  const seeded = useState<boolean>("webcam-seeded", () => false);
+
   const blockedByDownloads = computed(() => activeDownloads.value.length > 0);
 
   async function poll() {
-    if (!enabled.value || !isConnected.value) return;
+    if (!enabled.value || !(isConnected.value || adopted)) return;
     const started = generation;
     if (pollInFlight === started) return;
     pollInFlight = started;
     try {
       const next = await getCameraTransport().webcamStatus();
       // A turn-off or disconnect may have landed while the call was in flight.
-      if (started !== generation || !enabled.value || !isConnected.value) return;
+      if (started !== generation || !enabled.value || !(isConnected.value || adopted)) return;
       status.value = next;
       error.value = null;
     } catch (cause) {
@@ -87,6 +96,28 @@ export function useWebcam() {
     return true;
   }
 
+  async function seed() {
+    if (seeded.value || seeding || !getCameraTransport().available) return;
+    seeding = true;
+    const started = generation;
+    try {
+      const current = await getCameraTransport().webcamStatus();
+      seeded.value = true;
+      // Anything the user did while this was in flight is newer than the answer.
+      if (started !== generation || enabled.value || current.state === "off") return;
+      adopted = true;
+      enabled.value = true;
+      status.value = current;
+      setCameraQueueHeld(true);
+      startPolling();
+    } catch {
+      // Left unseeded, so the next use asks again.
+    } finally {
+      seeding = false;
+    }
+  }
+  if (import.meta.client) void seed();
+
   async function turnOn() {
     if (enabled.value) return;
     if (blockedByDownloads.value) {
@@ -115,6 +146,7 @@ export function useWebcam() {
 
   async function turnOff() {
     const stopping = ++generation;
+    adopted = false;
     stopPolling();
     enabled.value = false;
     status.value = null;
@@ -139,6 +171,15 @@ export function useWebcam() {
     reconnectWatchStarted = true;
     effectScope(true).run(() => {
       const { isConnected: connectedNow } = useCamera();
+      setBeforeCameraTeardown(async () => {
+        if (enabled.value) await turnOff();
+      });
+      // `wantConnection` drops only on a user disconnect or the app giving up
+      // on the camera. A transient drop leaves it set while reconnecting.
+      const wantConnection = useState<boolean>("camera-want-connection", () => false);
+      watch(wantConnection, (wanted) => {
+        if (!wanted && enabled.value) void turnOff();
+      });
       watch(connectedNow, async (connected) => {
         if (!enabled.value) return;
         if (!connected) {

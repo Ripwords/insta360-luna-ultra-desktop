@@ -54,16 +54,31 @@ fn build_start_live_stream_body() -> Vec<u8> {
     body
 }
 
-fn response_head() -> Vec<u8> {
-    concat!(
-        "HTTP/1.1 200 OK\r\n",
-        "Content-Type: application/octet-stream\r\n",
-        "Cache-Control: no-store\r\n",
-        "Access-Control-Allow-Origin: *\r\n",
-        "Connection: close\r\n\r\n"
+/// The origins the app's own webview fetches from: the release build on
+/// macOS and Linux, on Windows, and the Nuxt dev server.
+const ALLOWED_ORIGINS: [&str; 3] = [
+    "tauri://localhost",
+    "http://tauri.localhost",
+    "http://localhost:3000",
+];
+
+/// The response head. Cross-origin access is granted only to the app's own
+/// origins, by echoing the request's `Origin`; any other page can still send
+/// the request but the browser will not let it read the video.
+fn response_head(origin: Option<&str>) -> Vec<u8> {
+    let cors = origin
+        .filter(|origin| ALLOWED_ORIGINS.contains(origin))
+        .map(|origin| format!("Access-Control-Allow-Origin: {origin}\r\n"))
+        .unwrap_or_default();
+    format!(
+        "HTTP/1.1 200 OK\r\n\
+         Content-Type: application/octet-stream\r\n\
+         Cache-Control: no-store\r\n\
+         Vary: Origin\r\n\
+         {cors}\
+         Connection: close\r\n\r\n"
     )
-    .as_bytes()
-    .to_vec()
+    .into_bytes()
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -203,6 +218,14 @@ impl LiveViewState {
     pub(crate) async fn release(&self, consumer: Consumer) {
         let mut preview = self.inner.lock().await;
         self.release_locked(&mut preview, consumer).await;
+    }
+
+    /// Drops every consumer, sending STOP if any held the stream. For quit.
+    pub(crate) async fn release_all(&self) {
+        let mut preview = self.inner.lock().await;
+        for consumer in [Consumer::Viewfinder, Consumer::Webcam] {
+            self.release_locked(&mut preview, consumer).await;
+        }
     }
 
     pub(crate) fn relay(&self) -> Arc<Relay> {
@@ -362,17 +385,23 @@ pub(crate) async fn write_within(socket: &mut TcpStream, bytes: &[u8], limit: Du
 /// mid-GOP; the page reconnects for a clean start.
 async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>, write_timeout: Duration) {
     // Any path: we serve one thing. The Host check still applies.
-    let refusal = match read_request(&mut socket, REQUEST_TIMEOUT).await {
-        Request::Get(_) => None,
-        Request::WrongHost => Some(MISDIRECTED),
-        Request::Invalid => Some(BAD_REQUEST),
+    let (refusal, origin) = match read_request(&mut socket, REQUEST_TIMEOUT).await {
+        Request::Get(_, origin) => (None, origin),
+        Request::WrongHost => (Some(MISDIRECTED), None),
+        Request::Invalid => (Some(BAD_REQUEST), None),
     };
     if let Some(status) = refusal {
         let _ = write_within(&mut socket, &status_response(status), write_timeout).await;
         return;
     }
     let subscription = relay.subscribe();
-    if !write_within(&mut socket, &response_head(), write_timeout).await {
+    if !write_within(
+        &mut socket,
+        &response_head(origin.as_deref()),
+        write_timeout,
+    )
+    .await
+    {
         return;
     }
     let mut started = !subscription.bootstrap.is_empty();
@@ -521,11 +550,33 @@ mod tests {
 
     #[test]
     fn http_response_head_declares_a_streaming_body() {
-        let head = String::from_utf8(response_head()).unwrap();
+        let head = String::from_utf8(response_head(None)).unwrap();
         assert!(head.starts_with("HTTP/1.1 200 OK\r\n"));
         assert!(head.contains("Content-Type: application/octet-stream"));
-        assert!(head.contains("Access-Control-Allow-Origin: *"));
         assert!(head.ends_with("\r\n\r\n"));
+    }
+
+    #[test]
+    fn cors_is_granted_only_to_the_apps_own_origins() {
+        for origin in ALLOWED_ORIGINS {
+            let head = String::from_utf8(response_head(Some(origin))).unwrap();
+            assert!(
+                head.contains(&format!("Access-Control-Allow-Origin: {origin}\r\n")),
+                "{origin}"
+            );
+            assert!(head.contains("Vary: Origin\r\n"));
+        }
+        for origin in [
+            None,
+            Some("https://evil.example"),
+            Some("null"),
+            Some("http://localhost:3001"),
+            Some("http://localhost:3000.evil.example"),
+        ] {
+            let head = String::from_utf8(response_head(origin)).unwrap();
+            assert!(!head.contains("Access-Control-Allow-Origin"), "{origin:?}");
+            assert!(head.ends_with("Connection: close\r\n\r\n"));
+        }
     }
 
     use crate::webcam::nal::{AccessUnit, ParamSets};
@@ -565,6 +616,37 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn the_viewfinder_echoes_an_allowed_origin_only() {
+        let relay = Relay::new();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(serve_annexb(listener, Arc::clone(&relay)));
+        for (origin, granted) in [("tauri://localhost", true), ("https://evil.example", false)] {
+            let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let request = format!(
+                "GET /stream HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: {origin}\r\n\r\n"
+            );
+            client.write_all(request.as_bytes()).await.unwrap();
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                let mut byte = [0u8; 1];
+                let n = tokio::time::timeout(READ_LIMIT, client.read(&mut byte))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(n, 1);
+                head.push(byte[0]);
+            }
+            let head = String::from_utf8(head).unwrap();
+            assert_eq!(
+                head.contains(&format!("Access-Control-Allow-Origin: {origin}")),
+                granted,
+                "{origin}"
+            );
+        }
+    }
+
     async fn viewfinder(relay: &Arc<Relay>) -> TcpStream {
         let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -589,7 +671,7 @@ mod tests {
             assert_eq!(n, 1, "socket closed inside the response head");
             head.push(byte[0]);
         }
-        assert_eq!(head, response_head());
+        assert_eq!(head, response_head(None));
     }
 
     /// The NAL types following each four-byte start code in `bytes`.
@@ -824,6 +906,21 @@ mod tests {
         let (session, camera) = fake::connect(OnStart::HangUp).await;
         let result = live.acquire(Consumer::Viewfinder, session).await;
         assert!(result.is_err());
+        assert_eq!(camera.wait_for(2).await, [START, STOP]);
+        assert!(consumers(&live).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn release_all_stops_the_camera_once_for_every_consumer() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Viewfinder, Arc::clone(&session))
+            .await
+            .unwrap();
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        live.release_all().await;
         assert_eq!(camera.wait_for(2).await, [START, STOP]);
         assert!(consumers(&live).await.is_empty());
     }

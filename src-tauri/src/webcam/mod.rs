@@ -387,6 +387,27 @@ impl WebcamState {
     }
 }
 
+/// Longest a quit waits for the camera to be told to stop streaming.
+const SHUTDOWN_LIMIT: Duration = Duration::from_secs(2);
+
+/// Stops webcam mode and the viewfinder, so the camera is not left streaming
+/// after the app quits. Best effort: gives up after `limit` rather than
+/// hanging the quit on a camera that has stopped answering.
+pub async fn shutdown_within(webcam: &WebcamState, live: &LiveViewState, limit: Duration) {
+    let stopping = async {
+        webcam.stop(live).await;
+        live.release_all().await;
+    };
+    if tokio::time::timeout(limit, stopping).await.is_err() {
+        log::warn!("the camera did not confirm STOP before quit");
+    }
+}
+
+/// `shutdown_within` with the limit the quit path uses.
+pub async fn shutdown(webcam: &WebcamState, live: &LiveViewState) {
+    shutdown_within(webcam, live, SHUTDOWN_LIMIT).await;
+}
+
 /// Turns webcam mode on: binds the port, starts the camera's preview, and
 /// follows the session until stopped. Calling it again returns the status.
 #[tauri::command]
@@ -794,6 +815,36 @@ mod tests {
         webcam.stop(&source.live).await;
         assert_eq!(webcam.status(&source.live.relay()).state, WebcamPhase::Off);
         assert_eq!(camera.codes(), [START], "the viewfinder still holds it");
+    }
+
+    #[tokio::test]
+    async fn shutdown_tells_the_camera_to_stop_and_clears_both_consumers() {
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        let live = LiveViewState::default();
+        live.acquire(Consumer::Viewfinder, Arc::clone(&session))
+            .await
+            .unwrap();
+        let webcam = WebcamState::default();
+        shutdown(&webcam, &live).await;
+        assert_eq!(camera.wait_for(2).await, [START, STOP]);
+    }
+
+    #[tokio::test]
+    async fn shutdown_gives_up_on_a_camera_that_never_answers_stop() {
+        let (session, camera) = fake::connect(OnStart::Ignore).await;
+        let live = Arc::new(LiveViewState::default());
+        let pending = tokio::spawn({
+            let live = Arc::clone(&live);
+            let session = Arc::clone(&session);
+            async move { live.acquire(Consumer::Webcam, session).await }
+        });
+        camera.wait_for(1).await;
+        pending.abort();
+        let _ = pending.await;
+        let began = Instant::now();
+        shutdown_within(&WebcamState::default(), &live, Duration::from_millis(100)).await;
+        assert!(began.elapsed() < Duration::from_secs(2));
+        assert_eq!(camera.wait_for(2).await, [START, STOP]);
     }
 
     #[test]
