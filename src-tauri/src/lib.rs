@@ -1,4 +1,5 @@
 mod liveview;
+mod webcam;
 mod luna;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
