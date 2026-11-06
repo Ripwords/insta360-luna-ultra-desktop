@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DownloadEntry, WebcamStatus } from "~/types/media";
+import { FAILURE_THRESHOLD, reportCameraFailure } from "~/utils/cameraHealth";
 import { isCameraQueueHeld, setCameraQueueHeld } from "~/utils/cameraQueue";
 import { resetCameraTransport, setCameraTransport } from "~/utils/transport";
 import { makeFakeTransport } from "../helpers/fakeTransport";
@@ -515,5 +516,85 @@ describe("useWebcam", () => {
     expect(transport.webcamStatus).toHaveBeenCalledTimes(1);
     expect(webcam.enabled.value).toBe(false);
     expect(isCameraQueueHeld()).toBe(false);
+  });
+  it("stops the stream before the session is torn down on a user disconnect", async () => {
+    const order: string[] = [];
+    setup({
+      webcamStop: vi.fn(async () => {
+        order.push("webcamStop");
+      }),
+      disconnect: vi.fn(async () => {
+        order.push("disconnect");
+      }),
+    });
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+    order.length = 0;
+
+    await camera.disconnect();
+
+    expect(order).toEqual(["webcamStop", "disconnect"]);
+  });
+
+  it("stops the stream before the session is torn down on a forced disconnect", async () => {
+    const order: string[] = [];
+    setup({
+      probe: vi.fn(async () => false),
+      webcamStop: vi.fn(async () => {
+        order.push("webcamStop");
+      }),
+      disconnect: vi.fn(async () => {
+        order.push("disconnect");
+      }),
+    });
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+    order.length = 0;
+
+    for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(order).toEqual(["webcamStop", "disconnect"]);
+  });
+
+  it("keeps polling an adopted stream while the camera shows disconnected", async () => {
+    const transport = setup();
+    useState<boolean>("webcam-seeded").value = false;
+    const webcam = await mountComposable(() => useWebcam());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(webcam.enabled.value).toBe(true);
+    vi.mocked(transport.webcamStatus).mockClear();
+    vi.mocked(transport.webcamStatus).mockImplementation(async () => STALLED);
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(transport.webcamStatus).toHaveBeenCalledTimes(1);
+    expect(webcam.status.value).toEqual(STALLED);
+    await webcam.turnOff();
+  });
+
+  it("retries the seed on the next use when the first call fails", async () => {
+    const transport = setup();
+    vi.mocked(transport.webcamStatus).mockImplementationOnce(async () =>
+      Promise.reject(new Error("not ready")),
+    );
+    useState<boolean>("webcam-seeded").value = false;
+    const first = await mountComposable(() => useWebcam());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(first.enabled.value).toBe(false);
+
+    const second = await mountComposable(() => useWebcam());
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(second.enabled.value).toBe(true);
+    await second.turnOff();
   });
 });
