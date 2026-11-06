@@ -121,8 +121,8 @@ async fn serve_client(
     write_timeout: Duration,
 ) {
     let refusal = match read_request(&mut socket, REQUEST_TIMEOUT).await {
-        Request::Get(path) if path == WEBCAM_PATH => None,
-        Request::Get(_) => Some(NOT_FOUND.to_vec()),
+        Request::Get(path, _) if path == WEBCAM_PATH => None,
+        Request::Get(..) => Some(NOT_FOUND.to_vec()),
         Request::WrongHost => Some(status_response(MISDIRECTED)),
         Request::Invalid => Some(status_response(BAD_REQUEST)),
     };
