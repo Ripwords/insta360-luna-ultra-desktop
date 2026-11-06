@@ -41,7 +41,7 @@ pub struct TsMuxer {
     cc_video: u8,
     /// PTS of the last PAT/PMT pair, once one has been sent.
     last_psi: Option<u64>,
-    /// A params-only AU's bytes, waiting for the next picture.
+    /// The latest params-only AU's bytes, waiting for the next picture.
     held: Vec<u8>,
 }
 
@@ -62,6 +62,8 @@ impl TsMuxer {
     /// next picture.
     pub fn mux(&mut self, au: &AccessUnit) -> Vec<u8> {
         if !has_vcl(self.codec, &au.data) {
+            // Only the latest params apply; a params-only stream must not grow this.
+            self.held.clear();
             self.held.extend_from_slice(&au.data);
             return Vec::new();
         }
@@ -611,6 +613,78 @@ mod tests {
     }
 
     #[test]
+    fn held_params_are_replaced_not_appended() {
+        let vps = [0, 0, 0, 1, 0x40, 0x01, 0x0c];
+        let newer = [0, 0, 0, 1, 0x40, 0x01, 0x0d];
+        let slice = [0, 0, 0, 1, 0x26, 0x01, 0x80, 0xaa];
+        let mut muxer = TsMuxer::new(Codec::H265);
+        for data in [&vps[..], &vps, &newer] {
+            let params_only = AccessUnit {
+                data: data.to_vec(),
+                keyframe: false,
+                params: None,
+                pts90k: 10,
+            };
+            assert!(muxer.mux(&params_only).is_empty());
+        }
+        let keyframe = AccessUnit {
+            data: slice.to_vec(),
+            keyframe: true,
+            params: None,
+            pts90k: 10,
+        };
+        let pes = pes_list(&muxer.mux(&keyframe));
+        assert_eq!(
+            pes_es(&pes[0].bytes),
+            [&[0, 0, 0, 1, 0x46, 0x01, 0x50][..], &newer, &slice].concat(),
+            "only the latest params-only AU rides along"
+        );
+    }
+
+    /// Payload sizes around the first packet's 176-byte room and the
+    /// following packets' 184, so the last packet needs 0, 1, 2 and more
+    /// bytes of stuffing.
+    #[test]
+    fn pes_survives_every_size_across_packet_boundaries() {
+        let aud = [0, 0, 0, 1, 0x46, 0x01, 0x50];
+        let mut stuffing_seen = [false; 3];
+        // ES = AUD (7) + slice header (6) + filler; PES header is 14 bytes.
+        for filler in 120..=600 {
+            let mut data = vec![0, 0, 0, 1, 0x26, 0x01];
+            data.resize(6 + filler, 0xaa);
+            let au = AccessUnit {
+                data: data.clone(),
+                keyframe: false,
+                params: None,
+                pts90k: 10,
+            };
+            let ts = TsMuxer::new(Codec::H265).mux(&au);
+            let packets = parse(&ts);
+            for p in packets.iter().filter(|p| p.pid == VIDEO_PID) {
+                let af = p.adaptation.map_or(0, |a| a.len());
+                assert!(af <= 183, "adaptation field of {af} bytes");
+                if !p.pusi {
+                    // A trailing packet's adaptation field is pure stuffing.
+                    match p.adaptation.map(<[u8]>::len) {
+                        None => stuffing_seen[0] = true,
+                        Some(0) => stuffing_seen[1] = true,
+                        Some(1) => stuffing_seen[2] = true,
+                        Some(_) => {}
+                    }
+                }
+            }
+            let pes = pes_list(&ts);
+            assert_eq!(pes.len(), 1, "filler {filler}");
+            assert_eq!(pes_es(&pes[0].bytes), [&aud[..], &data].concat(), "filler {filler}");
+        }
+        assert_eq!(
+            stuffing_seen,
+            [true; 3],
+            "no-stuffing, 1-byte and 2-byte stuffing must all occur"
+        );
+    }
+
+    #[test]
     fn pts_wraps_at_33_bits() {
         let au = AccessUnit {
             data: vec![0, 0, 0, 1, 0x26, 0x01, 0x80, 0xaa],
@@ -642,10 +716,13 @@ mod tests {
         }
     }
 
+    /// The conformance tests run both ffprobe and ffmpeg.
     fn have_ffprobe() -> bool {
-        let found = Command::new("ffprobe").arg("-version").output().is_ok();
+        let found = ["ffprobe", "ffmpeg"]
+            .iter()
+            .all(|tool| Command::new(tool).arg("-version").output().is_ok());
         if !found {
-            println!("skipping: ffprobe not installed");
+            println!("skipping: ffprobe or ffmpeg not installed");
         }
         found
     }
