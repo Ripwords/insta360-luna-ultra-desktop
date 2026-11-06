@@ -220,6 +220,14 @@ impl LiveViewState {
         self.release_locked(&mut preview, consumer).await;
     }
 
+    /// Drops every consumer, sending STOP if any held the stream. For quit.
+    pub(crate) async fn release_all(&self) {
+        let mut preview = self.inner.lock().await;
+        for consumer in [Consumer::Viewfinder, Consumer::Webcam] {
+            self.release_locked(&mut preview, consumer).await;
+        }
+    }
+
     pub(crate) fn relay(&self) -> Arc<Relay> {
         Arc::clone(&self.relay)
     }
@@ -898,6 +906,21 @@ mod tests {
         let (session, camera) = fake::connect(OnStart::HangUp).await;
         let result = live.acquire(Consumer::Viewfinder, session).await;
         assert!(result.is_err());
+        assert_eq!(camera.wait_for(2).await, [START, STOP]);
+        assert!(consumers(&live).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn release_all_stops_the_camera_once_for_every_consumer() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Viewfinder, Arc::clone(&session))
+            .await
+            .unwrap();
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        live.release_all().await;
         assert_eq!(camera.wait_for(2).await, [START, STOP]);
         assert!(consumers(&live).await.is_empty());
     }

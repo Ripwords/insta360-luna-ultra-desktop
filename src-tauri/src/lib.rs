@@ -5,6 +5,7 @@ mod webcam;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  use tauri::Manager;
   tauri::Builder::default()
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_http::init())
@@ -40,6 +41,14 @@ pub fn run() {
       }
       Ok(())
     })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app, event| {
+      if let tauri::RunEvent::Exit = event {
+        // Without this the camera keeps streaming after the app has gone.
+        let webcam = app.state::<webcam::WebcamState>();
+        let live = app.state::<liveview::LiveViewState>();
+        tauri::async_runtime::block_on(webcam::shutdown(&webcam, &live));
+      }
+    });
 }
