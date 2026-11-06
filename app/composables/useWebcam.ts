@@ -42,6 +42,10 @@ export function useWebcam() {
   const status = useState<WebcamStatus | null>("webcam-status", () => null);
   const error = useState<string | null>("webcam-error", () => null);
 
+  // Set on the first call so a webview reload does not forget a stream that
+  // Rust is still serving. Shared state, so the answer is asked for only once.
+  const seeded = useState<boolean>("webcam-seeded", () => false);
+
   const blockedByDownloads = computed(() => activeDownloads.value.length > 0);
 
   async function poll() {
@@ -86,6 +90,24 @@ export function useWebcam() {
     status.value = next;
     return true;
   }
+
+  async function seed() {
+    if (seeded.value || !getCameraTransport().available) return;
+    seeded.value = true;
+    const started = generation;
+    try {
+      const current = await getCameraTransport().webcamStatus();
+      // Anything the user did while this was in flight is newer than the answer.
+      if (started !== generation || enabled.value || current.state === "off") return;
+      enabled.value = true;
+      status.value = current;
+      setCameraQueueHeld(true);
+      startPolling();
+    } catch {
+      // Nothing to adopt; the next explicit turn-on reports real errors.
+    }
+  }
+  if (import.meta.client) void seed();
 
   async function turnOn() {
     if (enabled.value) return;
@@ -139,6 +161,12 @@ export function useWebcam() {
     reconnectWatchStarted = true;
     effectScope(true).run(() => {
       const { isConnected: connectedNow } = useCamera();
+      // `wantConnection` drops only on a user disconnect or the app giving up
+      // on the camera. A transient drop leaves it set while reconnecting.
+      const wantConnection = useState<boolean>("camera-want-connection", () => false);
+      watch(wantConnection, (wanted) => {
+        if (!wanted && enabled.value) void turnOff();
+      });
       watch(connectedNow, async (connected) => {
         if (!enabled.value) return;
         if (!connected) {
