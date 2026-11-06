@@ -6,7 +6,7 @@
 //!   (consumed from the frontend via the http plugin).
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 
@@ -353,7 +353,10 @@ pub(crate) struct Session {
     /// When a download last received bytes, as reported by `luna_transfer_activity`.
     last_transfer_activity: StdMutex<Option<Instant>>,
     /// When the reader last received a video MEDIA frame.
-    last_video: StdMutex<Option<Instant>>,
+    last_video: Arc<StdMutex<Option<Instant>>>,
+    /// Set when a write timed out mid-packet: the wire holds a partial frame,
+    /// so the session is unusable and must be evicted.
+    poisoned: AtomicBool,
 }
 
 impl Session {
@@ -373,6 +376,10 @@ impl Session {
         *self.last_transfer_activity.lock().unwrap() = Some(Instant::now());
     }
 
+    fn is_poisoned(&self) -> bool {
+        self.poisoned.load(Ordering::Relaxed)
+    }
+
     pub(crate) fn last_video(&self) -> Option<Instant> {
         *self.last_video.lock().unwrap()
     }
@@ -382,10 +389,19 @@ impl Session {
     }
 
     async fn write(&self, packet: &[u8]) -> Result<(), String> {
-        let mut writer = self.writer.lock().await;
-        match tokio::time::timeout(WRITE_TIMEOUT, writer.write_all(packet)).await {
+        if self.is_poisoned() {
+            return Err("camera connection lost".into());
+        }
+        let write = async {
+            let mut writer = self.writer.lock().await;
+            writer.write_all(packet).await
+        };
+        match tokio::time::timeout(WRITE_TIMEOUT, write).await {
             Ok(result) => result.map_err(|e| format!("camera write failed: {e}")),
-            Err(_) => Err("camera write timed out".into()),
+            Err(_) => {
+                self.poisoned.store(true, Ordering::Relaxed);
+                Err("camera write timed out".into())
+            }
         }
     }
 
@@ -480,6 +496,8 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
 
     let (stream_tx, _) = broadcast::channel::<Vec<u8>>(512);
 
+    let last_video: Arc<StdMutex<Option<Instant>>> = Arc::default();
+
     let session = Arc::new(Session {
         writer: Mutex::new(write_half),
         pending: Arc::clone(&pending),
@@ -490,12 +508,11 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         info: StdMutex::new(LunaDeviceInfo::default()),
         stream_tx: stream_tx.clone(),
         last_transfer_activity: StdMutex::new(None),
-        last_video: StdMutex::new(None),
+        last_video: Arc::clone(&last_video),
+        poisoned: AtomicBool::new(false),
     });
 
     let reader_pending = pending;
-    // Weak: the session owns this task's handle, so a strong ref would leak it
-    let reader_session = Arc::downgrade(&session);
     let reader = tokio::spawn(async move {
         let mut buffer = Vec::new();
         let mut chunk = [0u8; 16 * 1024];
@@ -514,9 +531,7 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
                             Frame::Media { substream, data }
                                 if substream == MEDIA_VIDEO && !data.is_empty() =>
                             {
-                                if let Some(session) = reader_session.upgrade() {
-                                    *session.last_video.lock().unwrap() = Some(Instant::now());
-                                }
+                                *last_video.lock().unwrap() = Some(Instant::now());
                                 let _ = stream_tx.send(data);
                             }
                             // Secondary preview and gyro substreams are ignored
@@ -586,20 +601,18 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
             };
             match tick.await {
                 Ok(()) => failures = 0,
-                Err(_) if transfer_active => failures = 0,
+                Err(_) if transfer_active && !session.is_poisoned() => failures = 0,
                 Err(_) => {
                     failures += 1;
-                    if failures >= 2 {
+                    if failures >= 2 || session.is_poisoned() {
                         let mut stored = ka_state.lock().await;
-                        let is_current = stored.as_ref().is_some_and(|current| same_session(current, &session));
-                        if is_current {
+                        if stored.as_ref().is_some_and(|current| same_session(current, &session)) {
                             stored.take();
+                            // Emitted under the lock so a reconnect cannot see a stale event
+                            let _ = ka_app.emit("luna://disconnected", ());
                         }
                         drop(stored);
                         drop(session);
-                        if is_current {
-                            let _ = ka_app.emit("luna://disconnected", ());
-                        }
                         break;
                     }
                 }
@@ -712,7 +725,7 @@ mod tests {
         let now = Instant::now();
         assert!(!video_recent(None, now));
         assert!(video_recent(Some(now - Duration::from_secs(6)), now));
-        assert!(!video_recent(Some(now - Duration::from_secs(12)), now));
+        assert!(!video_recent(Some(now - VIDEO_ALIVE_WINDOW), now));
     }
 
     fn test_session(write_half: OwnedWriteHalf) -> Session {
@@ -726,7 +739,8 @@ mod tests {
             info: StdMutex::new(LunaDeviceInfo::default()),
             stream_tx: broadcast::channel::<Vec<u8>>(4).0,
             last_transfer_activity: StdMutex::new(None),
-            last_video: StdMutex::new(None),
+            last_video: Arc::default(),
+            poisoned: AtomicBool::new(false),
         }
     }
 
@@ -746,6 +760,11 @@ mod tests {
             .await
             .expect("write must return within the write timeout");
         assert!(result.unwrap_err().contains("timed out"));
+
+        let started = Instant::now();
+        let second = session.write(b"x").await;
+        assert!(second.is_err());
+        assert!(started.elapsed() < Duration::from_millis(500));
     }
 
     #[test]
