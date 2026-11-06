@@ -1,3 +1,5 @@
+import { shallowRef } from "vue";
+
 /**
  * Global concurrency limiter for camera HTTP traffic.
  *
@@ -37,7 +39,8 @@ interface QueuedTask {
 
 let active = 0;
 let paused = false;
-let held = false;
+/** Reactive so views that reach the camera outside the queue can wait on it. */
+const held = shallowRef(false);
 const queue: QueuedTask[] = [];
 
 const scoreOf = (priority: CameraPriority): number =>
@@ -59,16 +62,16 @@ export function setCameraQueuePaused(value: boolean): void {
  * hold drains the queue, and a pause still applies afterwards.
  */
 export function setCameraQueueHeld(value: boolean): void {
-  held = value;
+  held.value = value;
   if (!value) drain();
 }
 
 export function isCameraQueueHeld(): boolean {
-  return held;
+  return held.value;
 }
 
 function drain(): void {
-  if (held) return;
+  if (held.value) return;
   while (active < CAMERA_CONCURRENCY && queue.length > 0) {
     // Pick the highest-priority runnable task, re-scoring dynamic priorities so
     // the pick reflects the current scroll position.

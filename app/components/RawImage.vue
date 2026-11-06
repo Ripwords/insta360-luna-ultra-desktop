@@ -3,7 +3,7 @@ import { getCameraTransport } from "~/utils/transport";
 import { extractDngPreview } from "~/utils/dng";
 import { decodeRawToDataUrl } from "~/utils/rawCanvas";
 import { formatBytes } from "~/utils/media";
-import { withCameraSlot, CAMERA_PRIORITY } from "~/utils/cameraQueue";
+import { withCameraSlot, CAMERA_PRIORITY, isCameraQueueHeld } from "~/utils/cameraQueue";
 import { cachedMedia, hasCachedMedia } from "~/utils/mediaCache";
 import { rawPreviewKey } from "~/utils/rawPreviewCache";
 
@@ -46,6 +46,7 @@ const imgSrc = ref<string | null>(null);
 const state = ref<"idle" | "loading" | "loaded" | "nopreview" | "error">("idle");
 const phase = ref<"downloading" | "decoding">("downloading");
 const downloaded = ref(0);
+const held = computed(isCameraQueueHeld);
 const total = ref(0);
 /** Which stage failed — surfaced in the fallback UI so failures are diagnosable. */
 const reason = ref<"network" | "range-skipped" | "no-preview" | "decode-failed" | null>(null);
@@ -233,6 +234,11 @@ onBeforeUnmount(() => {
       </div>
     </slot>
 
+    <CameraHeldPlaceholder
+      v-else-if="held && phase === 'downloading' && downloaded === 0"
+      :detailed="fullFile"
+      class="absolute inset-0 bg-elevated"
+    />
     <div
       v-else
       class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-elevated text-dimmed"

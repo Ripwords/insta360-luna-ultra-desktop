@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { useClipboard } from "@vueuse/core";
 
-const SETUP_GUIDE_URL = "https://ripwords.github.io/insta360-luna-ultra-desktop/docs/webcam";
 const STALL_MESSAGE =
   "The camera stopped sending video. Its screen may have gone to sleep. Tap the camera's screen to wake it.";
 
 const { enabled, status, error, turnOn, turnOff } = useWebcam();
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
+
+/** Inline, not a link: the desktop webview has no way to open an external page. */
+const setupOpen = ref(false);
 
 /** True while a turn-on or turn-off call is in flight, so the switch can't be double-flipped. */
 const pending = ref(false);
@@ -49,26 +51,15 @@ const line = computed(() => {
     class="flex flex-col gap-3 rounded-[18px] border border-default bg-elevated/40 p-3"
     aria-label="Webcam mode"
   >
-    <div class="flex items-center justify-between gap-4">
-      <USwitch
-        :model-value="enabled"
-        :loading="pending"
-        :disabled="pending"
-        size="md"
-        label="Webcam mode"
-        description="Stream the preview to OBS."
-        @update:model-value="toggle"
-      />
-      <ULink
-        v-if="enabled"
-        :to="SETUP_GUIDE_URL"
-        target="_blank"
-        class="flex shrink-0 items-center gap-1 text-sm"
-      >
-        Set up OBS
-        <UIcon name="i-lucide-arrow-up-right" class="size-4" />
-      </ULink>
-    </div>
+    <USwitch
+      :model-value="enabled"
+      :loading="pending"
+      :disabled="pending"
+      size="md"
+      label="Webcam mode"
+      description="Stream the preview to OBS."
+      @update:model-value="toggle"
+    />
 
     <p v-if="error" class="text-sm text-error">{{ error }}</p>
 
@@ -100,6 +91,35 @@ const line = computed(() => {
         />
         <span>{{ line.text }}</span>
       </p>
+
+      <UCollapsible v-model:open="setupOpen" class="flex flex-col items-start gap-2">
+        <UButton
+          label="Set up OBS"
+          :trailing-icon="setupOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+          color="neutral"
+          variant="link"
+          size="md"
+          class="px-0"
+        />
+        <template #content>
+          <ol class="list-decimal space-y-1 pl-5 text-sm text-muted">
+            <li>
+              In OBS, under <span class="text-highlighted">Sources</span>, select + and choose
+              <span class="text-highlighted">Media Source</span>.
+            </li>
+            <li>Untick <span class="text-highlighted">Local File</span>.</li>
+            <li>
+              Paste the address above into <span class="text-highlighted">Input</span>, then select
+              OK.
+            </li>
+            <li>
+              Select <span class="text-highlighted">Start Virtual Camera</span>, and pick
+              <span class="text-highlighted">OBS Virtual Camera</span> in Zoom, Meet, Teams or
+              Discord.
+            </li>
+          </ol>
+        </template>
+      </UCollapsible>
     </template>
   </section>
 </template>

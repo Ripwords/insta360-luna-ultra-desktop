@@ -300,6 +300,7 @@ defineShortcuts({
         :item="previewItem"
         :has-prev="previewIndex > 0"
         :has-next="previewIndex >= 0 && previewIndex < orderedIds.length - 1"
+        :download-disabled="webcamOn"
         @prev="stepPreview(-1)"
         @next="stepPreview(1)"
         @download="onDownloadFromPreview"

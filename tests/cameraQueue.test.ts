@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { computed } from "vue";
 import {
   withCameraSlot,
   CAMERA_PRIORITY,
@@ -124,6 +125,15 @@ describe("withCameraSlot", () => {
     expect(isCameraQueueHeld()).toBe(false);
     await Promise.all([preview, thumb]);
     expect(order).toEqual(["preview", "thumb"]);
+  });
+
+  it("reports the hold reactively", () => {
+    const held = computed(() => isCameraQueueHeld());
+    expect(held.value).toBe(false);
+    setCameraQueueHeld(true);
+    expect(held.value).toBe(true);
+    setCameraQueueHeld(false);
+    expect(held.value).toBe(false);
   });
 
   it("hold and pause are independent", async () => {

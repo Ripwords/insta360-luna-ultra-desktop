@@ -26,6 +26,8 @@ let pollTimer: ReturnType<typeof setInterval> | undefined;
  */
 let generation = 0;
 let reconnectWatchStarted = false;
+/** Generation of the poll in flight, so a slow camera never gets stacked calls. */
+let pollInFlight: number | null = null;
 
 function stopPolling() {
   if (pollTimer !== undefined) clearInterval(pollTimer);
@@ -45,6 +47,8 @@ export function useWebcam() {
   async function poll() {
     if (!enabled.value || !isConnected.value) return;
     const started = generation;
+    if (pollInFlight === started) return;
+    pollInFlight = started;
     try {
       const next = await getCameraTransport().webcamStatus();
       // A turn-off or disconnect may have landed while the call was in flight.
@@ -53,6 +57,8 @@ export function useWebcam() {
       error.value = null;
     } catch (cause) {
       if (started === generation) error.value = errorMessage(cause, POLL_FALLBACK);
+    } finally {
+      if (pollInFlight === started) pollInFlight = null;
     }
   }
 
@@ -90,20 +96,25 @@ export function useWebcam() {
     const started = ++generation;
     error.value = null;
     enabled.value = true;
+    // Held before the start call, so no file transfer can begin while the
+    // camera is switching to streaming.
+    setCameraQueueHeld(true);
     try {
       if (!(await begin())) return;
-      setCameraQueueHeld(true);
       startPolling();
     } catch (cause) {
+      // A stale failure leaves the hold to whichever turn-on or turn-off
+      // superseded it.
       if (started !== generation) return;
       enabled.value = false;
       setCameraQueueHeld(false);
+      resumeDownloads();
       error.value = errorMessage(cause, START_FALLBACK);
     }
   }
 
   async function turnOff() {
-    generation++;
+    const stopping = ++generation;
     stopPolling();
     enabled.value = false;
     status.value = null;
@@ -114,7 +125,9 @@ export function useWebcam() {
         error.value = errorMessage(cause, "Webcam mode could not stop.");
       });
     // Released only once the camera has stopped streaming, so file traffic
-    // never overlaps the stream's tail.
+    // never overlaps the stream's tail. A turn-on during the stop owns the
+    // hold now.
+    if (stopping !== generation) return;
     setCameraQueueHeld(false);
     resumeDownloads();
   }

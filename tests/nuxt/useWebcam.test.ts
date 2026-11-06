@@ -351,4 +351,84 @@ describe("useWebcam", () => {
     expect(webcam.enabled.value).toBe(true);
     await webcam.turnOff();
   });
+  it("holds the camera queue as soon as it turns on", async () => {
+    const start = deferred<WebcamStatus>();
+    setup({ webcamStart: vi.fn(() => start.promise) });
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+
+    const turningOn = webcam.turnOn();
+    expect(isCameraQueueHeld()).toBe(true);
+    start.resolve(STREAMING);
+    await turningOn;
+    expect(isCameraQueueHeld()).toBe(true);
+    await webcam.turnOff();
+  });
+
+  it("keeps the hold when a stale start fails after a newer turn-on", async () => {
+    const first = deferred<WebcamStatus>();
+    const transport = setup();
+    vi.mocked(transport.webcamStart).mockImplementationOnce(() => first.promise);
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+
+    const turningOn = webcam.turnOn();
+    await webcam.turnOff();
+    await webcam.turnOn();
+    first.reject(new Error("late failure"));
+    await turningOn;
+
+    expect(webcam.enabled.value).toBe(true);
+    expect(webcam.error.value).toBeNull();
+    expect(isCameraQueueHeld()).toBe(true);
+    await webcam.turnOff();
+  });
+
+  it("keeps the hold when turned back on while a turn-off is stopping", async () => {
+    const stop = deferred<void>();
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    vi.mocked(transport.webcamStop).mockImplementationOnce(() => stop.promise);
+    const turningOff = webcam.turnOff();
+    await webcam.turnOn();
+    stop.resolve();
+    await turningOff;
+
+    expect(webcam.enabled.value).toBe(true);
+    expect(isCameraQueueHeld()).toBe(true);
+    await webcam.turnOff();
+    expect(isCameraQueueHeld()).toBe(false);
+  });
+
+  it("skips a poll tick while the previous poll is still in flight", async () => {
+    const slow = deferred<WebcamStatus>();
+    const transport = setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    vi.mocked(transport.webcamStatus).mockImplementationOnce(() => slow.promise);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(transport.webcamStatus).toHaveBeenCalledTimes(1);
+
+    slow.resolve(STREAMING);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(transport.webcamStatus).toHaveBeenCalledTimes(2);
+    await webcam.turnOff();
+  });
 });
