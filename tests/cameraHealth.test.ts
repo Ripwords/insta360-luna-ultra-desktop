@@ -80,6 +80,25 @@ describe("cameraHealth", () => {
     expect(second).toHaveBeenCalledTimes(1);
   });
 
+  it("re-arming with the same callback discards a pending probe verdict", async () => {
+    const onDead = vi.fn();
+    let release: (alive: boolean) => void = () => {};
+    const probe = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          release = resolve;
+        }),
+    );
+    armCameraHealth(onDead, probe);
+    for (let i = 0; i < FAILURE_THRESHOLD; i++) reportCameraFailure();
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    armCameraHealth(onDead, probe);
+    release(false);
+    await flush();
+    expect(onDead).not.toHaveBeenCalled();
+  });
+
   it("does not disconnect when the probe says the camera is alive", async () => {
     const onDead = vi.fn();
     const probe = vi.fn(() => Promise.resolve(true));
