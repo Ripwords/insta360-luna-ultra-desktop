@@ -103,6 +103,10 @@ extended attributes recursively; to remove only the quarantine flag, use
 **Local-network permission.** Reaching the camera at `192.168.42.1` requires
 macOS's Local Network permission — allow it when prompted, or enable it under
 **System Settings › Privacy & Security › Local Network**.
+If the switch is on and the app still can't connect, turn it off and on again,
+then quit and reopen the app. From v0.3.4 the whole app bundle is signed, so
+after updating from an earlier version macOS may ask for this permission once
+more.
 
 The permanent fix is Apple Developer ID signing + notarization (paid account
 required); once set up this step goes away.

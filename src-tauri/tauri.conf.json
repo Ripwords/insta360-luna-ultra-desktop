@@ -41,7 +41,8 @@
       "debugApplicationIdSuffix": ".debug"
     },
     "macOS": {
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "signingIdentity": "-"
     }
   },
   "plugins": {
