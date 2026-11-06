@@ -2,28 +2,31 @@
 # Regenerate the raw Annex-B fixtures that webcam::nal tests against.
 #
 # Every clip is 2 s of testsrc2 at 30 fps (60 pictures), written as a raw
-# elementary stream with no container. The exact commands are:
+# elementary stream with no container. B-frames are off: the camera's
+# low-latency preview has none, and webcam::ts stamps PTS in arrival (decode)
+# order, so reordered pictures would make ffmpeg report non-monotonic
+# timestamps. The exact commands are:
 #
 #   SRC="-f lavfi -i testsrc2=size=1280x720:rate=30 -t 2"
 #   ENC="-an -preset ultrafast -crf 42"
 #
 #   hevc-idr.h265:
 #     ffmpeg $SRC $ENC -c:v libx265 \
-#       -x265-params keyint=30:open-gop=0:repeat-headers=1 -f hevc hevc-idr.h265
+#       -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0 -f hevc hevc-idr.h265
 #   hevc-cra-aud.h265:
 #     ffmpeg $SRC $ENC -c:v libx265 \
-#       -x265-params keyint=30:open-gop=1:aud=1:repeat-headers=1 -f hevc hevc-cra-aud.h265
+#       -x265-params keyint=30:open-gop=1:aud=1:repeat-headers=1:bframes=0 -f hevc hevc-cra-aud.h265
 #   hevc-slices.h265:
 #     ffmpeg $SRC $ENC -c:v libx265 \
-#       -x265-params keyint=30:open-gop=0:repeat-headers=1:slices=4 -f hevc hevc-slices.h265
+#       -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0:slices=4 -f hevc hevc-slices.h265
 #   hevc-switch.h265 (a 1280x720 clip, then a 720x1280 clip, joined with cat):
 #     ffmpeg $SRC $ENC -c:v libx265 \
-#       -x265-params keyint=30:open-gop=0:repeat-headers=1 -f hevc landscape.h265
+#       -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0 -f hevc landscape.h265
 #     ffmpeg -f lavfi -i testsrc2=size=720x1280:rate=30 -t 2 $ENC -c:v libx265 \
-#       -x265-params keyint=30:open-gop=0:repeat-headers=1 -f hevc portrait.h265
+#       -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0 -f hevc portrait.h265
 #     cat landscape.h265 portrait.h265 > hevc-switch.h265
 #   h264-idr.h264:
-#     ffmpeg $SRC $ENC -c:v libx264 -pix_fmt yuv420p -bsf:v h264_mp4toannexb \
+#     ffmpeg $SRC $ENC -c:v libx264 -bf 0 -pix_fmt yuv420p -bsf:v h264_mp4toannexb \
 #       -f h264 h264-idr.h264
 #
 # Usage: scripts/make-webcam-fixtures.sh  (needs ffmpeg with libx264/libx265 on PATH)
@@ -45,21 +48,21 @@ ff() {
 }
 
 ff "${src[@]}" "${enc[@]}" -c:v libx265 \
-  -x265-params keyint=30:open-gop=0:repeat-headers=1 -f hevc "$out/hevc-idr.h265"
+  -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0 -f hevc "$out/hevc-idr.h265"
 
 ff "${src[@]}" "${enc[@]}" -c:v libx265 \
-  -x265-params keyint=30:open-gop=1:aud=1:repeat-headers=1 -f hevc "$out/hevc-cra-aud.h265"
+  -x265-params keyint=30:open-gop=1:aud=1:repeat-headers=1:bframes=0 -f hevc "$out/hevc-cra-aud.h265"
 
 ff "${src[@]}" "${enc[@]}" -c:v libx265 \
-  -x265-params keyint=30:open-gop=0:repeat-headers=1:slices=4 -f hevc "$out/hevc-slices.h265"
+  -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0:slices=4 -f hevc "$out/hevc-slices.h265"
 
 ff "${src[@]}" "${enc[@]}" -c:v libx265 \
-  -x265-params keyint=30:open-gop=0:repeat-headers=1 -f hevc "$work/landscape.h265"
+  -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0 -f hevc "$work/landscape.h265"
 ff "${src_portrait[@]}" "${enc[@]}" -c:v libx265 \
-  -x265-params keyint=30:open-gop=0:repeat-headers=1 -f hevc "$work/portrait.h265"
+  -x265-params keyint=30:open-gop=0:repeat-headers=1:bframes=0 -f hevc "$work/portrait.h265"
 cat "$work/landscape.h265" "$work/portrait.h265" > "$out/hevc-switch.h265"
 
-ff "${src[@]}" "${enc[@]}" -c:v libx264 -pix_fmt yuv420p -bsf:v h264_mp4toannexb \
+ff "${src[@]}" "${enc[@]}" -c:v libx264 -bf 0 -pix_fmt yuv420p -bsf:v h264_mp4toannexb \
   -f h264 "$out/h264-idr.h264"
 
 limit=$((300 * 1024))
