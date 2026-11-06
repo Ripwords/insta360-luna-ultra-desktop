@@ -57,6 +57,10 @@ impl TsMuxer {
         }
     }
 
+    pub fn codec(&self) -> Codec {
+        self.codec
+    }
+
     /// Whole 188-byte packets for one access unit. A params-only AU (the
     /// relay's bootstrap entry) yields nothing: its bytes ride along with the
     /// next picture.
@@ -675,11 +679,14 @@ mod tests {
             }
             let pes = pes_list(&ts);
             assert_eq!(pes.len(), 1, "filler {filler}");
-            assert_eq!(pes_es(&pes[0].bytes), [&aud[..], &data].concat(), "filler {filler}");
+            assert_eq!(
+                pes_es(&pes[0].bytes),
+                [&aud[..], &data].concat(),
+                "filler {filler}"
+            );
         }
         assert_eq!(
-            stuffing_seen,
-            [true; 3],
+            stuffing_seen, [true; 3],
             "no-stuffing, 1-byte and 2-byte stuffing must all occur"
         );
     }

@@ -12,7 +12,6 @@ use super::nal::{AccessUnit, AccessUnitAssembler, ParamSets};
 const BROADCAST_CAPACITY: usize = 256;
 /// Largest GOP cache kept for late joiners.
 const MAX_CACHE_BYTES: usize = 16 * 1024 * 1024;
-const START_CODE: [u8; 4] = [0, 0, 0, 1];
 
 pub struct Subscription {
     /// The params, then the pictures since the last keyframe; empty if no
@@ -138,13 +137,8 @@ impl Relay {
         if let (true, Some(params), Some(first)) =
             (state.cache_open, &state.params, state.cache.first())
         {
-            let mut data = Vec::new();
-            for nal in &params.nals {
-                data.extend_from_slice(&START_CODE);
-                data.extend_from_slice(nal);
-            }
             bootstrap.push(Arc::new(AccessUnit {
-                data,
+                data: params.annexb(),
                 keyframe: false,
                 params: Some(params.clone()),
                 pts90k: first.pts90k,
@@ -154,14 +148,10 @@ impl Relay {
         Subscription { bootstrap, live }
     }
 
-    // used by Task 8
-    #[allow(dead_code)]
     pub fn params(&self) -> Option<ParamSets> {
         self.lock().params.clone()
     }
 
-    // used by Task 8
-    #[allow(dead_code)]
     pub fn last_video(&self) -> Option<Instant> {
         self.lock().last_video
     }
@@ -181,8 +171,10 @@ impl Relay {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::webcam::nal::{Codec, hevc_dimensions};
+    use crate::webcam::nal::{hevc_dimensions, Codec};
     use std::time::Duration;
+
+    const START_CODE: [u8; 4] = [0, 0, 0, 1];
 
     const HEVC_IDR: &[u8] = include_bytes!("../../tests/fixtures/hevc-idr.h265");
     const HEVC_SWITCH: &[u8] = include_bytes!("../../tests/fixtures/hevc-switch.h265");
@@ -398,10 +390,16 @@ mod tests {
         assert!(!sub.bootstrap.is_empty());
 
         relay.discontinuity();
-        assert!(relay.subscribe().bootstrap.is_empty(), "cache must be dropped");
+        assert!(
+            relay.subscribe().bootstrap.is_empty(),
+            "cache must be dropped"
+        );
         // Mid-GOP pictures whose references are gone.
         feed(&relay, start, &pics, 40, 50);
-        assert!(drain(&mut sub).is_empty(), "mid-GOP AU broadcast after a gap");
+        assert!(
+            drain(&mut sub).is_empty(),
+            "mid-GOP AU broadcast after a gap"
+        );
         assert!(relay.subscribe().bootstrap.is_empty());
 
         // The next keyframe reopens the stream.

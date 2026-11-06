@@ -55,6 +55,18 @@ pub struct ParamSets {
     pub nals: Vec<Vec<u8>>,
 }
 
+impl ParamSets {
+    /// The parameter sets as Annex-B, each behind a 4-byte start code.
+    pub fn annexb(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        for nal in &self.nals {
+            data.extend_from_slice(&START_CODE);
+            data.extend_from_slice(nal);
+        }
+        data
+    }
+}
+
 /// What a NAL means for access-unit boundaries.
 struct NalInfo {
     vcl: bool,
@@ -439,8 +451,6 @@ impl BitReader<'_> {
 
 /// Display size from an H.265 SPS NAL (2-byte header included, no start
 /// code), with the conformance window applied.
-// used by Task 8
-#[allow(dead_code)]
 pub fn hevc_dimensions(sps: &[u8]) -> Option<(u32, u32)> {
     let rbsp = unescape_rbsp(sps);
     let mut r = BitReader {

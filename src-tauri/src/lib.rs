@@ -10,6 +10,7 @@ pub fn run() {
     .plugin(tauri_plugin_process::init())
     .manage(luna::LunaState::default())
     .manage(liveview::LiveViewState::default())
+    .manage(webcam::WebcamState::default())
     .invoke_handler(tauri::generate_handler![
       luna::luna_connect,
       luna::luna_disconnect,
@@ -20,6 +21,9 @@ pub fn run() {
       liveview::luna_liveview_start,
       liveview::luna_liveview_stop,
       liveview::luna_liveview_stats,
+      webcam::luna_webcam_start,
+      webcam::luna_webcam_stop,
+      webcam::luna_webcam_status,
     ])
     .setup(|app| {
       // Auto-updater (desktop only)

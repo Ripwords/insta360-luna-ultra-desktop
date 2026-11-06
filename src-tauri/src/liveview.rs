@@ -26,7 +26,6 @@ use tokio::task::{JoinHandle, JoinSet};
 use crate::luna::{
     wire_field_varint, LunaState, Session, CODE_START_LIVE_STREAM, CODE_STOP_LIVE_STREAM,
 };
-use crate::webcam::nal::ParamSets;
 use crate::webcam::relay::Relay;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
@@ -35,7 +34,6 @@ const CLIENT_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Bounds the STOP sent after a failed START; its answer doesn't matter.
 const BEST_EFFORT_TIMEOUT: Duration = Duration::from_secs(1);
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(100);
-const START_CODE: [u8; 4] = [0, 0, 0, 1];
 
 /// StartLiveStream, per `insta360.messages.StartLiveStream`:
 ///   2 enableVideo, 6 videoBitrate, 7 resolution, 8 enableGyro,
@@ -68,8 +66,6 @@ fn response_head() -> Vec<u8> {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Consumer {
     Viewfinder,
-    // used by Task 8
-    #[allow(dead_code)]
     Webcam,
 }
 
@@ -191,8 +187,6 @@ async fn stop_after_failed_start(session: &Session) {
 
 impl LiveViewState {
     /// Registers `consumer` and makes sure the camera is streaming on `session`.
-    // used by Task 8
-    #[allow(dead_code)]
     pub(crate) async fn acquire(
         &self,
         consumer: Consumer,
@@ -203,8 +197,6 @@ impl LiveViewState {
     }
 
     /// Unregisters `consumer`; the last one out stops the camera stream.
-    // used by Task 8
-    #[allow(dead_code)]
     pub(crate) async fn release(&self, consumer: Consumer) {
         let mut preview = self.inner.lock().await;
         self.release_locked(&mut preview, consumer).await;
@@ -217,8 +209,6 @@ impl LiveViewState {
     /// Restarts the camera's preview for the current consumers: on a new
     /// session, moves the pump there and sends START; on the current one,
     /// cycles STOP and START. With no consumers it does nothing.
-    // used by Task 8
-    #[allow(dead_code)]
     pub(crate) async fn restart(&self, session: Arc<Session>) -> Result<(), String> {
         let mut preview = self.inner.lock().await;
         if preview.consumers.is_empty() {
@@ -354,15 +344,6 @@ async fn serve_annexb(listener: TcpListener, relay: Arc<Relay>) {
     }
 }
 
-fn params_annexb(params: &ParamSets) -> Vec<u8> {
-    let mut data = Vec::new();
-    for nal in &params.nals {
-        data.extend_from_slice(&START_CODE);
-        data.extend_from_slice(nal);
-    }
-    data
-}
-
 /// Writes all of `bytes`, or gives up after `limit`.
 pub(crate) async fn write_within(socket: &mut TcpStream, bytes: &[u8], limit: Duration) -> bool {
     matches!(
@@ -401,7 +382,7 @@ async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>, write_timeout: D
             let (true, Some(params)) = (au.keyframe, &au.params) else {
                 continue;
             };
-            if !write_within(&mut socket, &params_annexb(params), write_timeout).await {
+            if !write_within(&mut socket, &params.annexb(), write_timeout).await {
                 return;
             }
             started = true;
@@ -536,7 +517,7 @@ mod tests {
         assert!(head.ends_with("\r\n\r\n"));
     }
 
-    use crate::webcam::nal::AccessUnit;
+    use crate::webcam::nal::{AccessUnit, ParamSets};
     use tokio::net::TcpStream;
 
     const HEVC_IDR: &[u8] = include_bytes!("../tests/fixtures/hevc-idr.h265");
@@ -616,7 +597,7 @@ mod tests {
 
     #[tokio::test]
     async fn early_joiner_gets_the_params_its_keyframe_decodes_with() {
-        use crate::webcam::nal::{Codec, ParamSets};
+        use crate::webcam::nal::Codec;
         let relay = Relay::new();
         let mut client = viewfinder(&relay).await;
         read_head(&mut client).await;
