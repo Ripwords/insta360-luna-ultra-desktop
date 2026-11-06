@@ -164,7 +164,7 @@ fn build_file_command(seq: u8, code: u16, request_id: u16, body: &[u8]) -> Vec<u
     frame
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RawResponse {
     /// Echoed command code; asserted in tests, carried for future status checks.
     #[allow(dead_code)]
@@ -175,7 +175,7 @@ pub(crate) struct RawResponse {
 
 /// A parsed UCD2 frame. FILE answers commands, STREAM is the keepalive
 /// echo, and MEDIA carries the live preview substreams.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Frame {
     File(RawResponse),
     /// Keepalive echo. Carries no payload we use — the probe proved video
@@ -194,7 +194,14 @@ fn drain_frames(buffer: &mut Vec<u8>) -> Vec<Frame> {
     let mut frames = Vec::new();
     loop {
         let Some(start) = buffer.windows(4).position(|w| w == UCD2_MAGIC) else {
-            buffer.clear();
+            // A read may end mid-magic: keep the longest suffix that could
+            // still become one, drop everything before it.
+            let keep = (1..UCD2_MAGIC.len().min(buffer.len() + 1))
+                .rev()
+                .find(|&n| buffer.ends_with(&UCD2_MAGIC[..n]))
+                .unwrap_or(0);
+            let drop = buffer.len() - keep;
+            buffer.drain(..drop);
             break;
         };
         if start > 0 {
@@ -777,6 +784,43 @@ mod tests {
             other => panic!("expected the gyro frame, got {other:?}"),
         }
         assert!(buffer.is_empty());
+    }
+
+    /// A socket read can end inside the 4-byte magic. The partial prefix must
+    /// survive so the next read completes it.
+    #[test]
+    fn drain_frames_keeps_partial_magic() {
+        let mut buffer = b"garbageUC".to_vec();
+        let frames = drain_frames(&mut buffer);
+        assert!(frames.is_empty());
+        assert_eq!(buffer, b"UC");
+    }
+
+    /// Frames must come out identical however the stream is split across reads.
+    #[test]
+    fn drain_frames_is_split_invariant() {
+        let mut stream = build_file_command(1, 12, 7, b"ok");
+        stream.extend_from_slice(&build_stream_hello(2));
+        let mut media = vec![MEDIA_VIDEO, 0x25, 0xde, 0xa9, 0, 0, 0, 0, 0];
+        media.extend((0..100u8).collect::<Vec<_>>());
+        let mut payload = (media.len() as u32).to_le_bytes().to_vec();
+        payload.extend_from_slice(&media);
+        payload.extend_from_slice(&[0u8; 4]);
+        stream.extend_from_slice(&build_ucd2(UCD2_MEDIA, 3, &payload));
+
+        let mut whole = stream.clone();
+        let expected = drain_frames(&mut whole);
+        assert_eq!(expected.len(), 3);
+
+        for k in 0..stream.len() {
+            let mut buffer = Vec::new();
+            let mut got = Vec::new();
+            buffer.extend_from_slice(&stream[..k]);
+            got.extend(drain_frames(&mut buffer));
+            buffer.extend_from_slice(&stream[k..]);
+            got.extend(drain_frames(&mut buffer));
+            assert_eq!(got, expected, "split at {k}");
+        }
     }
 
     /// The existing FILE parsing must be untouched by the refactor.
