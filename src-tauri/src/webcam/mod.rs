@@ -7,6 +7,7 @@ pub mod server;
 pub mod stall;
 pub mod ts;
 
+use std::future::Future;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex as StdMutex, Weak};
 use std::time::{Duration, Instant};
@@ -15,6 +16,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, Runtime, State};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::liveview::{Consumer, LiveViewState};
 use crate::luna::{LunaState, Session};
@@ -24,6 +26,13 @@ use stall::{StallAction, StallTracker, STALL_AFTER};
 
 /// How often the monitor checks the session and the video.
 const MONITOR_TICK: Duration = Duration::from_secs(1);
+/// First wait before retrying a failed acquire; doubles up to the cap.
+const ACQUIRE_RETRY_FIRST: Duration = Duration::from_secs(2);
+const ACQUIRE_RETRY_MAX: Duration = Duration::from_secs(30);
+
+fn next_retry_wait(wait: Duration) -> Duration {
+    (wait * 2).min(ACQUIRE_RETRY_MAX)
+}
 
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -65,11 +74,13 @@ pub fn phase(
         WebcamPhase::Stopped
     } else if stalled {
         WebcamPhase::Stalled
-    } else if last_video.is_some_and(|at| now.saturating_duration_since(at) < STALL_AFTER) {
-        WebcamPhase::Streaming
     } else {
-        // No video yet, or none for a moment the tracker has not ticked on.
-        WebcamPhase::Starting
+        match last_video {
+            None => WebcamPhase::Starting,
+            // Old video is a stall even before the tracker ticks on it.
+            Some(at) if now.saturating_duration_since(at) >= STALL_AFTER => WebcamPhase::Stalled,
+            Some(_) => WebcamPhase::Streaming,
+        }
     }
 }
 
@@ -100,8 +111,10 @@ fn dimensions(params: &ParamSets) -> Option<(u32, u32)> {
 struct Health {
     /// The bound port while webcam mode is on.
     port: Option<u16>,
-    /// The webcam holds the preview on a live session.
+    /// The camera has a live session.
     connected: bool,
+    /// The webcam holds the preview on that session.
+    held: bool,
     /// When that session was acquired; older video does not count.
     since: Option<Instant>,
     stalled: bool,
@@ -119,7 +132,7 @@ fn status(health: &Health, relay: &Relay, clients: u32, now: Instant) -> WebcamS
             seconds_since_frame: None,
         };
     };
-    let last_video = match (health.connected, health.since) {
+    let last_video = match (health.held, health.since) {
         (true, Some(since)) => relay.last_video().filter(|at| *at >= since),
         _ => None,
     };
@@ -142,6 +155,16 @@ struct Monitor {
     health: Arc<StdMutex<Health>>,
     session: Option<Weak<Session>>,
     tracker: StallTracker,
+    /// Latest video already given to the tracker.
+    last_seen: Option<Instant>,
+    retry: Option<Retry>,
+}
+
+/// A failed acquire on `session`: not tried again before `at`.
+struct Retry {
+    session: Weak<Session>,
+    at: Instant,
+    wait: Duration,
 }
 
 impl Monitor {
@@ -151,6 +174,8 @@ impl Monitor {
             health,
             session: None,
             tracker: StallTracker::new(now),
+            last_seen: None,
+            retry: None,
         };
         if let Some(session) = session {
             monitor.held(session, now);
@@ -172,8 +197,11 @@ impl Monitor {
     fn held(&mut self, session: &Arc<Session>, now: Instant) {
         self.session = Some(Arc::downgrade(session));
         self.tracker = StallTracker::new(now);
+        self.last_seen = None;
+        self.retry = None;
         let mut health = self.health();
         health.connected = true;
+        health.held = true;
         health.since = Some(now);
         health.stalled = false;
     }
@@ -181,23 +209,45 @@ impl Monitor {
     /// One check: follow `current`, the live session, then watch its video.
     async fn step(&mut self, current: Option<Arc<Session>>, live: &LiveViewState, now: Instant) {
         let Some(session) = current else {
+            self.retry = None;
             if self.session.take().is_some() {
                 live.release(Consumer::Webcam).await;
             }
             let mut health = self.health();
             health.connected = false;
+            health.held = false;
             health.stalled = false;
             return;
         };
         if !self.holds(&session) {
-            // A new session: take the preview there. On failure the next
-            // tick tries again.
+            // A new session: take the preview there. A failure is retried on
+            // that session after a growing wait; a different session at once.
+            let previous = self
+                .retry
+                .take()
+                .filter(|retry| Weak::ptr_eq(&retry.session, &Arc::downgrade(&session)));
+            if previous.as_ref().is_some_and(|retry| now < retry.at) {
+                self.retry = previous;
+                return;
+            }
             match live.acquire(Consumer::Webcam, Arc::clone(&session)).await {
                 Ok(()) => self.held(&session, now),
                 Err(error) => {
                     log::warn!("webcam could not start the preview: {error}");
+                    let wait =
+                        previous.map_or(ACQUIRE_RETRY_FIRST, |retry| next_retry_wait(retry.wait));
+                    self.retry = Some(Retry {
+                        session: Arc::downgrade(&session),
+                        at: now + wait,
+                        wait,
+                    });
                     self.session = None;
-                    self.health().connected = false;
+                    // Still connected: the phase reads starting, not stopped.
+                    let mut health = self.health();
+                    health.connected = true;
+                    health.held = false;
+                    health.since = None;
+                    health.stalled = false;
                 }
             }
             return;
@@ -207,7 +257,9 @@ impl Monitor {
             .relay()
             .last_video()
             .filter(|at| since.map_or(true, |s| *at >= s))
+            .filter(|at| self.last_seen.map_or(true, |seen| *at > seen))
         {
+            self.last_seen = Some(at);
             self.tracker.on_video(at);
         }
         if self.tracker.tick(now) == StallAction::Restart {
@@ -220,20 +272,42 @@ impl Monitor {
     }
 }
 
-async fn run_monitor<R: Runtime>(app: AppHandle<R>, mut monitor: Monitor) {
+/// Where webcam mode finds the camera session and the shared preview.
+trait Camera: Clone + Send + Sync + 'static {
+    fn session(&self) -> impl Future<Output = Option<Arc<Session>>> + Send + '_;
+    fn live(&self) -> &LiveViewState;
+}
+
+impl<R: Runtime> Camera for AppHandle<R> {
+    async fn session(&self) -> Option<Arc<Session>> {
+        self.state::<LunaState>().session().await
+    }
+
+    fn live(&self) -> &LiveViewState {
+        self.state::<LiveViewState>().inner()
+    }
+}
+
+/// Steps the monitor every tick until `cancel`, which is checked only
+/// between steps so a restart in progress always completes.
+async fn run_monitor<C: Camera>(camera: C, mut monitor: Monitor, cancel: CancellationToken) {
     let mut ticker = tokio::time::interval(MONITOR_TICK);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
-        ticker.tick().await;
-        let session = app.state::<LunaState>().session().await;
-        let live = app.state::<LiveViewState>();
-        monitor.step(session, &live, Instant::now()).await;
+        tokio::select! {
+            biased;
+            () = cancel.cancelled() => return,
+            _ = ticker.tick() => {}
+        }
+        let session = camera.session().await;
+        monitor.step(session, camera.live(), Instant::now()).await;
     }
 }
 
 struct Running {
     server: JoinHandle<()>,
     monitor: JoinHandle<()>,
+    cancel: CancellationToken,
 }
 
 #[derive(Default)]
@@ -258,6 +332,59 @@ impl WebcamState {
             Instant::now(),
         )
     }
+
+    async fn start<C: Camera>(&self, camera: C) -> Result<WebcamStatus, String> {
+        let mut running = self.running.lock().await;
+        let live = camera.live();
+        if running.is_some() {
+            return Ok(self.status(&live.relay()));
+        }
+        let session = camera
+            .session()
+            .await
+            .ok_or_else(|| "camera is not connected".to_string())?;
+        let listener = server::bind_webcam()
+            .await
+            .map_err(|e| format!("cannot open the webcam port: {e}"))?;
+        let port = listener
+            .local_addr()
+            .map_err(|e| format!("cannot read the webcam port: {e}"))?
+            .port();
+        live.acquire(Consumer::Webcam, Arc::clone(&session)).await?;
+
+        self.health().port = Some(port);
+        let monitor = Monitor::new(Arc::clone(&self.health), Some(&session), Instant::now());
+        let relay = live.relay();
+        let status = self.status(&relay);
+        let cancel = CancellationToken::new();
+        *running = Some(Running {
+            server: tokio::spawn(server::serve_ts(listener, relay, Arc::clone(&self.clients))),
+            monitor: tokio::spawn(run_monitor(camera, monitor, cancel.clone())),
+            cancel,
+        });
+        Ok(status)
+    }
+
+    async fn stop(&self, live: &LiveViewState) {
+        let mut running = self.running.lock().await;
+        let Some(Running {
+            server,
+            monitor,
+            cancel,
+        }) = running.take()
+        else {
+            return;
+        };
+        // The monitor first, so it cannot re-acquire behind the release. It
+        // finishes the step in progress rather than stopping mid-restart.
+        cancel.cancel();
+        let _ = monitor.await;
+        // Awaited so the listener is closed, and the port free, on return.
+        server.abort();
+        let _ = server.await;
+        *self.health() = Health::default();
+        live.release(Consumer::Webcam).await;
+    }
 }
 
 /// Turns webcam mode on: binds the port, starts the camera's preview, and
@@ -265,38 +392,9 @@ impl WebcamState {
 #[tauri::command]
 pub async fn luna_webcam_start<R: Runtime>(
     app: AppHandle<R>,
-    luna: State<'_, LunaState>,
-    live: State<'_, LiveViewState>,
     webcam: State<'_, WebcamState>,
 ) -> Result<WebcamStatus, String> {
-    let mut running = webcam.running.lock().await;
-    if running.is_some() {
-        return Ok(webcam.status(&live.relay()));
-    }
-    let session = luna
-        .session()
-        .await
-        .ok_or_else(|| "camera is not connected".to_string())?;
-    let listener = server::bind_webcam()
-        .await
-        .map_err(|e| format!("cannot open the webcam port: {e}"))?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| format!("cannot read the webcam port: {e}"))?
-        .port();
-    live.acquire(Consumer::Webcam, Arc::clone(&session)).await?;
-
-    webcam.health().port = Some(port);
-    let monitor = Monitor::new(Arc::clone(&webcam.health), Some(&session), Instant::now());
-    *running = Some(Running {
-        server: tokio::spawn(server::serve_ts(
-            listener,
-            live.relay(),
-            Arc::clone(&webcam.clients),
-        )),
-        monitor: tokio::spawn(run_monitor(app, monitor)),
-    });
-    Ok(webcam.status(&live.relay()))
+    webcam.start(app).await
 }
 
 /// Turns webcam mode off: closes the port and every client, and releases the
@@ -306,15 +404,7 @@ pub async fn luna_webcam_stop(
     live: State<'_, LiveViewState>,
     webcam: State<'_, WebcamState>,
 ) -> Result<(), String> {
-    let mut running = webcam.running.lock().await;
-    let Some(Running { server, monitor }) = running.take() else {
-        return Ok(());
-    };
-    // The monitor first, so it cannot re-acquire behind the release.
-    monitor.abort();
-    server.abort();
-    *webcam.health() = Health::default();
-    live.release(Consumer::Webcam).await;
+    webcam.stop(&live).await;
     Ok(())
 }
 
@@ -386,6 +476,20 @@ mod tests {
     }
 
     #[test]
+    fn phase_stalled_once_video_is_old_before_the_tracker_ticks() {
+        let now = Instant::now() + secs(60);
+        assert_eq!(
+            phase(true, true, Some(now - STALL_AFTER), false, now),
+            WebcamPhase::Stalled
+        );
+        assert_eq!(
+            phase(true, true, Some(now - secs(13)), false, now),
+            WebcamPhase::Stalled,
+            "old video never reads as starting"
+        );
+    }
+
+    #[test]
     fn status_serialises_to_the_frontend_contract() {
         let status = WebcamStatus {
             state: WebcamPhase::Streaming,
@@ -431,6 +535,7 @@ mod tests {
         let health = Health {
             port: Some(49283),
             connected: true,
+            held: true,
             since: Some(start + secs(1)),
             stalled: false,
         };
@@ -566,6 +671,129 @@ mod tests {
             .step(Some(Arc::clone(&session)), &live, now + secs(13))
             .await;
         assert_eq!(camera.wait_for(3).await, [START, STOP, START]);
+    }
+
+    #[tokio::test]
+    async fn old_video_does_not_clear_a_stall() {
+        let live = LiveViewState::default();
+        let health = health();
+        let now = Instant::now();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        let mut monitor = Monitor::new(Arc::clone(&health), Some(&session), now);
+        live.relay().push_chunk(HEVC_IDR, now + secs(1));
+        monitor
+            .step(Some(Arc::clone(&session)), &live, now + secs(1))
+            .await;
+        monitor
+            .step(Some(Arc::clone(&session)), &live, now + secs(14))
+            .await;
+        assert_eq!(camera.wait_for(3).await, [START, STOP, START]);
+        assert_eq!(snapshot(&health), (true, true));
+        // No video since: the same last frame must not read as a recovery.
+        monitor
+            .step(Some(Arc::clone(&session)), &live, now + secs(15))
+            .await;
+        assert_eq!(snapshot(&health), (true, true));
+    }
+
+    #[test]
+    fn acquire_retries_back_off_to_a_cap() {
+        let mut wait = ACQUIRE_RETRY_FIRST;
+        let mut waits = vec![wait];
+        for _ in 0..5 {
+            wait = next_retry_wait(wait);
+            waits.push(wait);
+        }
+        assert_eq!(waits, [2, 4, 8, 16, 30, 30].map(secs));
+    }
+
+    #[tokio::test]
+    async fn a_failing_acquire_waits_and_reports_starting() {
+        let live = LiveViewState::default();
+        let health = health();
+        let now = Instant::now();
+        let mut monitor = Monitor::new(Arc::clone(&health), None, now);
+        let (session, camera) = fake::connect(OnStart::HangUp).await;
+        monitor.step(Some(Arc::clone(&session)), &live, now).await;
+        assert_eq!(camera.wait_for(1).await[0], START);
+        // Within the wait: no new attempt (each would cost a command timeout).
+        monitor
+            .step(Some(Arc::clone(&session)), &live, now + secs(1))
+            .await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let starts = camera.codes().iter().filter(|c| **c == START).count();
+        assert_eq!(starts, 1, "{:?}", camera.codes());
+        {
+            let health = health.lock().unwrap();
+            assert!(health.connected && !health.held);
+            assert_eq!(
+                status(&health, &live.relay(), 0, now + secs(1)).state,
+                WebcamPhase::Starting,
+                "a session is present, so not stopped"
+            );
+        }
+
+        // A different session is tried at once.
+        let (second, second_camera) = fake::connect(OnStart::Answer).await;
+        monitor
+            .step(Some(Arc::clone(&second)), &live, now + secs(1))
+            .await;
+        assert_eq!(second_camera.wait_for(1).await, [START]);
+        assert!(health.lock().unwrap().held);
+    }
+
+    #[derive(Clone)]
+    struct TestCamera {
+        session: Arc<Session>,
+        live: Arc<LiveViewState>,
+    }
+
+    impl Camera for TestCamera {
+        fn session(&self) -> impl Future<Output = Option<Arc<Session>>> + Send + '_ {
+            std::future::ready(Some(Arc::clone(&self.session)))
+        }
+
+        fn live(&self) -> &LiveViewState {
+            &self.live
+        }
+    }
+
+    #[tokio::test]
+    async fn stop_closes_the_port_before_returning() {
+        let _fixed = server::FIXED_PORT.lock().await;
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        let source = TestCamera {
+            session: Arc::clone(&session),
+            live: Arc::new(LiveViewState::default()),
+        };
+        // The viewfinder keeps the preview, so the release sends nothing and
+        // stop has no reason to yield on its own.
+        source
+            .live
+            .acquire(Consumer::Viewfinder, session)
+            .await
+            .unwrap();
+        let webcam = WebcamState::default();
+        let first = webcam.start(source.clone()).await.unwrap();
+        let fixed = format!(
+            "http://127.0.0.1:{}{}",
+            server::WEBCAM_PORT,
+            server::WEBCAM_PATH
+        );
+        if first.url.as_deref() != Some(fixed.as_str()) {
+            eprintln!("skipped: port {} is held elsewhere", server::WEBCAM_PORT);
+            webcam.stop(&source.live).await;
+            return;
+        }
+        webcam.stop(&source.live).await;
+        let second = webcam.start(source.clone()).await.unwrap();
+        assert_eq!(second.url, first.url, "the listener must be closed by stop");
+        webcam.stop(&source.live).await;
+        assert_eq!(webcam.status(&source.live.relay()).state, WebcamPhase::Off);
+        assert_eq!(camera.codes(), [START], "the viewfinder still holds it");
     }
 
     #[test]

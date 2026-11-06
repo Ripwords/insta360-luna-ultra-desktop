@@ -1,4 +1,5 @@
 mod liveview;
+mod local_http;
 mod luna;
 mod webcam;
 

@@ -17,12 +17,15 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::State;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::Mutex;
 use tokio::task::{JoinHandle, JoinSet};
 
+use crate::local_http::{
+    read_request, status_response, Request, BAD_REQUEST, MISDIRECTED, REQUEST_TIMEOUT,
+};
 use crate::luna::{
     wire_field_varint, LunaState, Session, CODE_START_LIVE_STREAM, CODE_STOP_LIVE_STREAM,
 };
@@ -226,9 +229,10 @@ impl LiveViewState {
         let _ = session
             .send_command(CODE_STOP_LIVE_STREAM, &[], COMMAND_TIMEOUT)
             .await;
-        let started = send_start(&session).await;
-        // The camera's new stream shares no references with the old one.
+        // The camera's new stream shares no references with the old one. Cut
+        // before START: the camera may send its first keyframe before the ack.
         self.relay.discontinuity();
+        let started = send_start(&session).await;
         if started.is_err() {
             stop_after_failed_start(&session).await;
         }
@@ -357,9 +361,16 @@ pub(crate) async fn write_within(socket: &mut TcpStream, bytes: &[u8], limit: Du
 /// accepts nothing for `write_timeout`, is closed rather than continued
 /// mid-GOP; the page reconnects for a clean start.
 async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>, write_timeout: Duration) {
-    // Read and discard the request; we serve one thing.
-    let mut scratch = [0u8; 1024];
-    let _ = socket.read(&mut scratch).await;
+    // Any path: we serve one thing. The Host check still applies.
+    let refusal = match read_request(&mut socket, REQUEST_TIMEOUT).await {
+        Request::Get(_) => None,
+        Request::WrongHost => Some(MISDIRECTED),
+        Request::Invalid => Some(BAD_REQUEST),
+    };
+    if let Some(status) = refusal {
+        let _ = write_within(&mut socket, &status_response(status), write_timeout).await;
+        return;
+    }
     let subscription = relay.subscribe();
     if !write_within(&mut socket, &response_head(), write_timeout).await {
         return;
@@ -518,10 +529,41 @@ mod tests {
     }
 
     use crate::webcam::nal::{AccessUnit, ParamSets};
+    use tokio::io::AsyncReadExt;
     use tokio::net::TcpStream;
 
     const HEVC_IDR: &[u8] = include_bytes!("../tests/fixtures/hevc-idr.h265");
     const READ_LIMIT: Duration = Duration::from_secs(5);
+
+    fn request(port: u16, host: &str) -> String {
+        format!("GET /stream HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n")
+    }
+
+    #[tokio::test]
+    async fn the_viewfinder_refuses_a_foreign_host() {
+        let relay = Relay::new();
+        relay.push_chunk(HEVC_IDR, Instant::now());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(serve_annexb(listener, Arc::clone(&relay)));
+        for request in [
+            "GET /stream HTTP/1.1\r\nHost: evil.example\r\n\r\n".to_string(),
+            format!("GET /stream HTTP/1.1\r\nHost: evil.example:{port}\r\n\r\n"),
+            "GET /stream HTTP/1.1\r\n\r\n".to_string(),
+        ] {
+            let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            client.write_all(request.as_bytes()).await.unwrap();
+            let mut response = String::new();
+            tokio::time::timeout(READ_LIMIT, client.read_to_string(&mut response))
+                .await
+                .expect("a refused request must close the connection")
+                .unwrap();
+            assert!(
+                response.starts_with("HTTP/1.1 421 Misdirected Request\r\n"),
+                "{request:?}: {response}"
+            );
+        }
+    }
 
     async fn viewfinder(relay: &Arc<Relay>) -> TcpStream {
         let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
@@ -529,7 +571,7 @@ mod tests {
         tokio::spawn(serve_annexb(listener, Arc::clone(relay)));
         let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
         client
-            .write_all(b"GET /stream HTTP/1.1\r\n\r\n")
+            .write_all(request(port, "127.0.0.1").as_bytes())
             .await
             .unwrap();
         client
@@ -642,7 +684,7 @@ mod tests {
         let port = listener.local_addr().unwrap().port();
         let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
         client
-            .write_all(b"GET /stream HTTP/1.1\r\n\r\n")
+            .write_all(request(port, "127.0.0.1").as_bytes())
             .await
             .unwrap();
         let (socket, _) = listener.accept().await.unwrap();
@@ -826,6 +868,32 @@ mod tests {
         assert_eq!(camera.wait_for(3).await, [START, STOP, START]);
         assert!(live.relay().subscribe().bootstrap.is_empty());
         assert_eq!(consumers(&live).await, set(&[Consumer::Webcam]));
+    }
+
+    #[tokio::test]
+    async fn a_keyframe_sent_before_the_start_ack_survives_a_restart() {
+        let mut assembler = crate::webcam::nal::AccessUnitAssembler::new();
+        let mut pictures = assembler.push(HEVC_IDR, 0);
+        pictures.extend(assembler.flush());
+        assert!(pictures[0].keyframe);
+        // The keyframe and the picture after it, so the keyframe is complete.
+        let video = vec![pictures[0].data.clone(), pictures[1].data.clone()];
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect_streaming(OnStart::Answer, video).await;
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        live.restart(session).await.unwrap();
+        assert_eq!(camera.wait_for(3).await, [START, STOP, START]);
+        for _ in 0..100 {
+            let bootstrap = live.relay().subscribe().bootstrap;
+            if bootstrap.len() > 1 {
+                assert!(bootstrap[1].keyframe);
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        panic!("the new stream's first keyframe was dropped");
     }
 
     #[tokio::test]

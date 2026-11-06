@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::task::JoinSet;
@@ -15,6 +14,9 @@ use super::nal::AccessUnit;
 use super::relay::Relay;
 use super::ts::TsMuxer;
 use crate::liveview::write_within;
+use crate::local_http::{
+    read_request, status_response, Request, BAD_REQUEST, MISDIRECTED, REQUEST_TIMEOUT,
+};
 
 /// Fixed so the URL pasted into OBS keeps working between sessions.
 pub const WEBCAM_PORT: u16 = 49283;
@@ -22,11 +24,14 @@ pub const WEBCAM_PATH: &str = "/webcam.ts";
 
 /// A client that accepts no bytes for this long is closed.
 const CLIENT_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
-/// A client must send its request head within this long.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
-/// Longest request head read; anything longer is not a request we serve.
-const MAX_REQUEST: usize = 8 * 1024;
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(100);
+/// Most clients streamed at once; more get 503. OBS needs one per source.
+pub(crate) const MAX_CLIENTS: u32 = 8;
+const UNAVAILABLE: &str = "503 Service Unavailable";
+
+/// Serialises tests that bind the fixed port.
+#[cfg(test)]
+pub(crate) static FIXED_PORT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 const OK_HEAD: &[u8] = concat!(
     "HTTP/1.1 200 OK\r\n",
@@ -88,9 +93,14 @@ pub async fn serve_ts(listener: TcpListener, relay: Arc<Relay>, clients: Arc<Ato
 struct Counted(Arc<AtomicU32>);
 
 impl Counted {
-    fn new(clients: Arc<AtomicU32>) -> Self {
-        clients.fetch_add(1, Ordering::SeqCst);
-        Counted(clients)
+    /// A slot, unless `MAX_CLIENTS` are already streaming.
+    fn try_new(clients: Arc<AtomicU32>) -> Option<Self> {
+        clients
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
+                (n < MAX_CLIENTS).then_some(n + 1)
+            })
+            .ok()?;
+        Some(Counted(clients))
     }
 }
 
@@ -98,36 +108,6 @@ impl Drop for Counted {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
     }
-}
-
-/// The request path, once the head has arrived; None if the request is not
-/// a GET or never completes.
-async fn read_request_path(socket: &mut TcpStream) -> Option<String> {
-    let mut head = Vec::new();
-    let mut chunk = [0u8; 1024];
-    let read = async {
-        while !head.windows(4).any(|w| w == b"\r\n\r\n") {
-            let n = socket.read(&mut chunk).await.ok()?;
-            if n == 0 || head.len() + n > MAX_REQUEST {
-                return None;
-            }
-            head.extend_from_slice(&chunk[..n]);
-        }
-        Some(())
-    };
-    tokio::time::timeout(REQUEST_TIMEOUT, read).await.ok()??;
-    let line = head.split(|&b| b == b'\r').next()?;
-    let mut parts = std::str::from_utf8(line).ok()?.split(' ');
-    let (Some("GET"), Some(target)) = (parts.next(), parts.next()) else {
-        return None;
-    };
-    Some(
-        target
-            .split(['?', '#'])
-            .next()
-            .unwrap_or_default()
-            .to_string(),
-    )
 }
 
 /// One client: the head, then MPEG-TS from a clean start (the cached GOP, or
@@ -140,13 +120,21 @@ async fn serve_client(
     clients: Arc<AtomicU32>,
     write_timeout: Duration,
 ) {
-    let path = read_request_path(&mut socket).await;
-    if path.as_deref() != Some(WEBCAM_PATH) {
-        let _ = write_within(&mut socket, NOT_FOUND, write_timeout).await;
+    let refusal = match read_request(&mut socket, REQUEST_TIMEOUT).await {
+        Request::Get(path) if path == WEBCAM_PATH => None,
+        Request::Get(_) => Some(NOT_FOUND.to_vec()),
+        Request::WrongHost => Some(status_response(MISDIRECTED)),
+        Request::Invalid => Some(status_response(BAD_REQUEST)),
+    };
+    if let Some(response) = refusal {
+        let _ = write_within(&mut socket, &response, write_timeout).await;
         return;
     }
+    let Some(_counted) = Counted::try_new(clients) else {
+        let _ = write_within(&mut socket, &status_response(UNAVAILABLE), write_timeout).await;
+        return;
+    };
     let subscription = relay.subscribe();
-    let _counted = Counted::new(clients);
     if !write_within(&mut socket, OK_HEAD, write_timeout).await {
         return;
     }
@@ -238,7 +226,8 @@ mod tests {
 
     async fn get(port: u16, path: &str) -> TcpStream {
         let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-        let request = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nUser-Agent: test\r\n\r\n");
+        let request =
+            format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUser-Agent: test\r\n\r\n");
         client.write_all(request.as_bytes()).await.unwrap();
         client
     }
@@ -388,6 +377,7 @@ mod tests {
 
     #[tokio::test]
     async fn falls_back_when_port_taken() {
+        let _fixed = FIXED_PORT.lock().await;
         let held = std::net::TcpListener::bind(("127.0.0.1", WEBCAM_PORT));
         let listener = bind_webcam().await.expect("must bind somewhere");
         let port = listener.local_addr().unwrap().port();
@@ -485,6 +475,90 @@ mod tests {
         panic!("the departed client is still counted");
     }
 
+    async fn response_to(port: u16, request: &str) -> String {
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client.write_all(request.as_bytes()).await.unwrap();
+        let mut response = String::new();
+        tokio::time::timeout(READ_LIMIT, client.read_to_string(&mut response))
+            .await
+            .expect("a refused request must close the connection")
+            .unwrap();
+        response
+    }
+
+    #[tokio::test]
+    async fn foreign_hosts_are_misdirected() {
+        let relay = Relay::new();
+        relay.push_chunk(HEVC_IDR, Instant::now());
+        let server = server(&relay).await;
+        let port = server.port;
+        for request in [
+            format!("GET {WEBCAM_PATH} HTTP/1.1\r\nHost: evil.example\r\n\r\n"),
+            format!("GET {WEBCAM_PATH} HTTP/1.1\r\nHost: evil.example:{port}\r\n\r\n"),
+            format!("GET {WEBCAM_PATH} HTTP/1.1\r\n\r\n"),
+        ] {
+            let response = response_to(port, &request).await;
+            assert!(
+                response.starts_with("HTTP/1.1 421 Misdirected Request\r\n"),
+                "{request:?}: {response}"
+            );
+        }
+        // A refused request is never counted; localhost:{port} is served.
+        assert_eq!(server.clients.load(Ordering::SeqCst), 0);
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client
+            .write_all(
+                format!("GET {WEBCAM_PATH} HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n").as_bytes(),
+            )
+            .await
+            .unwrap();
+        assert!(read_head(&mut client)
+            .await
+            .starts_with("HTTP/1.1 200 OK\r\n"));
+        assert_eq!(server.clients.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn clients_beyond_the_cap_get_503() {
+        let relay = Relay::new();
+        relay.push_chunk(HEVC_IDR, Instant::now());
+        let server = server(&relay).await;
+        let mut streaming = Vec::new();
+        for _ in 0..MAX_CLIENTS {
+            let mut client = get(server.port, WEBCAM_PATH).await;
+            assert!(read_head(&mut client)
+                .await
+                .starts_with("HTTP/1.1 200 OK\r\n"));
+            streaming.push(client);
+        }
+        wait_for_clients(&server.clients, MAX_CLIENTS).await;
+        let request = format!(
+            "GET {WEBCAM_PATH} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n\r\n",
+            server.port
+        );
+        let response = response_to(server.port, &request).await;
+        assert!(
+            response.starts_with("HTTP/1.1 503 Service Unavailable\r\n"),
+            "{response}"
+        );
+        assert_eq!(server.clients.load(Ordering::SeqCst), MAX_CLIENTS);
+
+        // A freed slot is usable again.
+        drop(streaming.pop());
+        let start = Instant::now();
+        for _ in 0..50 {
+            if server.clients.load(Ordering::SeqCst) < MAX_CLIENTS {
+                break;
+            }
+            feed(&relay, start, &pictures(HEVC_IDR)[..5]);
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let mut client = get(server.port, WEBCAM_PATH).await;
+        assert!(read_head(&mut client)
+            .await
+            .starts_with("HTTP/1.1 200 OK\r\n"));
+    }
+
     // ffprobe end to end -------------------------------------------------
 
     fn have_tools() -> bool {
@@ -497,26 +571,55 @@ mod tests {
         found
     }
 
-    /// Runs a tool on a blocking thread, so the server keeps running on this one.
-    async fn run(program: &'static str, args: Vec<String>) -> (String, String) {
+    /// Runs a tool on a blocking thread, so the server keeps running on this
+    /// one. A tool still running after `limit` is killed and the test fails.
+    async fn run(program: &'static str, args: Vec<String>, limit: Duration) -> (String, String) {
         tokio::task::spawn_blocking(move || {
-            let out = Command::new(program).args(&args).output().expect(program);
-            (
-                String::from_utf8_lossy(&out.stdout).trim().to_string(),
-                String::from_utf8_lossy(&out.stderr).trim().to_string(),
-            )
+            use std::io::Read;
+            use std::process::Stdio;
+            let mut child = Command::new(program)
+                .args(&args)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect(program);
+            let drain = |mut pipe: Box<dyn Read + Send>| {
+                std::thread::spawn(move || {
+                    let mut text = String::new();
+                    let _ = pipe.read_to_string(&mut text);
+                    text.trim().to_string()
+                })
+            };
+            let out = drain(Box::new(child.stdout.take().unwrap()));
+            let err = drain(Box::new(child.stderr.take().unwrap()));
+            let deadline = Instant::now() + limit;
+            while child.try_wait().unwrap().is_none() {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("{program} hung; killed after {limit:?}");
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            (out.join().unwrap(), err.join().unwrap())
         })
         .await
         .unwrap()
     }
 
-    /// Feeds the fixture once `count` clients are streaming.
-    fn feed_when_connected(relay: &Arc<Relay>, clients: &Arc<AtomicU32>, count: u32) {
+    /// Feeds the fixture once a client is streaming, then closes the server
+    /// so the tool reads to the end instead of waiting on an endless stream.
+    fn feed_then_close(relay: &Arc<Relay>, server: &Server) {
         let relay = Arc::clone(relay);
-        let clients = Arc::clone(clients);
+        let clients = Arc::clone(&server.clients);
+        let task = server.task.abort_handle();
         tokio::spawn(async move {
-            wait_for_clients(&clients, count).await;
+            wait_for_clients(&clients, 1).await;
             feed(&relay, Instant::now(), &pictures(HEVC_IDR));
+            // The fixture is ~72 KiB: the client has written it all by now.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            task.abort();
         });
     }
 
@@ -528,32 +631,27 @@ mod tests {
         let relay = Relay::new();
         let server = server(&relay).await;
         let url = format!("http://127.0.0.1:{}{WEBCAM_PATH}", server.port);
-        // Bounded by stream time: 1 s of the fixture's 2 s, so it never waits
-        // on the endless stream.
-        feed_when_connected(&relay, &server.clients, 1);
-        let (out, err) = tokio::time::timeout(
-            Duration::from_secs(30),
-            run(
-                "ffprobe",
-                [
-                    "-v",
-                    "error",
-                    "-rw_timeout",
-                    "5000000",
-                    "-analyzeduration",
-                    "1000000",
-                    "-show_entries",
-                    "stream=codec_name,width,height",
-                    "-of",
-                    "csv=p=0",
-                    &url,
-                ]
-                .map(String::from)
-                .to_vec(),
-            ),
+        feed_then_close(&relay, &server);
+        let (out, err) = run(
+            "ffprobe",
+            [
+                "-v",
+                "error",
+                "-rw_timeout",
+                "5000000",
+                "-analyzeduration",
+                "1000000",
+                "-show_entries",
+                "stream=codec_name,width,height",
+                "-of",
+                "csv=p=0",
+                &url,
+            ]
+            .map(String::from)
+            .to_vec(),
+            Duration::from_secs(20),
         )
-        .await
-        .expect("ffprobe hung");
+        .await;
         assert_eq!(err, "");
         let mut lines: Vec<&str> = out.lines().filter(|l| !l.is_empty()).collect();
         lines.dedup();
@@ -568,35 +666,39 @@ mod tests {
         let relay = Relay::new();
         let server = server(&relay).await;
         let url = format!("http://127.0.0.1:{}{WEBCAM_PATH}", server.port);
-        feed_when_connected(&relay, &server.clients, 1);
-        let (out, err) = tokio::time::timeout(
-            Duration::from_secs(30),
-            run(
-                "ffmpeg",
-                [
-                    "-v",
-                    "error",
-                    "-rw_timeout",
-                    "5000000",
-                    "-analyzeduration",
-                    "1000000",
-                    "-i",
-                    &url,
-                    "-frames:v",
-                    "45",
-                    "-progress",
-                    "pipe:1",
-                    "-f",
-                    "null",
-                    "-",
-                ]
-                .map(String::from)
-                .to_vec(),
-            ),
+        feed_then_close(&relay, &server);
+        let (out, err) = run(
+            "ffmpeg",
+            [
+                "-v",
+                "error",
+                "-rw_timeout",
+                "5000000",
+                "-analyzeduration",
+                "1000000",
+                "-i",
+                &url,
+                "-frames:v",
+                "45",
+                "-progress",
+                "pipe:1",
+                "-f",
+                "null",
+                "-",
+            ]
+            .map(String::from)
+            .to_vec(),
+            Duration::from_secs(20),
         )
-        .await
-        .expect("ffmpeg hung");
-        assert_eq!(err, "", "decode errors over HTTP");
+        .await;
+        // The server closing the endless response is expected, not an error.
+        let errors: Vec<&str> = err
+            .lines()
+            .filter(|line| {
+                !(line.starts_with("[http @") && line.contains("Stream ends prematurely"))
+            })
+            .collect();
+        assert!(errors.is_empty(), "decode errors over HTTP: {errors:?}");
         assert!(out.lines().any(|line| line == "frame=45"), "{out}");
     }
 }

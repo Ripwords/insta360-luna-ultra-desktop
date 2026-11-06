@@ -769,6 +769,25 @@ pub(crate) mod fake {
     /// A session connected to a fake camera that echoes each command back as
     /// its response, except START as `on_start` says.
     pub(crate) async fn connect(on_start: OnStart) -> (Arc<Session>, FakeCamera) {
+        connect_streaming(on_start, Vec::new()).await
+    }
+
+    /// A video payload as the camera frames it: MEDIA, video substream.
+    pub(crate) fn media_frame(annex_b: &[u8]) -> Vec<u8> {
+        let mut payload = vec![MEDIA_VIDEO, 0, 0, 0, 0, 0, 0, 0, 0];
+        payload.extend_from_slice(annex_b);
+        let mut frame_payload = (payload.len() as u32).to_le_bytes().to_vec();
+        frame_payload.extend_from_slice(&payload);
+        frame_payload.extend_from_slice(&[0u8; 4]);
+        build_ucd2(UCD2_MEDIA, 0, &frame_payload)
+    }
+
+    /// Like [`connect`], but on each START the camera first sends `video`, as
+    /// a real camera starts streaming, and answers a moment later.
+    pub(crate) async fn connect_streaming(
+        on_start: OnStart,
+        video: Vec<Vec<u8>>,
+    ) -> (Arc<Session>, FakeCamera) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let codes: Arc<StdMutex<Vec<u16>>> = Arc::default();
@@ -791,6 +810,12 @@ pub(crate) mod fake {
                     if command.code == CODE_START_LIVE_STREAM && on_start == OnStart::HangUp && open {
                         let _ = write.shutdown().await;
                         open = false;
+                    }
+                    if command.code == CODE_START_LIVE_STREAM && open && !video.is_empty() {
+                        for chunk in &video {
+                            let _ = write.write_all(&media_frame(chunk)).await;
+                        }
+                        tokio::time::sleep(Duration::from_millis(50)).await;
                     }
                     if answer && open {
                         let reply = build_file_command(0, command.code, command.request_id, &[]);
