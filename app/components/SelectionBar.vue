@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ count: number; deleting?: boolean }>();
+defineProps<{ count: number; deleting?: boolean; downloadDisabled?: boolean }>();
 
 const emit = defineEmits<{
   download: [];
@@ -32,7 +32,7 @@ const emit = defineEmits<{
           icon="i-lucide-arrow-down-to-line"
           label="Download"
           size="sm"
-          :disabled="deleting"
+          :disabled="deleting || downloadDisabled"
           @click="emit('download')"
         />
         <UButton

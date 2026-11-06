@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { getCameraTransport } from "~/utils/transport";
 import { imageMimeFor } from "~/utils/media";
-import { withCameraSlot, CAMERA_PRIORITY, viewportPriority } from "~/utils/cameraQueue";
+import {
+  withCameraSlot,
+  CAMERA_PRIORITY,
+  isCameraQueueHeld,
+  viewportPriority,
+} from "~/utils/cameraQueue";
 import { cachedMedia } from "~/utils/mediaCache";
 
 /**
@@ -40,6 +45,7 @@ function onImgLoad(event: Event) {
 const el = useTemplateRef("el");
 const objectUrl = ref<string | null>(null);
 const state = ref<"idle" | "loading" | "loaded" | "error">("idle");
+const held = computed(isCameraQueueHeld);
 
 let observer: IntersectionObserver | null = null;
 
@@ -106,6 +112,7 @@ onBeforeUnmount(() => {
       :class="imgClass"
       @load="onImgLoad"
     />
+    <CameraHeldPlaceholder v-else-if="held && state !== 'error'" class="bg-elevated" />
     <div
       v-else
       class="flex size-full items-center justify-center bg-elevated"

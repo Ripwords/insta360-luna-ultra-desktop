@@ -2,9 +2,29 @@
 import type { NavigationMenuItem } from "@nuxt/ui";
 
 const { active } = useDownloads();
+const { enabled: webcamOn } = useWebcam();
 const route = useRoute();
 
-const items = computed<NavigationMenuItem[][]>(() => [
+const WEBCAM_ON = "Webcam mode on";
+
+/**
+ * The Camera item while webcam mode is on: a webcam icon beside the label
+ * (the `camera-trailing` slot), or, collapsed to an icon, a dot on the icon and
+ * the state in its tooltip.
+ */
+function cameraIndicator(collapsed: boolean): Partial<NavigationMenuItem> {
+  if (!webcamOn.value) return {};
+  if (collapsed) {
+    return {
+      chip: { color: "primary" },
+      tooltip: { text: `Camera · ${WEBCAM_ON}` },
+      "aria-label": `Camera, ${WEBCAM_ON.toLowerCase()}`,
+    };
+  }
+  return { slot: "camera" };
+}
+
+const navItems = (collapsed: boolean): NavigationMenuItem[][] => [
   [
     {
       label: "Connect",
@@ -16,6 +36,7 @@ const items = computed<NavigationMenuItem[][]>(() => [
       label: "Camera",
       icon: "i-lucide-camera",
       to: "/camera",
+      ...cameraIndicator(collapsed),
     },
     {
       label: "Gallery",
@@ -36,7 +57,7 @@ const items = computed<NavigationMenuItem[][]>(() => [
       to: "/settings",
     },
   ],
-]);
+];
 </script>
 
 <template>
@@ -61,7 +82,18 @@ const items = computed<NavigationMenuItem[][]>(() => [
       </template>
 
       <template #default="{ collapsed }">
-        <UNavigationMenu :collapsed :items orientation="vertical" class="mt-2" />
+        <UNavigationMenu
+          :collapsed
+          :items="navItems(collapsed)"
+          orientation="vertical"
+          class="mt-2"
+        >
+          <template #camera-trailing>
+            <span role="img" :aria-label="WEBCAM_ON" :title="WEBCAM_ON" class="flex">
+              <UIcon name="i-lucide-webcam" class="size-4 text-highlighted" />
+            </span>
+          </template>
+        </UNavigationMenu>
       </template>
 
       <template #footer="{ collapsed }">

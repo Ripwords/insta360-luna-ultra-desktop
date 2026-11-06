@@ -7,6 +7,7 @@ import {
   disarmCameraHealth,
   reportCameraFailure,
 } from "~/utils/cameraHealth";
+import { setCameraQueueHeld } from "~/utils/cameraQueue";
 import { resetCameraTransport, setCameraTransport } from "~/utils/transport";
 import { makeFakeTransport } from "../helpers/fakeTransport";
 import { makeMediaItem } from "../helpers/media";
@@ -283,5 +284,26 @@ describe("useDownloads", () => {
 
     expect(onDead).toHaveBeenCalledTimes(1);
     disarmCameraHealth();
+  });
+
+  it("does not start a queued download while the camera queue is held", async () => {
+    const transport = respondWith(CAMERA_BYTES);
+    setCameraTransport(transport);
+    const downloads = await mountComposable(() => useDownloads());
+
+    setCameraQueueHeld(true);
+    try {
+      downloads.enqueue([makeMediaItem({ size: 0 })], { watermark: false });
+      for (let tick = 0; tick < 5; tick++) await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(transport.fetch).not.toHaveBeenCalled();
+      expect(downloads.queue.value[0]!.status).toBe("queued");
+    } finally {
+      setCameraQueueHeld(false);
+    }
+
+    downloads.resume();
+    await settled(downloads.queue);
+    expect(downloads.queue.value[0]!.status).toBe("done");
   });
 });

@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import type { MediaItem } from "~/types/media";
 import { formatBytes, formatDuration } from "~/utils/media";
+import { isCameraQueueHeld } from "~/utils/cameraQueue";
 
 const props = defineProps<{
   item: MediaItem | null;
   hasPrev: boolean;
   hasNext: boolean;
+  downloadDisabled?: boolean;
 }>();
+
+/** The <video> streams straight from the camera, outside the queue, so it waits out the hold. */
+const held = computed(isCameraQueueHeld);
 
 const open = defineModel<boolean>("open", { required: true });
 
@@ -110,6 +115,7 @@ defineShortcuts({
               size="sm"
               color="neutral"
               variant="outline"
+              :disabled="downloadDisabled"
               @click="emit('download')"
             />
             <UDropdownMenu v-model:open="moreOpen" :items="moreItems">
@@ -138,8 +144,9 @@ defineShortcuts({
         >
           <!-- Play the low-res LRV proxy when available; the full-res file can
                be hundreds of MB and is meant for download, not preview. -->
+          <CameraHeldPlaceholder v-if="item.type === 'video' && held" detailed on-dark />
           <video
-            v-if="item.type === 'video'"
+            v-else-if="item.type === 'video'"
             ref="videoEl"
             :key="item.id"
             :src="item.lrvUrl ?? item.srcUrl"
@@ -196,6 +203,7 @@ defineShortcuts({
                   icon="i-lucide-arrow-down-to-line"
                   color="neutral"
                   variant="outline"
+                  :disabled="downloadDisabled"
                   @click="emit('download')"
                 />
               </div>
