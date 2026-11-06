@@ -61,6 +61,20 @@ const KEEPALIVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
 /// to queue. The ~9GB hardware run that validated this change used this value.
 const KEEPALIVE_COMMAND_TIMEOUT_BUSY: Duration = Duration::from_secs(25);
 
+/// While video MEDIA frames are arriving the camera is too busy to answer the
+/// keepalive queries, and the frames themselves prove the link is alive.
+const VIDEO_ALIVE_WINDOW: Duration = Duration::from_secs(12);
+/// Bounds a socket write so a wedged peer cannot hang the session forever.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(3);
+
+fn video_recent(last_video: Option<Instant>, now: Instant) -> bool {
+    last_video.is_some_and(|at| now.saturating_duration_since(at) < VIDEO_ALIVE_WINDOW)
+}
+
+pub(crate) fn same_session(a: &Arc<Session>, b: &Arc<Session>) -> bool {
+    Arc::ptr_eq(a, b)
+}
+
 fn within_transfer_window(last_activity: Option<Instant>, now: Instant) -> bool {
     last_activity.is_some_and(|at| now.saturating_duration_since(at) < TRANSFER_ACTIVITY_WINDOW)
 }
@@ -338,6 +352,8 @@ pub(crate) struct Session {
     stream_tx: broadcast::Sender<Vec<u8>>,
     /// When a download last received bytes, as reported by `luna_transfer_activity`.
     last_transfer_activity: StdMutex<Option<Instant>>,
+    /// When the reader last received a video MEDIA frame.
+    last_video: StdMutex<Option<Instant>>,
 }
 
 impl Session {
@@ -357,13 +373,20 @@ impl Session {
         *self.last_transfer_activity.lock().unwrap() = Some(Instant::now());
     }
 
+    pub(crate) fn last_video(&self) -> Option<Instant> {
+        *self.last_video.lock().unwrap()
+    }
+
     fn is_transfer_active(&self) -> bool {
         within_transfer_window(*self.last_transfer_activity.lock().unwrap(), Instant::now())
     }
 
     async fn write(&self, packet: &[u8]) -> Result<(), String> {
         let mut writer = self.writer.lock().await;
-        writer.write_all(packet).await.map_err(|e| format!("camera write failed: {e}"))
+        match tokio::time::timeout(WRITE_TIMEOUT, writer.write_all(packet)).await {
+            Ok(result) => result.map_err(|e| format!("camera write failed: {e}")),
+            Err(_) => Err("camera write timed out".into()),
+        }
     }
 
     async fn send_packet(&self, packet: Vec<u8>, request_id: u16, timeout: Duration) -> Result<RawResponse, String> {
@@ -467,9 +490,12 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         info: StdMutex::new(LunaDeviceInfo::default()),
         stream_tx: stream_tx.clone(),
         last_transfer_activity: StdMutex::new(None),
+        last_video: StdMutex::new(None),
     });
 
     let reader_pending = pending;
+    // Weak: the session owns this task's handle, so a strong ref would leak it
+    let reader_session = Arc::downgrade(&session);
     let reader = tokio::spawn(async move {
         let mut buffer = Vec::new();
         let mut chunk = [0u8; 16 * 1024];
@@ -488,6 +514,9 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
                             Frame::Media { substream, data }
                                 if substream == MEDIA_VIDEO && !data.is_empty() =>
                             {
+                                if let Some(session) = reader_session.upgrade() {
+                                    *session.last_video.lock().unwrap() = Some(Instant::now());
+                                }
                                 let _ = stream_tx.send(data);
                             }
                             // Secondary preview and gyro substreams are ignored
@@ -549,8 +578,10 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
             };
             let tick = async {
                 session.write(&hello).await?;
-                session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
-                session.send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout).await?;
+                if !video_recent(session.last_video(), Instant::now()) {
+                    session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
+                    session.send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout).await?;
+                }
                 Ok::<(), String>(())
             };
             match tick.await {
@@ -559,9 +590,16 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
                 Err(_) => {
                     failures += 1;
                     if failures >= 2 {
+                        let mut stored = ka_state.lock().await;
+                        let is_current = stored.as_ref().is_some_and(|current| same_session(current, &session));
+                        if is_current {
+                            stored.take();
+                        }
+                        drop(stored);
                         drop(session);
-                        ka_state.lock().await.take();
-                        let _ = ka_app.emit("luna://disconnected", ());
+                        if is_current {
+                            let _ = ka_app.emit("luna://disconnected", ());
+                        }
                         break;
                     }
                 }
@@ -667,6 +705,47 @@ mod tests {
 
     fn hex(s: &str) -> Vec<u8> {
         (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+    }
+
+    #[test]
+    fn video_recent_requires_video_inside_window() {
+        let now = Instant::now();
+        assert!(!video_recent(None, now));
+        assert!(video_recent(Some(now - Duration::from_secs(6)), now));
+        assert!(!video_recent(Some(now - Duration::from_secs(12)), now));
+    }
+
+    fn test_session(write_half: OwnedWriteHalf) -> Session {
+        Session {
+            writer: Mutex::new(write_half),
+            pending: Arc::default(),
+            seq: AtomicU8::new(0),
+            request_id: AtomicU16::new(1),
+            reader: StdMutex::new(None),
+            keepalive: StdMutex::new(None),
+            info: StdMutex::new(LunaDeviceInfo::default()),
+            stream_tx: broadcast::channel::<Vec<u8>>(4).0,
+            last_transfer_activity: StdMutex::new(None),
+            last_video: StdMutex::new(None),
+        }
+    }
+
+    #[tokio::test]
+    async fn write_times_out_on_a_wedged_socket() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let _server = tokio::spawn(async move {
+            let (_socket, _) = listener.accept().await.unwrap();
+            std::future::pending::<()>().await;
+        });
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let (_read_half, write_half) = stream.into_split();
+        let session = test_session(write_half);
+        let payload = vec![0u8; 64 * 1024 * 1024];
+        let result = tokio::time::timeout(WRITE_TIMEOUT + Duration::from_secs(1), session.write(&payload))
+            .await
+            .expect("write must return within the write timeout");
+        assert!(result.unwrap_err().contains("timed out"));
     }
 
     #[test]
