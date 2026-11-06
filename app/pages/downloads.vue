@@ -5,6 +5,7 @@ import { canWatermark } from "~/utils/watermark";
 useHead({ title: "Downloads" });
 
 const { queue, active, completed, retry, clearFinished } = useDownloads();
+const { enabled: webcamOn, turnOff: turnOffWebcam } = useWebcam();
 
 const hasFinished = computed(() =>
   queue.value.some((entry) => entry.status === "done" || entry.status === "error"),
@@ -32,6 +33,8 @@ const hasFinished = computed(() =>
     </template>
 
     <template #body>
+      <WebcamHoldNotice v-if="webcamOn" @turn-off="turnOffWebcam" />
+
       <div
         v-if="queue.length === 0"
         class="flex h-full flex-col items-center justify-center gap-4 text-center"

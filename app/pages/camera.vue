@@ -35,6 +35,7 @@ watch(
  * its requests fail, and the health detector force-disconnects the camera.
  */
 onBeforeRouteLeave(async () => {
+  // Releases only the viewfinder's claim; webcam mode keeps streaming.
   await stop();
 });
 
@@ -251,6 +252,8 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
 
         <!-- Mode strip + shutter -->
         <CameraCaptureBar />
+
+        <WebcamPanel />
       </div>
 
       <!-- Portals to the document body, so it lives here without disturbing the panel slots -->

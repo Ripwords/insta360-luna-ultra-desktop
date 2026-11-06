@@ -3,6 +3,8 @@ import {
   withCameraSlot,
   CAMERA_PRIORITY,
   CAMERA_CONCURRENCY,
+  isCameraQueueHeld,
+  setCameraQueueHeld,
   setCameraQueuePaused,
   viewportPriority,
 } from "~/utils/cameraQueue";
@@ -101,6 +103,47 @@ describe("withCameraSlot", () => {
 
     setCameraQueuePaused(false);
     await thumb; // resumes once unpaused
+    expect(order).toEqual(["preview", "thumb"]);
+  });
+
+  it("held queue runs nothing until released", async () => {
+    const order: string[] = [];
+    setCameraQueueHeld(true);
+    expect(isCameraQueueHeld()).toBe(true);
+    const preview = withCameraSlot(async () => {
+      order.push("preview");
+    }, CAMERA_PRIORITY.PREVIEW);
+    const thumb = withCameraSlot(async () => {
+      order.push("thumb");
+    }, CAMERA_PRIORITY.THUMBNAIL);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order).toEqual([]);
+
+    setCameraQueueHeld(false);
+    expect(isCameraQueueHeld()).toBe(false);
+    await Promise.all([preview, thumb]);
+    expect(order).toEqual(["preview", "thumb"]);
+  });
+
+  it("hold and pause are independent", async () => {
+    const order: string[] = [];
+    setCameraQueuePaused(true);
+    setCameraQueueHeld(true);
+    const thumb = withCameraSlot(async () => {
+      order.push("thumb");
+    }, CAMERA_PRIORITY.THUMBNAIL);
+    const preview = withCameraSlot(async () => {
+      order.push("preview");
+    }, CAMERA_PRIORITY.PREVIEW);
+
+    setCameraQueueHeld(false);
+    await preview;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order).toEqual(["preview"]);
+
+    setCameraQueuePaused(false);
+    await thumb;
     expect(order).toEqual(["preview", "thumb"]);
   });
 });

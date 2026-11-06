@@ -37,6 +37,7 @@ interface QueuedTask {
 
 let active = 0;
 let paused = false;
+let held = false;
 const queue: QueuedTask[] = [];
 
 const scoreOf = (priority: CameraPriority): number =>
@@ -52,7 +53,22 @@ export function setCameraQueuePaused(value: boolean): void {
   if (!value) drain();
 }
 
+/**
+ * While webcam mode is on, the camera can't stream and serve files at once, so
+ * nothing starts, whatever its priority. Separate from `paused`: releasing the
+ * hold drains the queue, and a pause still applies afterwards.
+ */
+export function setCameraQueueHeld(value: boolean): void {
+  held = value;
+  if (!value) drain();
+}
+
+export function isCameraQueueHeld(): boolean {
+  return held;
+}
+
 function drain(): void {
+  if (held) return;
   while (active < CAMERA_CONCURRENCY && queue.length > 0) {
     // Pick the highest-priority runnable task, re-scoring dynamic priorities so
     // the pick reflects the current scroll position.

@@ -12,6 +12,7 @@ import {
 } from "~/utils/streamDownload";
 import { getCameraTransport } from "~/utils/transport";
 import { beginHealthTransfer, endHealthTransfer } from "~/utils/cameraHealth";
+import { isCameraQueueHeld } from "~/utils/cameraQueue";
 
 export function useDownloads() {
   const queue = useState<DownloadEntry[]>("download-queue", () => []);
@@ -33,7 +34,9 @@ export function useDownloads() {
   async function processNext(): Promise<void> {
     for (;;) {
       const entry = queue.value.find((candidate) => candidate.status === "queued");
-      if (!entry) {
+      // Webcam mode holds camera HTTP traffic. Leave the entry queued; resume()
+      // picks it up once the hold is released.
+      if (!entry || isCameraQueueHeld()) {
         running.value = false;
         return;
       }
@@ -183,12 +186,16 @@ export function useDownloads() {
     }
   }
 
+  /** Start the queue again if it has work waiting and nothing is draining it. */
+  function resume() {
+    if (running.value || !queue.value.some((entry) => entry.status === "queued")) return;
+    running.value = true;
+    void processNext();
+  }
+
   function retry(id: string) {
     patch(id, { status: "queued", progress: 0, bytesWritten: undefined, error: undefined });
-    if (!running.value) {
-      running.value = true;
-      void processNext();
-    }
+    resume();
   }
 
   function clearFinished() {
@@ -197,5 +204,5 @@ export function useDownloads() {
     );
   }
 
-  return { queue, active, completed, enqueue, retry, clearFinished };
+  return { queue, active, completed, enqueue, retry, resume, clearFinished };
 }

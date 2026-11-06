@@ -1,4 +1,5 @@
 import type { WebcamStatus } from "~/types/media";
+import { setCameraQueueHeld } from "~/utils/cameraQueue";
 import { errorMessage } from "~/utils/errorMessage";
 import { getCameraTransport } from "~/utils/transport";
 
@@ -25,7 +26,7 @@ function stopPolling() {
 
 export function useWebcam() {
   const { isConnected } = useCamera();
-  const { active: activeDownloads } = useDownloads();
+  const { active: activeDownloads, resume: resumeDownloads } = useDownloads();
 
   const enabled = useState<boolean>("webcam-enabled", () => false);
   const status = useState<WebcamStatus | null>("webcam-status", () => null);
@@ -63,9 +64,11 @@ export function useWebcam() {
     enabled.value = true;
     try {
       await begin();
+      setCameraQueueHeld(true);
       startPolling();
     } catch (cause) {
       enabled.value = false;
+      setCameraQueueHeld(false);
       error.value = errorMessage(cause, START_FALLBACK);
     }
   }
@@ -80,6 +83,10 @@ export function useWebcam() {
       .catch((cause) => {
         error.value = errorMessage(cause, "Webcam mode could not stop.");
       });
+    // Released only once the camera has stopped streaming, so file traffic
+    // never overlaps the stream's tail.
+    setCameraQueueHeld(false);
+    resumeDownloads();
   }
 
   // Every component that calls useWebcam() would otherwise add its own

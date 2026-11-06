@@ -25,6 +25,7 @@ const {
   deleteSelected,
 } = useGallery();
 const { enqueue } = useDownloads();
+const { enabled: webcamOn, turnOff: turnOffWebcam } = useWebcam();
 const { settings } = useWatermarkSettings();
 const overlay = useOverlay();
 const confirmModal = overlay.create(ConfirmModal);
@@ -126,6 +127,8 @@ async function onDeleteFromPreview() {
 }
 
 async function downloadWithOptions(items: MediaItem[]): Promise<boolean> {
+  // The camera can't transfer files while it streams; the notice explains why.
+  if (webcamOn.value) return false;
   const instance = downloadModal.open({ items });
   if (!(await instance.result)) return false;
   enqueue(items, { watermark: settings.value.enabled });
@@ -208,6 +211,8 @@ defineShortcuts({
     </template>
 
     <template #body>
+      <WebcamHoldNotice v-if="webcamOn" @turn-off="turnOffWebcam" />
+
       <div
         v-if="!isConnected"
         class="flex h-full flex-col items-center justify-center gap-4 text-center"
@@ -284,6 +289,7 @@ defineShortcuts({
       <SelectionBar
         :count="selected.size"
         :deleting
+        :download-disabled="webcamOn"
         @download="onDownloadSelection"
         @delete="onDeleteSelection"
         @clear="clearSelection"

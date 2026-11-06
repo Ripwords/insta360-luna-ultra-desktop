@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DownloadEntry, WebcamStatus } from "~/types/media";
+import { isCameraQueueHeld, setCameraQueueHeld } from "~/utils/cameraQueue";
 import { resetCameraTransport, setCameraTransport } from "~/utils/transport";
 import { makeFakeTransport } from "../helpers/fakeTransport";
 import { makeMediaItem } from "../helpers/media";
@@ -34,6 +35,7 @@ describe("useWebcam", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    setCameraQueueHeld(false);
     resetCameraTransport();
     clearNuxtState(
       [
@@ -155,5 +157,34 @@ describe("useWebcam", () => {
 
     expect(webcam.error.value).toBe("camera is not connected");
     await webcam.turnOff();
+  });
+
+  it("holds the camera queue while on and releases it on turn-off", async () => {
+    setup();
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    expect(isCameraQueueHeld()).toBe(false);
+
+    await webcam.turnOn();
+    expect(isCameraQueueHeld()).toBe(true);
+
+    await webcam.turnOff();
+    expect(isCameraQueueHeld()).toBe(false);
+  });
+
+  it("leaves the camera queue released when start fails", async () => {
+    setup({ webcamStart: vi.fn(async () => Promise.reject(new Error("busy"))) });
+    const { camera, webcam } = await mountComposable(() => ({
+      camera: useCamera(),
+      webcam: useWebcam(),
+    }));
+    await camera.connect();
+    await webcam.turnOn();
+
+    expect(webcam.enabled.value).toBe(false);
+    expect(isCameraQueueHeld()).toBe(false);
   });
 });
