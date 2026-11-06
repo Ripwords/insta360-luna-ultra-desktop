@@ -58,6 +58,19 @@ export interface LiveViewStats {
   seconds: number;
 }
 
+export type WebcamPhase = "off" | "starting" | "streaming" | "stalled" | "stopped";
+
+/** Mirrors the Rust `WebcamStatus` (camelCase serde); `Option` arrives as null. */
+export interface WebcamStatus {
+  state: WebcamPhase;
+  url: string | null;
+  codec: "H.265" | "H.264" | null;
+  width: number | null;
+  height: number | null;
+  clients: number;
+  secondsSinceFrame: number | null;
+}
+
 export type DownloadStatus = "queued" | "downloading" | "done" | "error";
 
 export interface DownloadEntry {
