@@ -65,6 +65,18 @@ describe("useCamera", () => {
     expect(camera.isConnected.value).toBe(false);
   });
 
+  it("keeps the message when the transport rejects with a bare string", async () => {
+    setCameraTransport(
+      makeFakeTransport({
+        connect: vi.fn(() => Promise.reject("connecting to 192.168.42.1:6666 timed out")),
+      }),
+    );
+
+    const camera = await mountComposable(() => useCamera());
+    await camera.connect();
+    expect(camera.error.value).toBe("connecting to 192.168.42.1:6666 timed out");
+  });
+
   it("subscribes to disconnect through the transport, not Tauri directly", async () => {
     const transport = makeFakeTransport();
     setCameraTransport(transport);

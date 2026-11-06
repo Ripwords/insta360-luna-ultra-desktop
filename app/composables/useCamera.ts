@@ -1,5 +1,6 @@
 import type { CameraInfo, CameraStatus, MediaItem } from "~/types/media";
 import { getCameraTransport } from "~/utils/transport";
+import { errorMessage } from "~/utils/errorMessage";
 import { armCameraHealth, disarmCameraHealth, FAILURE_THRESHOLD } from "~/utils/cameraHealth";
 
 const DEFAULT_HOST = "192.168.42.1";
@@ -119,7 +120,7 @@ export function useCamera() {
     try {
       library.value = await getCameraTransport().listMedia(host.value);
     } catch (e) {
-      error.value = e instanceof Error ? e.message : "Failed to read the media library.";
+      error.value = errorMessage(e, "Failed to read the media library.");
     } finally {
       loadingLibrary.value = false;
     }
@@ -152,7 +153,7 @@ export function useCamera() {
     } catch (e) {
       status.value = "disconnected";
       info.value = null;
-      error.value = e instanceof Error ? e.message : "Could not connect to the camera.";
+      error.value = errorMessage(e, "Could not connect to the camera.");
     }
   }
 

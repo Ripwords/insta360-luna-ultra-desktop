@@ -3,6 +3,7 @@ import { canWatermark, watermarkNote, watermarkScope } from "~/utils/watermark";
 import { cacheRawPreviewFromBlob, isRawPhoto } from "~/utils/rawPreviewCache";
 import { renderWatermarked } from "~/utils/watermarkClient";
 import { saveBlob } from "~/utils/saveFile";
+import { errorMessage } from "~/utils/errorMessage";
 import {
   TRANSFER_STALL_MS,
   readCameraBody,
@@ -100,7 +101,7 @@ export function useDownloads() {
       } catch (error) {
         patch(entry.id, {
           status: "error",
-          error: error instanceof Error ? error.message : "Transfer failed",
+          error: errorMessage(error, "Transfer failed"),
         });
       } finally {
         endHealthTransfer();

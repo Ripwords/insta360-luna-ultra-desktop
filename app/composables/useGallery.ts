@@ -2,6 +2,7 @@ import type { MediaItem } from "~/types/media";
 import { dayLabel, groupByDay } from "~/utils/media";
 import { rangeSelect, toggleGroup, toggleId } from "~/utils/selection";
 import { getCameraTransport } from "~/utils/transport";
+import { errorMessage } from "~/utils/errorMessage";
 
 export type MediaFilter = "all" | "photo" | "video";
 export type StorageFilter = "all" | "internal" | "sdcard";
@@ -81,7 +82,7 @@ export function useGallery() {
     } catch (e) {
       toast.add({
         title: "Delete failed",
-        description: e instanceof Error ? e.message : "The camera rejected the delete request.",
+        description: errorMessage(e, "The camera rejected the delete request."),
         icon: "i-lucide-triangle-alert",
         color: "error",
       });
