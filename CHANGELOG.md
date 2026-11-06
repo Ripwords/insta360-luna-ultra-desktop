@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.3...master
+
+[compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.3...master)
+
+### 🩹 Fixes
+
+- **errors:** Show the real cause when a camera command rejects with a string ([cbe0072](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/cbe0072))
+- **macos:** Sign the whole app bundle ad-hoc ([a23552e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/a23552e))
+
+### ❤️ Contributors
+
+- JJ <teohjjteoh@gmail.com>
+
 ## v0.3.2...master
 
 [compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.2...master)
