@@ -232,6 +232,7 @@ impl AccessUnitAssembler {
         if self.in_nal && !self.discarding_nal {
             self.buf.drain(..consumed);
             self.scan_from = i - consumed;
+            self.close_open_if_pending_opens(&mut out);
             self.enforce_cap(&mut out);
         } else {
             // No NAL worth keeping: only a possible partial start code.
@@ -269,6 +270,27 @@ impl AccessUnitAssembler {
         out
     }
 
+    /// Whether the pending NAL, judged from its header alone, opens a picture.
+    fn pending_opens_au(&self) -> bool {
+        match self.codec {
+            Some(codec) if self.buf.len() >= 3 && self.buf[0] & 0x80 == 0 => {
+                NalInfo::of(codec, &self.buf).opens_au()
+            }
+            _ => false,
+        }
+    }
+
+    /// Emits the open picture if the pending NAL starts the next one, without
+    /// waiting for that NAL to finish. The NAL then finds no open picture
+    /// with slices, so nothing is emitted twice.
+    fn close_open_if_pending_opens(&mut self, out: &mut Vec<AccessUnit>) {
+        if self.open.as_ref().is_some_and(|au| au.has_vcl) && self.pending_opens_au() {
+            if let (Some(open), Some(codec)) = (self.open.take(), self.codec) {
+                out.push(open.close(codec, &self.params));
+            }
+        }
+    }
+
     /// Keeps the pending NAL plus the open picture within [`MAX_AU_BYTES`].
     fn enforce_cap(&mut self, out: &mut Vec<AccessUnit>) {
         let open_len = |open: &Option<OpenAu>| open.as_ref().map_or(0, |au| au.data.len());
@@ -277,17 +299,7 @@ impl AccessUnitAssembler {
         }
         // If the pending NAL begins the next picture, the open one is already
         // complete: emit it now rather than count it against the NAL.
-        let pending_opens_au = match self.codec {
-            Some(codec) if self.buf.len() >= 3 && self.buf[0] & 0x80 == 0 => {
-                NalInfo::of(codec, &self.buf).opens_au()
-            }
-            _ => false,
-        };
-        if pending_opens_au && self.open.as_ref().is_some_and(|au| au.has_vcl) {
-            if let (Some(open), Some(codec)) = (self.open.take(), self.codec) {
-                out.push(open.close(codec, &self.params));
-            }
-        }
+        self.close_open_if_pending_opens(out);
         if self.buf.len() + open_len(&self.open) <= MAX_AU_BYTES {
             return;
         }
@@ -653,6 +665,23 @@ mod tests {
             ]
             .concat()
         );
+    }
+
+    #[test]
+    fn a_picture_is_emitted_when_the_next_one_starts() {
+        for fixture in [HEVC_IDR, H264_IDR] {
+            let pictures: Vec<Vec<u8>> = assemble(fixture).into_iter().map(|u| u.data).collect();
+            let mut assembler = AccessUnitAssembler::new();
+            let mut emitted = Vec::new();
+            for (n, picture) in pictures.iter().enumerate() {
+                emitted.extend(assembler.push(picture, n as u64));
+                assert_eq!(emitted.len(), n, "after picture {n}");
+            }
+            emitted.extend(assembler.flush());
+            let data: Vec<&[u8]> = emitted.iter().map(|u| u.data.as_slice()).collect();
+            let expected: Vec<&[u8]> = pictures.iter().map(Vec::as_slice).collect();
+            assert_eq!(data, expected);
+        }
     }
 
     #[test]

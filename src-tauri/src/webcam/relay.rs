@@ -148,7 +148,9 @@ impl Relay {
         self.lock().last_video
     }
 
-    /// Drops partial data when the session changes. Cache and clients stay.
+    /// Drops partial data when the session changes: the old session's
+    /// in-flight pictures (the held-back one and any partial NAL) are
+    /// discarded without flushing. Cache and clients stay.
     pub fn reset_assembler(&self) {
         self.lock().assembler = AccessUnitAssembler::new();
     }
@@ -163,8 +165,8 @@ mod tests {
     const HEVC_IDR: &[u8] = include_bytes!("../../tests/fixtures/hevc-idr.h265");
     const HEVC_SWITCH: &[u8] = include_bytes!("../../tests/fixtures/hevc-switch.h265");
 
-    /// Pictures the assembler keeps open or pending after each push.
-    const HELD_BACK: usize = 2;
+    /// Pictures the assembler keeps open after each push.
+    const HELD_BACK: usize = 1;
 
     /// Reference AUs of a fixture, used to cut it into one chunk per picture.
     fn pictures(bytes: &[u8]) -> Vec<Vec<u8>> {
@@ -226,9 +228,8 @@ mod tests {
         assert_eq!(sub.bootstrap[0].data, expected);
         assert!(sub.bootstrap[1].keyframe);
         assert_eq!(sub.bootstrap[0].pts90k, sub.bootstrap[1].pts90k);
-        // The assembler holds back the last two pushed pictures (an AU closes
-        // once the next one's first NAL is complete), so AUs 0..=33 are out.
-        assert_eq!(sub.bootstrap.len(), 1 + (34 - 30));
+        // The assembler holds back the last pushed picture, so AUs 0..=34 are out.
+        assert_eq!(sub.bootstrap.len(), 1 + (35 - 30));
     }
 
     #[test]
@@ -265,14 +266,37 @@ mod tests {
         assert_eq!(joined, all[from..]);
     }
 
+    fn with_params(mut au: AccessUnit, tag: u8) -> AccessUnit {
+        au.params = Some(ParamSets {
+            codec: Codec::H265,
+            nals: vec![vec![0x40, 0x01, tag]],
+        });
+        au
+    }
+
     #[test]
     fn identical_repeated_params_keep_the_cache() {
         let relay = Relay::new();
-        let start = Instant::now();
-        let pics = pictures(HEVC_IDR);
-        feed(&relay, start, &pics, 0, 36);
-        // The keyframe at 30 repeated its headers in-band; the cache survived.
-        assert_eq!(relay.subscribe().bootstrap.len(), 5);
+        let now = Instant::now();
+        relay.push_au(with_params(synthetic(true, 10, 1), 0xaa), now);
+        relay.push_au(synthetic(false, 10, 2), now);
+        relay.push_au(with_params(synthetic(false, 10, 3), 0xaa), now);
+        relay.push_au(synthetic(false, 10, 4), now);
+        assert_eq!(relay.subscribe().bootstrap.len(), 1 + 4);
+    }
+
+    #[test]
+    fn different_params_on_a_non_key_au_close_the_cache_until_the_next_keyframe() {
+        let relay = Relay::new();
+        let now = Instant::now();
+        relay.push_au(with_params(synthetic(true, 10, 1), 0xaa), now);
+        relay.push_au(synthetic(false, 10, 2), now);
+        relay.push_au(with_params(synthetic(false, 10, 3), 0xbb), now);
+        assert!(relay.subscribe().bootstrap.is_empty());
+        relay.push_au(with_params(synthetic(true, 10, 4), 0xbb), now);
+        let bootstrap = relay.subscribe().bootstrap;
+        assert_eq!(bootstrap.len(), 2);
+        assert_eq!(bootstrap[0].params.as_ref().unwrap().nals[0][2], 0xbb);
     }
 
     #[test]
