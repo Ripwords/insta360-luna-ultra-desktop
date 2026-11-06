@@ -41,6 +41,9 @@ pub struct AccessUnit {
     /// Annex-B, each NAL behind a 4-byte start code.
     pub data: Vec<u8>,
     pub keyframe: bool,
+    /// The parameter sets carried in-band. The relay also sets them on a
+    /// keyframe that carried none, to the ones in force when it was published,
+    /// so `data` may not contain them.
     pub params: Option<ParamSets>,
     pub pts90k: u64,
 }

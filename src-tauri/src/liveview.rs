@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::{Arc, Mutex as StdMutex, Weak};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -24,12 +24,17 @@ use tokio::sync::Mutex;
 use tokio::task::{JoinHandle, JoinSet};
 
 use crate::luna::{
-    same_session, wire_field_varint, LunaState, Session, CODE_START_LIVE_STREAM,
-    CODE_STOP_LIVE_STREAM,
+    wire_field_varint, LunaState, Session, CODE_START_LIVE_STREAM, CODE_STOP_LIVE_STREAM,
 };
+use crate::webcam::nal::ParamSets;
 use crate::webcam::relay::Relay;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
+/// A client that accepts no bytes for this long is closed.
+const CLIENT_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Bounds the STOP sent after a failed START; its answer doesn't matter.
+const BEST_EFFORT_TIMEOUT: Duration = Duration::from_secs(1);
+const ACCEPT_BACKOFF: Duration = Duration::from_millis(100);
 const START_CODE: [u8; 4] = [0, 0, 0, 1];
 
 /// StartLiveStream, per `insta360.messages.StartLiveStream`:
@@ -123,53 +128,41 @@ impl Stats {
 }
 
 struct Preview {
-    /// Created once; outlives camera sessions so clients survive a reconnect.
-    relay: Arc<Relay>,
     consumers: HashSet<Consumer>,
-    /// The session START was sent on, while its pump runs.
-    session: Option<Arc<Session>>,
+    /// The session START was sent on, while its pump runs. Weak, so a session
+    /// the keepalive evicts is dropped: its stream closes, which ends the
+    /// pump, and no STOP is sent to a dead camera.
+    session: Option<Weak<Session>>,
     pump: Option<JoinHandle<()>>,
-    stats: Option<Arc<Stats>>,
     viewfinder: Option<(u16, JoinHandle<()>)>,
 }
 
 impl Preview {
-    fn stop_pump(&mut self) {
-        if let Some(pump) = self.pump.take() {
-            pump.abort();
-        }
-        self.session = None;
-        self.stats = None;
-    }
-
-    fn start_pump(&mut self, session: &Arc<Session>) {
-        self.stop_pump();
-        self.relay.reset_assembler();
-        let stats = Arc::new(Stats::default());
-        *stats.started.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
-        self.pump = Some(tokio::spawn(pump(
-            session.subscribe_stream(),
-            Arc::clone(&self.relay),
-            Arc::clone(&stats),
-        )));
-        self.stats = Some(stats);
-        self.session = Some(Arc::clone(session));
+    fn is_current(&self, session: &Arc<Session>) -> bool {
+        self.session
+            .as_ref()
+            .is_some_and(|current| Weak::ptr_eq(current, &Arc::downgrade(session)))
     }
 }
 
+/// The relay and the pump's counters live outside the lock, which is held
+/// across camera commands for seconds at a time.
 pub struct LiveViewState {
+    /// Created once; outlives camera sessions so clients survive a reconnect.
+    relay: Arc<Relay>,
+    stats: StdMutex<Option<Arc<Stats>>>,
     inner: Mutex<Preview>,
 }
 
 impl Default for LiveViewState {
     fn default() -> Self {
         LiveViewState {
+            relay: Relay::new(),
+            stats: StdMutex::new(None),
             inner: Mutex::new(Preview {
-                relay: Relay::new(),
                 consumers: HashSet::new(),
                 session: None,
                 pump: None,
-                stats: None,
                 viewfinder: None,
             }),
         }
@@ -188,6 +181,14 @@ async fn send_start(session: &Session) -> Result<(), String> {
         .map_err(|e| format!("camera rejected START_LIVE_STREAM: {e}"))
 }
 
+/// After a START that failed or timed out: the camera may have acted on it,
+/// and nothing else would stop it.
+async fn stop_after_failed_start(session: &Session) {
+    let _ = session
+        .send_command(CODE_STOP_LIVE_STREAM, &[], BEST_EFFORT_TIMEOUT)
+        .await;
+}
+
 impl LiveViewState {
     /// Registers `consumer` and makes sure the camera is streaming on `session`.
     // used by Task 8
@@ -198,7 +199,7 @@ impl LiveViewState {
         session: Arc<Session>,
     ) -> Result<(), String> {
         let mut preview = self.inner.lock().await;
-        acquire_locked(&mut preview, consumer, &session).await
+        self.acquire_locked(&mut preview, consumer, &session).await
     }
 
     /// Unregisters `consumer`; the last one out stops the camera stream.
@@ -206,52 +207,107 @@ impl LiveViewState {
     #[allow(dead_code)]
     pub(crate) async fn release(&self, consumer: Consumer) {
         let mut preview = self.inner.lock().await;
-        release_locked(&mut preview, consumer).await;
+        self.release_locked(&mut preview, consumer).await;
     }
 
+    pub(crate) fn relay(&self) -> Arc<Relay> {
+        Arc::clone(&self.relay)
+    }
+
+    /// Restarts the camera's preview for the current consumers: on a new
+    /// session, moves the pump there and sends START; on the current one,
+    /// cycles STOP and START. With no consumers it does nothing.
     // used by Task 8
     #[allow(dead_code)]
-    pub(crate) async fn relay(&self) -> Arc<Relay> {
-        Arc::clone(&self.inner.lock().await.relay)
-    }
-}
-
-async fn acquire_locked(
-    preview: &mut Preview,
-    consumer: Consumer,
-    session: &Arc<Session>,
-) -> Result<(), String> {
-    let switched = !preview
-        .session
-        .as_ref()
-        .is_some_and(|current| same_session(current, session));
-    let (after, command) = transition(&preview.consumers, Change::Acquire(consumer));
-    if switched {
-        // Existing consumers carry over: the relay keeps their sockets open
-        // and resyncs on the new session's next access unit.
-        preview.start_pump(session);
-        if let Err(error) = send_start(session).await {
-            // Forget the session so the next acquire retries START.
-            preview.stop_pump();
-            return Err(error);
+    pub(crate) async fn restart(&self, session: Arc<Session>) -> Result<(), String> {
+        let mut preview = self.inner.lock().await;
+        if preview.consumers.is_empty() {
+            return Ok(());
         }
-    } else if command == Some(Command::Start) {
-        send_start(session).await?;
+        if !preview.is_current(&session) {
+            self.start_pump(&mut preview, &session);
+            if let Err(error) = send_start(&session).await {
+                stop_after_failed_start(&session).await;
+                self.stop_pump(&mut preview);
+                return Err(error);
+            }
+            return Ok(());
+        }
+        let _ = session
+            .send_command(CODE_STOP_LIVE_STREAM, &[], COMMAND_TIMEOUT)
+            .await;
+        let started = send_start(&session).await;
+        // The camera's new stream shares no references with the old one.
+        self.relay.discontinuity();
+        if started.is_err() {
+            stop_after_failed_start(&session).await;
+        }
+        started
     }
-    preview.consumers = after;
-    Ok(())
-}
 
-async fn release_locked(preview: &mut Preview, consumer: Consumer) {
-    let (after, command) = transition(&preview.consumers, Change::Release(consumer));
-    preview.consumers = after;
-    if command == Some(Command::Stop) {
-        let session = preview.session.clone();
-        preview.stop_pump();
-        if let Some(session) = session {
-            let _ = session
-                .send_command(CODE_STOP_LIVE_STREAM, &[], COMMAND_TIMEOUT)
-                .await;
+    fn stop_pump(&self, preview: &mut Preview) {
+        if let Some(pump) = preview.pump.take() {
+            pump.abort();
+        }
+        preview.session = None;
+        *self.stats.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
+    fn start_pump(&self, preview: &mut Preview, session: &Arc<Session>) {
+        self.stop_pump(preview);
+        self.relay.discontinuity();
+        let stats = Arc::new(Stats::default());
+        *stats.started.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+        preview.pump = Some(tokio::spawn(pump(
+            session.subscribe_stream(),
+            Arc::clone(&self.relay),
+            Arc::clone(&stats),
+        )));
+        preview.session = Some(Arc::downgrade(session));
+        *self.stats.lock().unwrap_or_else(|e| e.into_inner()) = Some(stats);
+    }
+
+    /// Cancel-safe: the claim and the session are recorded before START goes
+    /// out, so if this future is dropped mid-START, the consumer's release
+    /// still stops the camera. On an error both are rolled back.
+    async fn acquire_locked(
+        &self,
+        preview: &mut Preview,
+        consumer: Consumer,
+        session: &Arc<Session>,
+    ) -> Result<(), String> {
+        let before = preview.consumers.clone();
+        let (after, command) = transition(&before, Change::Acquire(consumer));
+        let switched = !preview.is_current(session);
+        preview.consumers = after;
+        if switched {
+            // Existing consumers carry over: the relay keeps their sockets
+            // open and resyncs on the new session's next keyframe.
+            self.start_pump(preview, session);
+        }
+        if switched || command == Some(Command::Start) {
+            if let Err(error) = send_start(session).await {
+                stop_after_failed_start(session).await;
+                // Forget the session so the next acquire retries START.
+                self.stop_pump(preview);
+                preview.consumers = before;
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    async fn release_locked(&self, preview: &mut Preview, consumer: Consumer) {
+        let (after, command) = transition(&preview.consumers, Change::Release(consumer));
+        preview.consumers = after;
+        if command == Some(Command::Stop) {
+            let session = preview.session.as_ref().and_then(Weak::upgrade);
+            self.stop_pump(preview);
+            if let Some(session) = session {
+                let _ = session
+                    .send_command(CODE_STOP_LIVE_STREAM, &[], COMMAND_TIMEOUT)
+                    .await;
+            }
         }
     }
 }
@@ -268,9 +324,9 @@ async fn pump(
                 stats.record(&payload);
                 relay.push_chunk(&payload, Instant::now());
             }
-            // Chunks were dropped: discard the partial picture; the relay
-            // resyncs at the next access unit start.
-            Err(RecvError::Lagged(_)) => relay.reset_assembler(),
+            // Chunks were dropped: what follows may reference pictures that
+            // never arrived, so the relay waits for the next keyframe.
+            Err(RecvError::Lagged(_)) => relay.discontinuity(),
             Err(RecvError::Closed) => break,
         }
     }
@@ -282,38 +338,54 @@ async fn serve_annexb(listener: TcpListener, relay: Arc<Relay>) {
     let mut clients = JoinSet::new();
     loop {
         tokio::select! {
-            accepted = listener.accept() => {
-                let Ok((socket, _)) = accepted else { break };
-                clients.spawn(serve_client(socket, Arc::clone(&relay)));
-            }
+            accepted = listener.accept() => match accepted {
+                Ok((socket, _)) => {
+                    clients.spawn(serve_client(socket, Arc::clone(&relay), CLIENT_WRITE_TIMEOUT));
+                }
+                Err(error) => {
+                    // Usually transient (out of file descriptors, a reset
+                    // before accept); back off rather than spin.
+                    log::warn!("viewfinder accept failed: {error}");
+                    tokio::time::sleep(ACCEPT_BACKOFF).await;
+                }
+            },
             Some(_) = clients.join_next() => {}
         }
     }
 }
 
-fn params_annexb(relay: &Relay) -> Vec<u8> {
+fn params_annexb(params: &ParamSets) -> Vec<u8> {
     let mut data = Vec::new();
-    for nal in relay.params().map(|p| p.nals).unwrap_or_default() {
+    for nal in &params.nals {
         data.extend_from_slice(&START_CODE);
-        data.extend_from_slice(&nal);
+        data.extend_from_slice(nal);
     }
     data
 }
 
+/// Writes all of `bytes`, or gives up after `limit`.
+pub(crate) async fn write_within(socket: &mut TcpStream, bytes: &[u8], limit: Duration) -> bool {
+    matches!(
+        tokio::time::timeout(limit, socket.write_all(bytes)).await,
+        Ok(Ok(()))
+    )
+}
+
 /// One client: the head, then the bootstrap (params, then the pictures since
-/// the last keyframe), then live pictures. A client that falls behind is
-/// closed rather than continued mid-GOP; the page reconnects for a clean start.
-async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>) {
+/// the last keyframe), then live pictures. A client that falls behind, or
+/// accepts nothing for `write_timeout`, is closed rather than continued
+/// mid-GOP; the page reconnects for a clean start.
+async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>, write_timeout: Duration) {
     // Read and discard the request; we serve one thing.
     let mut scratch = [0u8; 1024];
     let _ = socket.read(&mut scratch).await;
     let subscription = relay.subscribe();
-    if socket.write_all(&response_head()).await.is_err() {
+    if !write_within(&mut socket, &response_head(), write_timeout).await {
         return;
     }
     let mut started = !subscription.bootstrap.is_empty();
     for au in &subscription.bootstrap {
-        if socket.write_all(&au.data).await.is_err() {
+        if !write_within(&mut socket, &au.data, write_timeout).await {
             return;
         }
     }
@@ -324,16 +396,17 @@ async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>) {
             Err(RecvError::Lagged(_) | RecvError::Closed) => return,
         };
         if !started {
-            // Nothing cached at join time: wait for a keyframe to start on.
-            if !au.keyframe {
+            // Nothing cached at join time: wait for a keyframe to start on,
+            // led by the params it was published with.
+            let (true, Some(params)) = (au.keyframe, &au.params) else {
                 continue;
-            }
-            if au.params.is_none() && socket.write_all(&params_annexb(&relay)).await.is_err() {
+            };
+            if !write_within(&mut socket, &params_annexb(params), write_timeout).await {
                 return;
             }
             started = true;
         }
-        if socket.write_all(&au.data).await.is_err() {
+        if !write_within(&mut socket, &au.data, write_timeout).await {
             return;
         }
     }
@@ -373,7 +446,8 @@ pub async fn luna_liveview_start(
         .ok_or_else(|| "camera is not connected".to_string())?;
 
     let mut preview = live.inner.lock().await;
-    acquire_locked(&mut preview, Consumer::Viewfinder, &session).await?;
+    live.acquire_locked(&mut preview, Consumer::Viewfinder, &session)
+        .await?;
     if let Some((port, _)) = preview.viewfinder {
         return Ok(info(port));
     }
@@ -392,11 +466,12 @@ pub async fn luna_liveview_start(
     let (listener, port) = match bound {
         Ok(bound) => bound,
         Err(error) => {
-            release_locked(&mut preview, Consumer::Viewfinder).await;
+            live.release_locked(&mut preview, Consumer::Viewfinder)
+                .await;
             return Err(error);
         }
     };
-    let server = tokio::spawn(serve_annexb(listener, Arc::clone(&preview.relay)));
+    let server = tokio::spawn(serve_annexb(listener, live.relay()));
     preview.viewfinder = Some((port, server));
     Ok(info(port))
 }
@@ -408,14 +483,14 @@ pub async fn luna_liveview_stop(live: State<'_, LiveViewState>) -> Result<(), St
     if let Some((_, server)) = preview.viewfinder.take() {
         server.abort();
     }
-    release_locked(&mut preview, Consumer::Viewfinder).await;
+    live.release_locked(&mut preview, Consumer::Viewfinder)
+        .await;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn luna_liveview_stats(live: State<'_, LiveViewState>) -> Result<LiveViewStats, String> {
-    let preview = live.inner.lock().await;
-    let Some(stats) = preview.stats.as_ref() else {
+    let Some(stats) = live.stats.lock().unwrap_or_else(|e| e.into_inner()).clone() else {
         return Ok(LiveViewStats::default());
     };
     let first = stats
@@ -517,13 +592,114 @@ mod tests {
     async fn viewfinder_client_gets_params_then_keyframe() {
         let relay = Relay::new();
         relay.push_chunk(&HEVC_IDR[..HEVC_IDR.len() / 2], Instant::now());
+        let bootstrap_len: usize = relay
+            .subscribe()
+            .bootstrap
+            .iter()
+            .map(|au| au.data.len())
+            .sum();
+        assert!(bootstrap_len > 0);
         let mut client = viewfinder(&relay).await;
         read_head(&mut client).await;
         let mut body = Vec::new();
-        while nal_types(&body).len() < 2 {
+        while body.len() < bootstrap_len {
             assert!(read_some(&mut client, &mut body).await > 0, "closed early");
         }
-        assert_eq!(nal_types(&body)[0], 32, "first NAL must be the VPS");
+        let types = nal_types(&body);
+        assert_eq!(types[..3], [32, 33, 34], "VPS, SPS, PPS first: {types:?}");
+        let first_slice = types.iter().find(|&&t| t <= 31).copied();
+        assert!(
+            first_slice.is_some_and(|t| (16..=21).contains(&t)),
+            "an IRAP must come before any other slice: {types:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn early_joiner_gets_the_params_its_keyframe_decodes_with() {
+        use crate::webcam::nal::{Codec, ParamSets};
+        let relay = Relay::new();
+        let mut client = viewfinder(&relay).await;
+        read_head(&mut client).await;
+        let params = |tag: u8| {
+            Some(ParamSets {
+                codec: Codec::H265,
+                nals: vec![vec![0x40, 0x01, tag]],
+            })
+        };
+        let keyframe = [0, 0, 0, 1, 0x26, 0x01, 0xaf];
+        relay.push_au(
+            AccessUnit {
+                data: keyframe.to_vec(),
+                keyframe: true,
+                params: params(0xaa),
+                pts90k: 1,
+            },
+            Instant::now(),
+        );
+        // The params change before the client gets to the keyframe.
+        relay.push_au(
+            AccessUnit {
+                data: vec![0, 0, 0, 1, 0x02, 0x01, 0xbb],
+                keyframe: false,
+                params: params(0xbb),
+                pts90k: 2,
+            },
+            Instant::now(),
+        );
+        let expected = [&[0, 0, 0, 1, 0x40, 0x01, 0xaa][..], &keyframe].concat();
+        let mut body = Vec::new();
+        while body.len() < expected.len() {
+            assert!(read_some(&mut client, &mut body).await > 0, "closed early");
+        }
+        assert_eq!(body[..expected.len()], expected);
+    }
+
+    #[tokio::test]
+    async fn a_client_that_stops_reading_is_closed() {
+        let relay = Relay::new();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client
+            .write_all(b"GET /stream HTTP/1.1\r\n\r\n")
+            .await
+            .unwrap();
+        let (socket, _) = listener.accept().await.unwrap();
+        let served = tokio::spawn(serve_client(
+            socket,
+            Arc::clone(&relay),
+            Duration::from_millis(200),
+        ));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        // Far more than the socket buffers hold, and fewer AUs than would lag.
+        relay.push_au(
+            AccessUnit {
+                data: vec![0, 0, 0, 1, 0x26, 0x01, 0xaf],
+                keyframe: true,
+                params: Some(ParamSets {
+                    codec: crate::webcam::nal::Codec::H265,
+                    nals: vec![vec![0x40, 0x01, 0xaa]],
+                }),
+                pts90k: 0,
+            },
+            Instant::now(),
+        );
+        for i in 1..200 {
+            relay.push_au(
+                AccessUnit {
+                    data: vec![0; 256 * 1024],
+                    keyframe: false,
+                    params: None,
+                    pts90k: i,
+                },
+                Instant::now(),
+            );
+        }
+        tokio::time::timeout(Duration::from_secs(3), served)
+            .await
+            .expect("a client that stops reading must be closed")
+            .unwrap();
+        drop(client);
     }
 
     #[tokio::test]
@@ -592,7 +768,7 @@ mod tests {
         assert_eq!(bootstrap.len(), bootstrap_len);
 
         // A new session: its stream starts afresh on an IDR.
-        relay.reset_assembler();
+        relay.discontinuity();
         relay.push_chunk(HEVC_IDR, Instant::now());
         let mut after = Vec::new();
         while !nal_types(&after).iter().any(|t| (16..=21).contains(t)) {
@@ -608,6 +784,119 @@ mod tests {
             !matches!(still_open, Ok(Ok(0))),
             "socket closed after the switch"
         );
+    }
+
+    use crate::luna::fake::{self, OnStart};
+
+    const START: u16 = CODE_START_LIVE_STREAM;
+    const STOP: u16 = CODE_STOP_LIVE_STREAM;
+
+    async fn consumers(live: &LiveViewState) -> HashSet<Consumer> {
+        live.inner.lock().await.consumers.clone()
+    }
+
+    #[tokio::test]
+    async fn failed_start_sends_stop_and_drops_the_claim() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::HangUp).await;
+        let result = live.acquire(Consumer::Viewfinder, session).await;
+        assert!(result.is_err());
+        assert_eq!(camera.wait_for(2).await, [START, STOP]);
+        assert!(consumers(&live).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_acquire_cancelled_mid_start_keeps_its_claim() {
+        let live = Arc::new(LiveViewState::default());
+        let (session, camera) = fake::connect(OnStart::Ignore).await;
+        let pending = tokio::spawn({
+            let live = Arc::clone(&live);
+            let session = Arc::clone(&session);
+            async move { live.acquire(Consumer::Webcam, session).await }
+        });
+        camera.wait_for(1).await;
+        pending.abort();
+        let _ = pending.await;
+        assert_eq!(consumers(&live).await, set(&[Consumer::Webcam]));
+        // So the release that follows still stops the camera.
+        live.release(Consumer::Webcam).await;
+        assert_eq!(camera.wait_for(2).await, [START, STOP]);
+    }
+
+    #[tokio::test]
+    async fn restart_without_consumers_sends_nothing() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.restart(session).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(camera.codes().is_empty());
+    }
+
+    #[tokio::test]
+    async fn restart_cycles_stop_then_start_and_drops_the_cache() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        live.relay().push_chunk(HEVC_IDR, Instant::now());
+        assert!(!live.relay().subscribe().bootstrap.is_empty());
+        live.restart(session).await.unwrap();
+        assert_eq!(camera.wait_for(3).await, [START, STOP, START]);
+        assert!(live.relay().subscribe().bootstrap.is_empty());
+        assert_eq!(consumers(&live).await, set(&[Consumer::Webcam]));
+    }
+
+    #[tokio::test]
+    async fn restart_on_a_new_session_switches_without_stopping_the_old() {
+        let live = LiveViewState::default();
+        let (old, old_camera) = fake::connect(OnStart::Answer).await;
+        let (new, new_camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Webcam, old).await.unwrap();
+        live.restart(Arc::clone(&new)).await.unwrap();
+        assert_eq!(new_camera.wait_for(1).await, [START]);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(old_camera.codes(), [START]);
+        // The pump now follows the new session: a further restart cycles it.
+        live.restart(new).await.unwrap();
+        assert_eq!(new_camera.wait_for(3).await, [START, STOP, START]);
+    }
+
+    #[tokio::test]
+    async fn an_evicted_session_is_not_kept_alive() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        let weak = Arc::downgrade(&session);
+        drop(session);
+        assert!(
+            weak.upgrade().is_none(),
+            "the preview must not own the session"
+        );
+        // The pump ends with the session's stream.
+        let pump = live
+            .inner
+            .lock()
+            .await
+            .pump
+            .as_ref()
+            .map(JoinHandle::is_finished);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let finished = live
+            .inner
+            .lock()
+            .await
+            .pump
+            .as_ref()
+            .map(JoinHandle::is_finished);
+        assert!(pump.is_some() && finished == Some(true));
+        // No STOP on a dead session.
+        tokio::time::timeout(Duration::from_secs(1), live.release(Consumer::Webcam))
+            .await
+            .expect("release must not wait on a dead session");
+        assert_eq!(camera.codes(), [START]);
     }
 
     fn set(consumers: &[Consumer]) -> HashSet<Consumer> {

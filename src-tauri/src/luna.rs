@@ -485,12 +485,9 @@ fn large_options_body() -> Vec<u8> {
         .collect()
 }
 
-async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, host: String) -> Result<LunaDeviceInfo, String> {
-    let stream = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect((host.as_str(), CONTROL_PORT)))
-        .await
-        .map_err(|_| format!("connecting to {host}:{CONTROL_PORT} timed out"))?
-        .map_err(|e| format!("cannot reach camera at {host}:{CONTROL_PORT}: {e}"))?;
-
+/// Wraps a connected control socket in a session and starts its reader,
+/// which routes command responses and forwards primary video.
+fn start_session(stream: TcpStream, first_seq: u8) -> Arc<Session> {
     let (mut read_half, write_half) = stream.into_split();
     let pending: Arc<StdMutex<HashMap<u16, oneshot::Sender<RawResponse>>>> = Arc::default();
 
@@ -501,7 +498,7 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
     let session = Arc::new(Session {
         writer: Mutex::new(write_half),
         pending: Arc::clone(&pending),
-        seq: AtomicU8::new(0x24),
+        seq: AtomicU8::new(first_seq),
         request_id: AtomicU16::new(1),
         reader: StdMutex::new(None),
         keepalive: StdMutex::new(None),
@@ -547,6 +544,16 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         reader_pending.lock().unwrap().clear();
     });
     session.reader.lock().unwrap().replace(reader);
+    session
+}
+
+async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, host: String) -> Result<LunaDeviceInfo, String> {
+    let stream = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect((host.as_str(), CONTROL_PORT)))
+        .await
+        .map_err(|_| format!("connecting to {host}:{CONTROL_PORT} timed out"))?
+        .map_err(|e| format!("cannot reach camera at {host}:{CONTROL_PORT}: {e}"))?;
+
+    let session = start_session(stream, 0x24);
 
     // STREAM hello authorizes the HTTP media index a moment later
     session.write(&build_stream_hello(session.next_seq())).await?;
@@ -710,6 +717,91 @@ pub async fn luna_command(state: State<'_, LunaState>, code: u16, body: Vec<u8>)
         .ok_or_else(|| "camera is not connected".to_string())?;
     let response = session.send_command(code, &body, Duration::from_secs(10)).await?;
     Ok(response.body)
+}
+
+/// A fake camera on loopback for tests of code that drives a session.
+#[cfg(test)]
+pub(crate) mod fake {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    /// What the fake does when it receives START_LIVE_STREAM.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub(crate) enum OnStart {
+        Answer,
+        /// Never answers, so the command times out.
+        Ignore,
+        /// Closes its sending side, so the pending command fails at once.
+        /// It keeps reading and recording what arrives.
+        HangUp,
+    }
+
+    pub(crate) struct FakeCamera {
+        codes: Arc<StdMutex<Vec<u16>>>,
+        task: JoinHandle<()>,
+    }
+
+    impl FakeCamera {
+        /// Command codes received, in order.
+        pub(crate) fn codes(&self) -> Vec<u16> {
+            self.codes.lock().unwrap().clone()
+        }
+
+        /// Waits until `count` commands have arrived.
+        pub(crate) async fn wait_for(&self, count: usize) -> Vec<u16> {
+            for _ in 0..500 {
+                let codes = self.codes();
+                if codes.len() >= count {
+                    return codes;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            panic!("camera received only {:?}", self.codes());
+        }
+    }
+
+    impl Drop for FakeCamera {
+        fn drop(&mut self) {
+            self.task.abort();
+        }
+    }
+
+    /// A session connected to a fake camera that echoes each command back as
+    /// its response, except START as `on_start` says.
+    pub(crate) async fn connect(on_start: OnStart) -> (Arc<Session>, FakeCamera) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let codes: Arc<StdMutex<Vec<u16>>> = Arc::default();
+        let recorded = Arc::clone(&codes);
+        let task = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let (mut read, mut write) = socket.into_split();
+            let mut buffer = Vec::new();
+            let mut chunk = [0u8; 4096];
+            let mut open = true;
+            while let Ok(n) = read.read(&mut chunk).await {
+                if n == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..n]);
+                for frame in drain_frames(&mut buffer) {
+                    let Frame::File(command) = frame else { continue };
+                    recorded.lock().unwrap().push(command.code);
+                    let answer = command.code != CODE_START_LIVE_STREAM || on_start == OnStart::Answer;
+                    if command.code == CODE_START_LIVE_STREAM && on_start == OnStart::HangUp && open {
+                        let _ = write.shutdown().await;
+                        open = false;
+                    }
+                    if answer && open {
+                        let reply = build_file_command(0, command.code, command.request_id, &[]);
+                        let _ = write.write_all(&reply).await;
+                    }
+                }
+            }
+        });
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        (start_session(stream, 0), FakeCamera { codes, task })
+    }
 }
 
 #[cfg(test)]

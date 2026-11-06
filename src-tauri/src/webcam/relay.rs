@@ -29,6 +29,8 @@ struct State {
     cache_bytes: usize,
     /// False until a keyframe arrives, and after a clear.
     cache_open: bool,
+    /// After a discontinuity: publish nothing until a keyframe.
+    awaiting_keyframe: bool,
     last_pts: Option<u64>,
     last_video: Option<Instant>,
 }
@@ -58,6 +60,7 @@ impl Relay {
                 cache: Vec::new(),
                 cache_bytes: 0,
                 cache_open: false,
+                awaiting_keyframe: false,
                 last_pts: None,
                 last_video: None,
             }),
@@ -101,6 +104,17 @@ impl Relay {
             state.params = au.params.clone();
             state.close_cache();
         }
+        if state.awaiting_keyframe {
+            if !au.keyframe {
+                return;
+            }
+            state.awaiting_keyframe = false;
+        }
+        // A keyframe names the params it decodes with, so a late starter
+        // never pairs it with params that changed since.
+        if au.keyframe && au.params.is_none() {
+            au.params = state.params.clone();
+        }
         let au = Arc::new(au);
         if au.keyframe {
             state.close_cache();
@@ -140,6 +154,8 @@ impl Relay {
         Subscription { bootstrap, live }
     }
 
+    // used by Task 8
+    #[allow(dead_code)]
     pub fn params(&self) -> Option<ParamSets> {
         self.lock().params.clone()
     }
@@ -150,11 +166,15 @@ impl Relay {
         self.lock().last_video
     }
 
-    /// Drops partial data when the session changes: the old session's
-    /// in-flight pictures (the held-back one and any partial NAL) are
-    /// discarded without flushing. Cache and clients stay.
-    pub fn reset_assembler(&self) {
-        self.lock().assembler = AccessUnitAssembler::new();
+    /// A gap in the camera's stream: a session switch, a restart, or dropped
+    /// chunks. The partial picture, the GOP cache and every picture until the
+    /// next keyframe are dropped, since their references may be gone.
+    /// Clients stay connected.
+    pub fn discontinuity(&self) {
+        let mut state = self.lock();
+        state.assembler = AccessUnitAssembler::new();
+        state.close_cache();
+        state.awaiting_keyframe = true;
     }
 }
 
@@ -355,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn last_video_tracks_non_empty_chunks_and_reset_keeps_the_cache() {
+    fn last_video_tracks_non_empty_chunks() {
         let relay = Relay::new();
         let start = Instant::now();
         assert_eq!(relay.last_video(), None);
@@ -364,9 +384,47 @@ mod tests {
         assert_eq!(relay.last_video(), None);
         let pics = pictures(HEVC_IDR);
         feed(&relay, start, &pics, 0, 3);
-        let before = relay.subscribe().bootstrap.len();
-        relay.reset_assembler();
-        assert_eq!(relay.subscribe().bootstrap.len(), before);
+        relay.discontinuity();
         assert!(relay.last_video().is_some());
+    }
+
+    #[test]
+    fn discontinuity_publishes_nothing_until_a_keyframe() {
+        let relay = Relay::new();
+        let start = Instant::now();
+        let pics = pictures(HEVC_IDR);
+        feed(&relay, start, &pics, 0, 36);
+        let mut sub = relay.subscribe();
+        assert!(!sub.bootstrap.is_empty());
+
+        relay.discontinuity();
+        assert!(relay.subscribe().bootstrap.is_empty(), "cache must be dropped");
+        // Mid-GOP pictures whose references are gone.
+        feed(&relay, start, &pics, 40, 50);
+        assert!(drain(&mut sub).is_empty(), "mid-GOP AU broadcast after a gap");
+        assert!(relay.subscribe().bootstrap.is_empty());
+
+        // The next keyframe reopens the stream.
+        feed(&relay, start, &pics, 30, 33);
+        let live = drain(&mut sub);
+        assert!(!live.is_empty());
+        assert!(live[0].keyframe, "first AU after a gap must be a keyframe");
+        let bootstrap = relay.subscribe().bootstrap;
+        assert!(bootstrap[1].keyframe);
+    }
+
+    #[test]
+    fn keyframes_carry_the_params_they_decode_with() {
+        let relay = Relay::new();
+        let now = Instant::now();
+        relay.push_au(with_params(synthetic(true, 10, 1), 0xaa), now);
+        let mut sub = relay.subscribe();
+        let mut bare = synthetic(true, 10, 2);
+        bare.params = None;
+        relay.push_au(bare, now);
+        relay.push_au(synthetic(false, 10, 3), now);
+        let live = drain(&mut sub);
+        assert_eq!(live[0].params.as_ref().unwrap().nals[0][2], 0xaa);
+        assert_eq!(live[1].params, None, "non-key AUs stay as sent");
     }
 }
