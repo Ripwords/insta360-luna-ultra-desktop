@@ -31,6 +31,7 @@ Docs: https://ripwords.github.io/insta360-luna-ultra-desktop/
 
 - **Real camera connection** — pairs with the Luna Ultra over its own Wi-Fi network using the camera's TCP control protocol and HTTP media index. No mock data.
 - **Camera control** — live viewfinder with a HUD (recording time, storage, resolution, battery), 1×–15× zoom, six capture modes, and one-tap photo/video capture.
+- **Webcam mode** — serves the live preview to OBS as a Media Source, so OBS's Virtual Camera can use the camera in Zoom, Meet, Teams, or Discord.
 - **Pro bar** — exposure (ISO, shutter, EV, WB), look (colour mode, Leica and cinematic filters, strength), and format (resolution, framerate, aspect).
 - **Gallery** — date-grouped grid with photo/video filtering, three thumbnail sizes, and a full-screen preview with metadata and keyboard navigation.
 - **Multi-select** — click to toggle, shift-click for ranges, per-day select, select-all, with a floating action bar for downloads and deletes.
