@@ -6,6 +6,7 @@ const { isConnected } = useCamera();
 const { device, settings, loading, error, load } = useCameraSettings();
 const { active, starting, error: liveError, diagnostics, start, stop } = useLiveView();
 const { recording, elapsedLabel } = useCameraCapture();
+const { enabled: webcamOn } = useWebcam();
 // Scrolling over the picture is the desktop way to zoom; the dial is a readout
 // you can also drag. Both drive the same gesture state.
 const { onWheel } = useCameraZoom();
@@ -18,11 +19,13 @@ const settingsOpen = ref(false);
 /**
  * Opening the page should feel like picking up a camera: the preview starts on
  * its own as soon as we are connected, and stops when the connection drops.
+ * Webcam mode pauses it: OBS shows the picture, and decoding it twice is
+ * wasted work. Stopping releases only the viewfinder's claim.
  */
 watch(
-  isConnected,
-  (connected) => {
-    if (connected) void start();
+  [isConnected, webcamOn],
+  ([connected, webcam]) => {
+    if (connected && !webcam) void start();
     else void stop();
   },
   { immediate: true },
@@ -148,7 +151,13 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             v-if="!active"
             class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60"
           >
-            <template v-if="starting">
+            <template v-if="webcamOn">
+              <UIcon name="i-lucide-cast" class="size-6" />
+              <span class="max-w-xs text-center text-sm">
+                Webcam mode is on, so the preview is paused. OBS shows the picture.
+              </span>
+            </template>
+            <template v-else-if="starting">
               <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin" />
               <span class="text-sm">Starting preview…</span>
             </template>
