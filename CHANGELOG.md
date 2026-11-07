@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.3.4...master
+
+[compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.4...master)
+
+### 🚀 Enhancements
+
+- **webcam:** Split the preview stream into access units ([def8de6](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/def8de6))
+- **webcam:** Relay with GOP cache so late joiners start clean ([0b8aa32](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/0b8aa32))
+- **webcam:** Mux access units into MPEG-TS ([7863d5e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7863d5e))
+- **webcam:** Webcam state and transport for the frontend ([738a843](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/738a843))
+- **webcam:** Webcam mode toggle, stream address and gallery hold ([7a1f982](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7a1f982))
+- **webcam:** Serve the preview as MPEG-TS on a fixed localhost port ([ebb0f4c](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/ebb0f4c))
+- **webcam:** Serve a low-latency Browser Source page for OBS ([fcf31e4](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/fcf31e4))
+- **webcam:** Pause the Camera page preview while Webcam mode is on ([841f455](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/841f455))
+
+### 🩹 Fixes
+
+- **health:** Ignore probe verdicts from a previous arming ([c0de722](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/c0de722))
+- **liveview:** Keep a partial UCD2 header across socket reads ([30a88cc](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/30a88cc))
+- **connection:** Skip keepalive queries while video flows and bound socket writes ([ff8e79e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/ff8e79e))
+- **connection:** Treat a timed-out write as a dead session ([c1dfd98](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/c1dfd98))
+- **webcam:** Bound and overflow-proof the access-unit parser ([6e95e64](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/6e95e64))
+- **webcam:** Emit each picture one frame sooner and pin the params-cache ruling ([42353ac](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/42353ac))
+- **webcam:** Bound held params in the TS muxer ([ee8df1e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/ee8df1e))
+- **webcam:** Guard useWebcam against stale starts ([7cdec76](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/7cdec76))
+- **liveview:** Reset the relay on discontinuities and harden preview ownership ([c55508f](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/c55508f))
+- **webcam:** Hold every camera fetch and tighten the webcam UI ([b500c77](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/b500c77))
+- **webcam:** Harden the webcam server and restart ordering ([751bb21](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/751bb21))
+- **webcam:** Turn webcam mode off on disconnect and adopt a running stream on load ([d940efd](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/d940efd))
+- **liveview:** Grant viewfinder CORS only to the app's own origins ([157a859](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/157a859))
+- **webcam:** Stop the camera's preview on app exit ([64c6009](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/64c6009))
+- **webcam:** Stop the stream before teardown, keep an adopted stream polled, retry a failed seed ([fd69411](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/fd69411))
+- **liveview:** Restart an idle stream when the viewfinder joins it ([75adf79](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/75adf79))
+- **webcam:** Start OBS at the live edge ([b268826](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/b268826))
+- **liveview:** Announce live view so the camera unfolds ([4158e25](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/4158e25))
+
+### 💅 Refactors
+
+- **liveview:** Share one camera preview between consumers through the relay ([46cb37f](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/46cb37f))
+
+### 📖 Documentation
+
+- **spec:** Webcam mode via OBS and preview-stream fixes ([b0aeff9](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/b0aeff9))
+- **plan:** Webcam mode implementation plan ([07c87c3](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/07c87c3))
+- Webcam mode with OBS ([521b01f](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/521b01f))
+- Tighten webcam page ([410dbb2](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/410dbb2))
+- Drop an unverified firmware date from the protocol note ([b565f05](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/b565f05))
+- **webcam:** Say the computer is offline while it streams ([e11d373](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/e11d373))
+
+### 🏡 Chore
+
+- Ignore local worktrees and agent scratch ([ebddfc2](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/ebddfc2))
+- **probes:** Add joystick triple-click and Wi-Fi station mode probes ([364d154](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/364d154))
+- **probes:** Drop the Wi-Fi station mode probe ([508a564](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/508a564))
+- **probes:** Drop the joystick probe; buttons are locked while connected ([9f32ae5](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/9f32ae5))
+
+### ✅ Tests
+
+- **liveview:** Byte-at-a-time UCD2 framing and anchored expectations ([6f43bbb](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/6f43bbb))
+
+### ❤️ Contributors
+
+- JJ <teohjjteoh@gmail.com>
+
 ## v0.3.3...master
 
 [compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.3...master)
