@@ -37,6 +37,17 @@ const CLIENT_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Bounds the STOP sent after a failed START; its answer doesn't matter.
 const BEST_EFFORT_TIMEOUT: Duration = Duration::from_secs(1);
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(100);
+/// How long a running stream may go without video before a consumer that
+/// joins it restarts the camera. Long enough for a fresh START to bring the
+/// first picture.
+const IDLE_AFTER: Duration = Duration::from_secs(2);
+
+/// Whether the stream started at `started` has sent no video for
+/// `IDLE_AFTER`. Video from before the start belongs to an older stream.
+fn stream_idle(started: Instant, last_video: Option<Instant>, now: Instant) -> bool {
+    let since = last_video.filter(|at| *at >= started).unwrap_or(started);
+    now.saturating_duration_since(since) >= IDLE_AFTER
+}
 
 /// StartLiveStream, per `insta360.messages.StartLiveStream`:
 ///   2 enableVideo, 6 videoBitrate, 7 resolution, 8 enableGyro,
@@ -148,6 +159,8 @@ struct Preview {
     /// pump, and no STOP is sent to a dead camera.
     session: Option<Weak<Session>>,
     pump: Option<JoinHandle<()>>,
+    /// When the camera last confirmed START on `session`.
+    started: Option<Instant>,
     viewfinder: Option<(u16, JoinHandle<()>)>,
 }
 
@@ -177,6 +190,7 @@ impl Default for LiveViewState {
                 consumers: HashSet::new(),
                 session: None,
                 pump: None,
+                started: None,
                 viewfinder: None,
             }),
         }
@@ -247,17 +261,24 @@ impl LiveViewState {
                 self.stop_pump(&mut preview);
                 return Err(error);
             }
+            preview.started = Some(Instant::now());
             return Ok(());
         }
+        self.cycle(&mut preview, &session).await
+    }
+
+    /// STOP then START on the session the pump already follows.
+    async fn cycle(&self, preview: &mut Preview, session: &Session) -> Result<(), String> {
         let _ = session
             .send_command(CODE_STOP_LIVE_STREAM, &[], COMMAND_TIMEOUT)
             .await;
         // The camera's new stream shares no references with the old one. Cut
         // before START: the camera may send its first keyframe before the ack.
         self.relay.discontinuity();
-        let started = send_start(&session).await;
-        if started.is_err() {
-            stop_after_failed_start(&session).await;
+        let started = send_start(session).await;
+        match started {
+            Ok(()) => preview.started = Some(Instant::now()),
+            Err(_) => stop_after_failed_start(session).await,
         }
         started
     }
@@ -267,6 +288,7 @@ impl LiveViewState {
             pump.abort();
         }
         preview.session = None;
+        preview.started = None;
         *self.stats.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 
@@ -309,6 +331,19 @@ impl LiveViewState {
                 self.stop_pump(preview);
                 preview.consumers = before;
                 return Err(error);
+            }
+            preview.started = Some(Instant::now());
+            return Ok(());
+        }
+        // Joining a stream the camera has stopped sending, e.g. after it
+        // folded into gallery mode: only a new START brings it back out.
+        let joined = !before.contains(&consumer);
+        let idle = preview
+            .started
+            .is_some_and(|started| stream_idle(started, session.last_video(), Instant::now()));
+        if joined && idle {
+            if let Err(error) = self.cycle(preview, session).await {
+                log::warn!("could not restart the idle preview: {error}");
             }
         }
         Ok(())
@@ -898,6 +933,78 @@ mod tests {
 
     async fn consumers(live: &LiveViewState) -> HashSet<Consumer> {
         live.inner.lock().await.consumers.clone()
+    }
+
+    fn ms(n: u64) -> Duration {
+        Duration::from_millis(n)
+    }
+
+    #[test]
+    fn a_stream_with_recent_video_is_not_idle() {
+        let started = Instant::now();
+        let now = started + ms(10_000);
+        assert!(!stream_idle(started, Some(now - ms(100)), now));
+    }
+
+    #[test]
+    fn a_just_started_stream_gets_time_to_send_video() {
+        let started = Instant::now();
+        assert!(!stream_idle(started, None, started + IDLE_AFTER - ms(1)));
+        assert!(stream_idle(started, None, started + IDLE_AFTER));
+    }
+
+    #[test]
+    fn video_from_before_the_start_does_not_count() {
+        let started = Instant::now() + ms(5_000);
+        let old_video = started - ms(100);
+        assert!(stream_idle(started, Some(old_video), started + IDLE_AFTER));
+    }
+
+    #[test]
+    fn video_that_stopped_makes_the_stream_idle() {
+        let started = Instant::now();
+        let last = started + ms(1_000);
+        assert!(!stream_idle(started, Some(last), last + IDLE_AFTER - ms(1)));
+        assert!(stream_idle(started, Some(last), last + IDLE_AFTER));
+    }
+
+    /// The camera folds into gallery mode when it stops streaming, for
+    /// example after browsing its gallery on the device. Opening the
+    /// viewfinder must bring it back out even while webcam mode holds the
+    /// stream, as a fresh START did before the stream was shared.
+    #[tokio::test]
+    async fn joining_an_idle_stream_restarts_the_camera() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        tokio::time::sleep(IDLE_AFTER + ms(50)).await;
+        live.acquire(Consumer::Viewfinder, session).await.unwrap();
+        assert_eq!(camera.wait_for(3).await, [START, STOP, START]);
+    }
+
+    #[tokio::test]
+    async fn joining_a_stream_with_video_sends_nothing() {
+        let mut assembler = crate::webcam::nal::AccessUnitAssembler::new();
+        let mut pictures = assembler.push(HEVC_IDR, 0);
+        pictures.extend(assembler.flush());
+        let video = vec![pictures[0].data.clone(), pictures[1].data.clone()];
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect_streaming(OnStart::Answer, video).await;
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if session.last_video().is_some() {
+                break;
+            }
+            tokio::time::sleep(ms(10)).await;
+        }
+        assert!(session.last_video().is_some(), "the fake sent no video");
+        live.acquire(Consumer::Viewfinder, session).await.unwrap();
+        tokio::time::sleep(ms(100)).await;
+        assert_eq!(camera.codes(), [START]);
     }
 
     #[tokio::test]
