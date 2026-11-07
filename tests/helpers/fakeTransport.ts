@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { CameraInfo, LiveViewStats, MediaItem } from "~/types/media";
+import type { CameraInfo, LiveViewStats, MediaItem, WebcamStatus } from "~/types/media";
 import type { CameraTransport } from "~/utils/transport";
 
 const INFO: CameraInfo = {
@@ -8,6 +8,16 @@ const INFO: CameraInfo = {
   serial: "FAKE-0001",
   firmware: "1.0.238",
   ssid: "Luna Ultra.OSC",
+};
+
+const OFF: WebcamStatus = {
+  state: "off",
+  url: null,
+  codec: null,
+  width: null,
+  height: null,
+  clients: 0,
+  secondsSinceFrame: null,
 };
 
 const STATS: LiveViewStats = { bytes: 0, frames: 0, firstBytesHex: "", seconds: 0 };
@@ -28,6 +38,9 @@ export function makeFakeTransport(overrides: Partial<CameraTransport> = {}): Cam
     liveViewStart: vi.fn(async () => ({ url: "http://127.0.0.1:9000/live", port: 9000 })),
     liveViewStop: vi.fn(async () => {}),
     liveViewStats: vi.fn(async () => STATS),
+    webcamStart: vi.fn(async () => OFF),
+    webcamStop: vi.fn(async () => {}),
+    webcamStatus: vi.fn(async () => OFF),
     probeOscPreview: vi.fn(async (): Promise<string | null> => null),
     fetch: vi.fn(async () => new Response(null, { status: 200 })),
     probe: vi.fn(async () => true),

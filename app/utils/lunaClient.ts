@@ -1,4 +1,10 @@
-import type { CameraInfo, LiveViewStats, MediaItem, MediaStorage } from "~/types/media";
+import type {
+  CameraInfo,
+  LiveViewStats,
+  MediaItem,
+  MediaStorage,
+  WebcamStatus,
+} from "~/types/media";
 import { isTauri } from "~/utils/saveFile";
 import { buildMediaItems, entriesFromPaths } from "~/utils/lunaIndex";
 import { reportCameraFailure, reportCameraSuccess } from "~/utils/cameraHealth";
@@ -152,6 +158,18 @@ export const lunaClient = {
 
   async liveViewStats(): Promise<LiveViewStats> {
     return tauriInvoke<LiveViewStats>("luna_liveview_stats");
+  },
+
+  async webcamStart(): Promise<WebcamStatus> {
+    return tauriInvoke<WebcamStatus>("luna_webcam_start");
+  },
+
+  async webcamStop(): Promise<void> {
+    if (isTauri()) await tauriInvoke("luna_webcam_stop");
+  },
+
+  async webcamStatus(): Promise<WebcamStatus> {
+    return tauriInvoke<WebcamStatus>("luna_webcam_status");
   },
 
   /**

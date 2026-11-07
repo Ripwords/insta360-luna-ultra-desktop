@@ -40,6 +40,12 @@ observed from the camera on 2026-08-03 — an 18-byte, 9-varint message in which
 field 2 and field 3 toggle 1 → 0 as the gimbal reaches its pan limits. Two
 distinct flags for two distinct directions, in two clean time clusters.
 
+**Confirmed on device 2026-11-07: `PHONE_COMMAND_SET_ACCESS_CAMERA_FILE_STATE`
+(118) with `state = LIVE_VIEW` (5) unfolds the camera.** Recent firmware
+folds the camera when an app connects, and START_LIVE_STREAM
+alone no longer brings it out; `SET_STANDBY_MODE` `WAKE_UP` is acknowledged but
+does nothing. The app now sends the announcement before every START.
+
 ## Where the 297 sit
 
 | Area                       | Count  | Note                                            |

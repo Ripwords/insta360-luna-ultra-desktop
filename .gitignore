@@ -53,3 +53,7 @@ docs/site/public/favicon-64.png
 docs/site/public/apple-touch-icon.png
 docs/site/public/icon-192.png
 docs/site/public/icon-512.png
+
+# Local worktrees and agent scratch
+.worktrees/
+.superpowers/

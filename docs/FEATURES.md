@@ -51,14 +51,15 @@ turns out to live — see [`PROTOCOL-GAP.md`](PROTOCOL-GAP.md).
 
 ## Live view
 
-| Feature                              | Status | Notes                                                                              |
-| ------------------------------------ | ------ | ---------------------------------------------------------------------------------- |
-| OSC MJPEG preview                    | ✅     | Probed first; used when the camera offers it.                                      |
-| Control-session H.264 stream         | ✅     | `START_LIVE_STREAM` → Rust bridges the socket to a local HTTP port.                |
-| Annex-B → WebCodecs decode to canvas | ✅     | NAL splitting, access-unit assembly, keyframe gating in `app/utils/annexB.ts`.     |
-| Preview auto-start / auto-stop       | ✅     | Starts on connect, releases the camera's single HTTP connection before navigation. |
-| Stream diagnostics                   | 🧪     | Inside the settings slide-over, which is gated with `allSettings`.                 |
-| Preview resolution control           | ○      | Preview arrives flat at 1280×960; no lever found for it.                           |
+| Feature                              | Status | Notes                                                                                                                                                                                                                                                                              |
+| ------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OSC MJPEG preview                    | ✅     | Probed first; used when the camera offers it.                                                                                                                                                                                                                                      |
+| Control-session H.265/H.264 stream   | ✅     | `START_LIVE_STREAM` → Rust bridges the socket to a local HTTP port.                                                                                                                                                                                                                |
+| Annex-B → WebCodecs decode to canvas | ✅     | NAL splitting, access-unit assembly, keyframe gating in `app/utils/annexB.ts`.                                                                                                                                                                                                     |
+| Preview auto-start / auto-stop       | ✅     | Starts on connect, releases the viewfinder's claim on the preview before navigation.                                                                                                                                                                                               |
+| Webcam mode (OBS)                    | 🧪     | Serves a Browser-source page at `http://127.0.0.1:49283/obs` (raw H.265 at `/webcam.h265`, MPEG-TS at `/webcam.ts`). Pauses thumbnails, downloads and the Camera page preview while on. The computer has no internet over Wi-Fi meanwhile: the camera cannot join another network. |
+| Stream diagnostics                   | 🧪     | Inside the settings slide-over, which is gated with `allSettings`.                                                                                                                                                                                                                 |
+| Preview resolution control           | ○      | Resolution follows the camera mode, read from the stream; no lever found for it.                                                                                                                                                                                                   |
 
 ## Capture
 

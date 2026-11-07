@@ -2,7 +2,7 @@
 import "pannellum/build/pannellum.css";
 import { getCameraTransport } from "~/utils/transport";
 import { imageMimeFor } from "~/utils/media";
-import { withCameraSlot, CAMERA_PRIORITY } from "~/utils/cameraQueue";
+import { withCameraSlot, CAMERA_PRIORITY, isCameraQueueHeld } from "~/utils/cameraQueue";
 
 /**
  * Interactive 360 / panorama viewer built on Pannellum. The equirectangular
@@ -13,6 +13,9 @@ const props = defineProps<{ src: string }>();
 
 const container = useTemplateRef("container");
 const state = ref<"loading" | "ready" | "error">("loading");
+const held = computed(isCameraQueueHeld);
+/** The camera transfer is done; what is left is decoding, which the hold doesn't affect. */
+const fetched = ref(false);
 
 let viewer: PannellumViewer | null = null;
 let objectUrl: string | null = null;
@@ -28,6 +31,7 @@ onMounted(async () => {
       const mime = imageMimeFor(props.src);
       return mime && raw.type !== mime ? new Blob([raw], { type: mime }) : raw;
     }, CAMERA_PRIORITY.PREVIEW);
+    fetched.value = true;
     objectUrl = URL.createObjectURL(blob);
 
     // UMD build: attaches window.pannellum as a side effect
@@ -73,8 +77,14 @@ onBeforeUnmount(() => {
   <div class="pano-root relative size-full">
     <div ref="container" class="size-full" />
 
+    <CameraHeldPlaceholder
+      v-if="state === 'loading' && held && !fetched"
+      detailed
+      on-dark
+      class="pointer-events-none absolute inset-0"
+    />
     <div
-      v-if="state === 'loading'"
+      v-else-if="state === 'loading'"
       class="pointer-events-none absolute inset-0 flex items-center justify-center"
     >
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-dimmed" />

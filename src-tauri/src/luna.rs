@@ -6,7 +6,7 @@
 //!   (consumed from the frontend via the http plugin).
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 
@@ -35,6 +35,9 @@ pub(crate) const MEDIA_VIDEO: u8 = 0x20;
 
 pub(crate) const CODE_START_LIVE_STREAM: u16 = 1;
 pub(crate) const CODE_STOP_LIVE_STREAM: u16 = 2;
+/// SetAccessCameraFileState { AccessState state = 1 }: tells the camera what
+/// the app is doing with it.
+pub(crate) const CODE_SET_ACCESS_CAMERA_FILE_STATE: u16 = 118;
 const CODE_TAKE_PICTURE: u16 = 3;
 const CODE_START_CAPTURE: u16 = 4;
 const CODE_STOP_CAPTURE: u16 = 5;
@@ -60,6 +63,20 @@ const KEEPALIVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(2);
 /// Slower ticks while a transfer is active give the busy camera fewer queries
 /// to queue. The ~9GB hardware run that validated this change used this value.
 const KEEPALIVE_COMMAND_TIMEOUT_BUSY: Duration = Duration::from_secs(25);
+
+/// While video MEDIA frames are arriving the camera is too busy to answer the
+/// keepalive queries, and the frames themselves prove the link is alive.
+const VIDEO_ALIVE_WINDOW: Duration = Duration::from_secs(12);
+/// Bounds a socket write so a wedged peer cannot hang the session forever.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(3);
+
+fn video_recent(last_video: Option<Instant>, now: Instant) -> bool {
+    last_video.is_some_and(|at| now.saturating_duration_since(at) < VIDEO_ALIVE_WINDOW)
+}
+
+pub(crate) fn same_session(a: &Arc<Session>, b: &Arc<Session>) -> bool {
+    Arc::ptr_eq(a, b)
+}
 
 fn within_transfer_window(last_activity: Option<Instant>, now: Instant) -> bool {
     last_activity.is_some_and(|at| now.saturating_duration_since(at) < TRANSFER_ACTIVITY_WINDOW)
@@ -164,7 +181,7 @@ fn build_file_command(seq: u8, code: u16, request_id: u16, body: &[u8]) -> Vec<u
     frame
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RawResponse {
     /// Echoed command code; asserted in tests, carried for future status checks.
     #[allow(dead_code)]
@@ -175,13 +192,16 @@ pub(crate) struct RawResponse {
 
 /// A parsed UCD2 frame. FILE answers commands, STREAM is the keepalive
 /// echo, and MEDIA carries the live preview substreams.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Frame {
     File(RawResponse),
     /// Keepalive echo. Carries no payload we use — the probe proved video
     /// rides MEDIA frames, never these.
     Stream,
-    Media { substream: u8, data: Vec<u8> },
+    Media {
+        substream: u8,
+        data: Vec<u8>,
+    },
 }
 
 /// Incremental UCD2 frame scanner over the receive buffer. Returns complete
@@ -194,7 +214,14 @@ fn drain_frames(buffer: &mut Vec<u8>) -> Vec<Frame> {
     let mut frames = Vec::new();
     loop {
         let Some(start) = buffer.windows(4).position(|w| w == UCD2_MAGIC) else {
-            buffer.clear();
+            // A read may end mid-magic: keep the longest suffix that could
+            // still become one, drop everything before it.
+            let keep = (1..UCD2_MAGIC.len().min(buffer.len() + 1))
+                .rev()
+                .find(|&n| buffer.ends_with(&UCD2_MAGIC[..n]))
+                .unwrap_or(0);
+            let discard = buffer.len() - keep;
+            buffer.drain(..discard);
             break;
         };
         if start > 0 {
@@ -293,14 +320,23 @@ fn parse_device_info(host: &str, bodies: &[Vec<u8>]) -> LunaDeviceInfo {
     let device_name = seen.iter().find(|text| contains_brand(text)).cloned();
     let serial = seen
         .iter()
-        .find(|text| text.len() >= 8 && text.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()))
+        .find(|text| {
+            text.len() >= 8
+                && text
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        })
         .cloned();
     let firmware = seen
         .iter()
         .find(|text| {
             let stripped = text.strip_prefix('v').unwrap_or(text);
             let parts: Vec<&str> = stripped.splitn(3, '.').collect();
-            parts.len() == 3 && parts.iter().take(2).all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+            parts.len() == 3
+                && parts
+                    .iter()
+                    .take(2)
+                    .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
         })
         .cloned();
     let ssid = seen
@@ -331,6 +367,11 @@ pub(crate) struct Session {
     stream_tx: broadcast::Sender<Vec<u8>>,
     /// When a download last received bytes, as reported by `luna_transfer_activity`.
     last_transfer_activity: StdMutex<Option<Instant>>,
+    /// When the reader last received a video MEDIA frame.
+    last_video: Arc<StdMutex<Option<Instant>>>,
+    /// Set when a write timed out mid-packet: the wire holds a partial frame,
+    /// so the session is unusable and must be evicted.
+    poisoned: AtomicBool,
 }
 
 impl Session {
@@ -350,16 +391,41 @@ impl Session {
         *self.last_transfer_activity.lock().unwrap() = Some(Instant::now());
     }
 
+    fn is_poisoned(&self) -> bool {
+        self.poisoned.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn last_video(&self) -> Option<Instant> {
+        *self.last_video.lock().unwrap()
+    }
+
     fn is_transfer_active(&self) -> bool {
         within_transfer_window(*self.last_transfer_activity.lock().unwrap(), Instant::now())
     }
 
     async fn write(&self, packet: &[u8]) -> Result<(), String> {
-        let mut writer = self.writer.lock().await;
-        writer.write_all(packet).await.map_err(|e| format!("camera write failed: {e}"))
+        if self.is_poisoned() {
+            return Err("camera connection lost".into());
+        }
+        let write = async {
+            let mut writer = self.writer.lock().await;
+            writer.write_all(packet).await
+        };
+        match tokio::time::timeout(WRITE_TIMEOUT, write).await {
+            Ok(result) => result.map_err(|e| format!("camera write failed: {e}")),
+            Err(_) => {
+                self.poisoned.store(true, Ordering::Relaxed);
+                Err("camera write timed out".into())
+            }
+        }
     }
 
-    async fn send_packet(&self, packet: Vec<u8>, request_id: u16, timeout: Duration) -> Result<RawResponse, String> {
+    async fn send_packet(
+        &self,
+        packet: Vec<u8>,
+        request_id: u16,
+        timeout: Duration,
+    ) -> Result<RawResponse, String> {
         let (tx, rx) = oneshot::channel();
         self.pending.lock().unwrap().insert(request_id, tx);
         if let Err(error) = self.write(&packet).await {
@@ -382,7 +448,12 @@ impl Session {
         self.stream_tx.subscribe()
     }
 
-    pub(crate) async fn send_command(&self, code: u16, body: &[u8], timeout: Duration) -> Result<RawResponse, String> {
+    pub(crate) async fn send_command(
+        &self,
+        code: u16,
+        body: &[u8],
+        timeout: Duration,
+    ) -> Result<RawResponse, String> {
         let request_id = self.next_request_id();
         let packet = build_file_command(self.next_seq(), code, request_id, body);
         self.send_packet(packet, request_id, timeout).await
@@ -390,7 +461,14 @@ impl Session {
 
     /// Replays a captured command byte-for-byte (fixed seq and request id),
     /// as the original app does during the info handshake.
-    async fn send_exact(&self, seq: u8, code: u16, request_id: u16, body: &[u8], timeout: Duration) -> Result<RawResponse, String> {
+    async fn send_exact(
+        &self,
+        seq: u8,
+        code: u16,
+        request_id: u16,
+        body: &[u8],
+        timeout: Duration,
+    ) -> Result<RawResponse, String> {
         let packet = build_file_command(seq, code, request_id, body);
         self.send_packet(packet, request_id, timeout).await
     }
@@ -439,27 +517,28 @@ fn large_options_body() -> Vec<u8> {
         .collect()
 }
 
-async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, host: String) -> Result<LunaDeviceInfo, String> {
-    let stream = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect((host.as_str(), CONTROL_PORT)))
-        .await
-        .map_err(|_| format!("connecting to {host}:{CONTROL_PORT} timed out"))?
-        .map_err(|e| format!("cannot reach camera at {host}:{CONTROL_PORT}: {e}"))?;
-
+/// Wraps a connected control socket in a session and starts its reader,
+/// which routes command responses and forwards primary video.
+fn start_session(stream: TcpStream, first_seq: u8) -> Arc<Session> {
     let (mut read_half, write_half) = stream.into_split();
     let pending: Arc<StdMutex<HashMap<u16, oneshot::Sender<RawResponse>>>> = Arc::default();
 
     let (stream_tx, _) = broadcast::channel::<Vec<u8>>(512);
 
+    let last_video: Arc<StdMutex<Option<Instant>>> = Arc::default();
+
     let session = Arc::new(Session {
         writer: Mutex::new(write_half),
         pending: Arc::clone(&pending),
-        seq: AtomicU8::new(0x24),
+        seq: AtomicU8::new(first_seq),
         request_id: AtomicU16::new(1),
         reader: StdMutex::new(None),
         keepalive: StdMutex::new(None),
         info: StdMutex::new(LunaDeviceInfo::default()),
         stream_tx: stream_tx.clone(),
         last_transfer_activity: StdMutex::new(None),
+        last_video: Arc::clone(&last_video),
+        poisoned: AtomicBool::new(false),
     });
 
     let reader_pending = pending;
@@ -474,13 +553,16 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
                     for frame in drain_frames(&mut buffer) {
                         match frame {
                             Frame::File(response) => {
-                                if let Some(tx) = reader_pending.lock().unwrap().remove(&response.request_id) {
+                                if let Some(tx) =
+                                    reader_pending.lock().unwrap().remove(&response.request_id)
+                                {
                                     let _ = tx.send(response);
                                 }
                             }
                             Frame::Media { substream, data }
                                 if substream == MEDIA_VIDEO && !data.is_empty() =>
                             {
+                                *last_video.lock().unwrap() = Some(Instant::now());
                                 let _ = stream_tx.send(data);
                             }
                             // Secondary preview and gyro substreams are ignored
@@ -496,9 +578,28 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         reader_pending.lock().unwrap().clear();
     });
     session.reader.lock().unwrap().replace(reader);
+    session
+}
+
+async fn open_session(
+    app: AppHandle,
+    state: Arc<Mutex<Option<Arc<Session>>>>,
+    host: String,
+) -> Result<LunaDeviceInfo, String> {
+    let stream = tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        TcpStream::connect((host.as_str(), CONTROL_PORT)),
+    )
+    .await
+    .map_err(|_| format!("connecting to {host}:{CONTROL_PORT} timed out"))?
+    .map_err(|e| format!("cannot reach camera at {host}:{CONTROL_PORT}: {e}"))?;
+
+    let session = start_session(stream, 0x24);
 
     // STREAM hello authorizes the HTTP media index a moment later
-    session.write(&build_stream_hello(session.next_seq())).await?;
+    session
+        .write(&build_stream_hello(session.next_seq()))
+        .await?;
 
     // Device info probes; tolerate individual failures like the original app
     let info_timeout = Duration::from_secs(4);
@@ -510,7 +611,10 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
     ];
     for (code, request_id, body) in probes {
         let seq = session.next_seq();
-        if let Ok(response) = session.send_exact(seq, code, request_id, &body, info_timeout).await {
+        if let Ok(response) = session
+            .send_exact(seq, code, request_id, &body, info_timeout)
+            .await
+        {
             bodies.push(response.body);
         }
     }
@@ -532,7 +636,9 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         ticker.tick().await;
         loop {
             ticker.tick().await;
-            let Some(session) = ka_session.upgrade() else { break };
+            let Some(session) = ka_session.upgrade() else {
+                break;
+            };
             let transfer_active = session.is_transfer_active();
             let hello = build_stream_hello(session.next_seq());
             let cmd_timeout = if transfer_active {
@@ -542,19 +648,33 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
             };
             let tick = async {
                 session.write(&hello).await?;
-                session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
-                session.send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout).await?;
+                if !video_recent(session.last_video(), Instant::now()) {
+                    session
+                        .send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout)
+                        .await?;
+                    session
+                        .send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout)
+                        .await?;
+                }
                 Ok::<(), String>(())
             };
             match tick.await {
                 Ok(()) => failures = 0,
-                Err(_) if transfer_active => failures = 0,
+                Err(_) if transfer_active && !session.is_poisoned() => failures = 0,
                 Err(_) => {
                     failures += 1;
-                    if failures >= 2 {
+                    if failures >= 2 || session.is_poisoned() {
+                        let mut stored = ka_state.lock().await;
+                        if stored
+                            .as_ref()
+                            .is_some_and(|current| same_session(current, &session))
+                        {
+                            stored.take();
+                            // Emitted under the lock so a reconnect cannot see a stale event
+                            let _ = ka_app.emit("luna://disconnected", ());
+                        }
+                        drop(stored);
                         drop(session);
-                        ka_state.lock().await.take();
-                        let _ = ka_app.emit("luna://disconnected", ());
                         break;
                     }
                 }
@@ -568,7 +688,11 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
 }
 
 #[tauri::command]
-pub async fn luna_connect(app: AppHandle, state: State<'_, LunaState>, host: String) -> Result<LunaDeviceInfo, String> {
+pub async fn luna_connect(
+    app: AppHandle,
+    state: State<'_, LunaState>,
+    host: String,
+) -> Result<LunaDeviceInfo, String> {
     let trimmed = host.trim();
     if trimmed.is_empty() {
         return Err("camera host is empty".into());
@@ -585,7 +709,12 @@ pub async fn luna_disconnect(state: State<'_, LunaState>) -> Result<(), String> 
 
 #[tauri::command]
 pub async fn luna_status(state: State<'_, LunaState>) -> Result<Option<LunaDeviceInfo>, String> {
-    Ok(state.session.lock().await.as_ref().map(|session| session.device_info()))
+    Ok(state
+        .session
+        .lock()
+        .await
+        .as_ref()
+        .map(|session| session.device_info()))
 }
 
 /// The frontend received download bytes from the camera. A no-op without a session.
@@ -598,10 +727,16 @@ pub async fn luna_transfer_activity(state: State<'_, LunaState>) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn luna_delete_files(state: State<'_, LunaState>, paths: Vec<String>) -> Result<(), String> {
+pub async fn luna_delete_files(
+    state: State<'_, LunaState>,
+    paths: Vec<String>,
+) -> Result<(), String> {
     let session = {
         let guard = state.session.lock().await;
-        guard.as_ref().cloned().ok_or_else(|| "camera is not connected".to_string())?
+        guard
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| "camera is not connected".to_string())?
     };
     let mut unique: Vec<String> = Vec::new();
     for path in paths {
@@ -614,7 +749,11 @@ pub async fn luna_delete_files(state: State<'_, LunaState>, paths: Vec<String>) 
     }
     for batch in unique.chunks(50) {
         session
-            .send_command(CODE_DELETE_FILES, &build_delete_files_body(batch), Duration::from_secs(20))
+            .send_command(
+                CODE_DELETE_FILES,
+                &build_delete_files_body(batch),
+                Duration::from_secs(20),
+            )
             .await?;
     }
     Ok(())
@@ -642,7 +781,11 @@ fn is_allowed_command(code: u16) -> bool {
 /// Send a protobuf body to the camera and return the raw response body.
 /// Encoding and decoding live in the frontend, which owns the schema.
 #[tauri::command]
-pub async fn luna_command(state: State<'_, LunaState>, code: u16, body: Vec<u8>) -> Result<Vec<u8>, String> {
+pub async fn luna_command(
+    state: State<'_, LunaState>,
+    code: u16,
+    body: Vec<u8>,
+) -> Result<Vec<u8>, String> {
     if !is_allowed_command(code) {
         return Err(format!("command {code} is not permitted"));
     }
@@ -650,8 +793,132 @@ pub async fn luna_command(state: State<'_, LunaState>, code: u16, body: Vec<u8>)
         .session()
         .await
         .ok_or_else(|| "camera is not connected".to_string())?;
-    let response = session.send_command(code, &body, Duration::from_secs(10)).await?;
+    let response = session
+        .send_command(code, &body, Duration::from_secs(10))
+        .await?;
     Ok(response.body)
+}
+
+/// A fake camera on loopback for tests of code that drives a session.
+#[cfg(test)]
+pub(crate) mod fake {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    /// What the fake does when it receives START_LIVE_STREAM.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub(crate) enum OnStart {
+        Answer,
+        /// Never answers, so the command times out.
+        Ignore,
+        /// Closes its sending side, so the pending command fails at once.
+        /// It keeps reading and recording what arrives.
+        HangUp,
+    }
+
+    pub(crate) struct FakeCamera {
+        codes: Arc<StdMutex<Vec<u16>>>,
+        task: JoinHandle<()>,
+    }
+
+    impl FakeCamera {
+        /// Command codes received, in order, without the live-view
+        /// announcement that precedes every START.
+        pub(crate) fn codes(&self) -> Vec<u16> {
+            let mut codes = self.all_codes();
+            codes.retain(|code| *code != CODE_SET_ACCESS_CAMERA_FILE_STATE);
+            codes
+        }
+
+        /// Every command code received, in order.
+        pub(crate) fn all_codes(&self) -> Vec<u16> {
+            self.codes.lock().unwrap().clone()
+        }
+
+        /// Waits until `count` commands other than the announcement have arrived.
+        pub(crate) async fn wait_for(&self, count: usize) -> Vec<u16> {
+            for _ in 0..500 {
+                let codes = self.codes();
+                if codes.len() >= count {
+                    return codes;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            panic!("camera received only {:?}", self.codes());
+        }
+    }
+
+    impl Drop for FakeCamera {
+        fn drop(&mut self) {
+            self.task.abort();
+        }
+    }
+
+    /// A session connected to a fake camera that echoes each command back as
+    /// its response, except START as `on_start` says.
+    pub(crate) async fn connect(on_start: OnStart) -> (Arc<Session>, FakeCamera) {
+        connect_streaming(on_start, Vec::new()).await
+    }
+
+    /// A video payload as the camera frames it: MEDIA, video substream.
+    pub(crate) fn media_frame(annex_b: &[u8]) -> Vec<u8> {
+        let mut payload = vec![MEDIA_VIDEO, 0, 0, 0, 0, 0, 0, 0, 0];
+        payload.extend_from_slice(annex_b);
+        let mut frame_payload = (payload.len() as u32).to_le_bytes().to_vec();
+        frame_payload.extend_from_slice(&payload);
+        frame_payload.extend_from_slice(&[0u8; 4]);
+        build_ucd2(UCD2_MEDIA, 0, &frame_payload)
+    }
+
+    /// Like [`connect`], but on each START the camera first sends `video`, as
+    /// a real camera starts streaming, and answers a moment later.
+    pub(crate) async fn connect_streaming(
+        on_start: OnStart,
+        video: Vec<Vec<u8>>,
+    ) -> (Arc<Session>, FakeCamera) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let codes: Arc<StdMutex<Vec<u16>>> = Arc::default();
+        let recorded = Arc::clone(&codes);
+        let task = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let (mut read, mut write) = socket.into_split();
+            let mut buffer = Vec::new();
+            let mut chunk = [0u8; 4096];
+            let mut open = true;
+            while let Ok(n) = read.read(&mut chunk).await {
+                if n == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..n]);
+                for frame in drain_frames(&mut buffer) {
+                    let Frame::File(command) = frame else {
+                        continue;
+                    };
+                    recorded.lock().unwrap().push(command.code);
+                    let answer =
+                        command.code != CODE_START_LIVE_STREAM || on_start == OnStart::Answer;
+                    if command.code == CODE_START_LIVE_STREAM && on_start == OnStart::HangUp && open
+                    {
+                        let _ = write.shutdown().await;
+                        open = false;
+                    }
+                    if command.code == CODE_START_LIVE_STREAM && open && !video.is_empty() {
+                        for chunk in &video {
+                            let _ = write.write_all(&media_frame(chunk)).await;
+                        }
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                    if answer && open {
+                        let reply = build_file_command(0, command.code, command.request_id, &[]);
+                        let _ = write.write_all(&reply).await;
+                    }
+                }
+            }
+        });
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        (start_session(stream, 0), FakeCamera { codes, task })
+    }
 }
 
 #[cfg(test)]
@@ -659,15 +926,74 @@ mod tests {
     use super::*;
 
     fn hex(s: &str) -> Vec<u8> {
-        (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn video_recent_requires_video_inside_window() {
+        let now = Instant::now();
+        assert!(!video_recent(None, now));
+        assert!(video_recent(Some(now - Duration::from_secs(6)), now));
+        assert!(!video_recent(Some(now - VIDEO_ALIVE_WINDOW), now));
+    }
+
+    fn test_session(write_half: OwnedWriteHalf) -> Session {
+        Session {
+            writer: Mutex::new(write_half),
+            pending: Arc::default(),
+            seq: AtomicU8::new(0),
+            request_id: AtomicU16::new(1),
+            reader: StdMutex::new(None),
+            keepalive: StdMutex::new(None),
+            info: StdMutex::new(LunaDeviceInfo::default()),
+            stream_tx: broadcast::channel::<Vec<u8>>(4).0,
+            last_transfer_activity: StdMutex::new(None),
+            last_video: Arc::default(),
+            poisoned: AtomicBool::new(false),
+        }
+    }
+
+    #[tokio::test]
+    async fn write_times_out_on_a_wedged_socket() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let _server = tokio::spawn(async move {
+            let (_socket, _) = listener.accept().await.unwrap();
+            std::future::pending::<()>().await;
+        });
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let (_read_half, write_half) = stream.into_split();
+        let session = test_session(write_half);
+        let payload = vec![0u8; 64 * 1024 * 1024];
+        let result = tokio::time::timeout(
+            WRITE_TIMEOUT + Duration::from_secs(1),
+            session.write(&payload),
+        )
+        .await
+        .expect("write must return within the write timeout");
+        assert!(result.unwrap_err().contains("timed out"));
+
+        let started = Instant::now();
+        let second = session.write(b"x").await;
+        assert!(second.is_err());
+        assert!(started.elapsed() < Duration::from_millis(500));
     }
 
     #[test]
     fn transfer_window_requires_recent_activity() {
         let now = Instant::now();
-        assert!(!within_transfer_window(None, now), "no transfer has ever delivered bytes");
+        assert!(
+            !within_transfer_window(None, now),
+            "no transfer has ever delivered bytes"
+        );
         assert!(within_transfer_window(Some(now), now));
-        assert!(within_transfer_window(Some(now - TRANSFER_ACTIVITY_WINDOW / 2), now));
+        assert!(within_transfer_window(
+            Some(now - TRANSFER_ACTIVITY_WINDOW / 2),
+            now
+        ));
         assert!(
             !within_transfer_window(Some(now - TRANSFER_ACTIVITY_WINDOW), now),
             "a transfer that stopped delivering bytes must not suppress the keepalive forever"
@@ -686,7 +1012,10 @@ mod tests {
     #[test]
     fn checksum_matches_captured_trailer() {
         let frame = hex("55434432010c04100f0000000800020100008000000830080f080b");
-        assert_eq!(insta360_checksum(&frame), u32::from_le_bytes([0x7c, 0x00, 0x8e, 0x7c]));
+        assert_eq!(
+            insta360_checksum(&frame),
+            u32::from_le_bytes([0x7c, 0x00, 0x8e, 0x7c])
+        );
     }
 
     #[test]
@@ -740,7 +1069,10 @@ mod tests {
         ] {
             assert!(is_allowed_command(code), "code {code} should be allowed");
         }
-        assert!(!is_allowed_command(CODE_DELETE_FILES), "deletion has its own command");
+        assert!(
+            !is_allowed_command(CODE_DELETE_FILES),
+            "deletion has its own command"
+        );
         assert!(!is_allowed_command(9999), "unknown codes must be refused");
     }
 
@@ -776,6 +1108,65 @@ mod tests {
             Frame::Media { substream, .. } => assert_eq!(*substream, 0x40),
             other => panic!("expected the gyro frame, got {other:?}"),
         }
+        assert!(buffer.is_empty());
+    }
+
+    /// A socket read can end inside the 4-byte magic. The partial prefix must
+    /// survive so the next read completes it.
+    #[test]
+    fn drain_frames_keeps_partial_magic() {
+        let mut buffer = b"garbageUC".to_vec();
+        let frames = drain_frames(&mut buffer);
+        assert!(frames.is_empty());
+        assert_eq!(buffer, b"UC");
+    }
+
+    /// Frames must come out identical however the stream is split across reads.
+    #[test]
+    fn drain_frames_is_split_invariant() {
+        let mut stream = build_file_command(1, 12, 7, b"ok");
+        stream.extend_from_slice(&build_stream_hello(2));
+        let mut media = vec![MEDIA_VIDEO, 0x25, 0xde, 0xa9, 0, 0, 0, 0, 0];
+        media.extend((0..100u8).collect::<Vec<_>>());
+        let mut payload = (media.len() as u32).to_le_bytes().to_vec();
+        payload.extend_from_slice(&media);
+        payload.extend_from_slice(&[0u8; 4]);
+        stream.extend_from_slice(&build_ucd2(UCD2_MEDIA, 3, &payload));
+
+        let mut whole = stream.clone();
+        let expected = drain_frames(&mut whole);
+        assert_eq!(expected.len(), 3);
+        match &expected[0] {
+            Frame::File(response) => assert_eq!(response.request_id, 7),
+            other => panic!("expected a file response, got {other:?}"),
+        }
+        assert_eq!(expected[1], Frame::Stream);
+        match &expected[2] {
+            Frame::Media { substream, data } => {
+                assert_eq!(*substream, 0x20);
+                assert_eq!(data.len(), 100);
+            }
+            other => panic!("expected a media frame, got {other:?}"),
+        }
+
+        for k in 0..stream.len() {
+            let mut buffer = Vec::new();
+            let mut got = Vec::new();
+            buffer.extend_from_slice(&stream[..k]);
+            got.extend(drain_frames(&mut buffer));
+            buffer.extend_from_slice(&stream[k..]);
+            got.extend(drain_frames(&mut buffer));
+            assert_eq!(got, expected, "split at {k}");
+        }
+
+        // One byte per read: partial magic is retained repeatedly ("U", "UC", "UCD").
+        let mut buffer = Vec::new();
+        let mut got = Vec::new();
+        for byte in &stream {
+            buffer.push(*byte);
+            got.extend(drain_frames(&mut buffer));
+        }
+        assert_eq!(got, expected, "byte-at-a-time");
         assert!(buffer.is_empty());
     }
 
@@ -815,7 +1206,12 @@ mod tests {
         use std::process::{Child, Command, Stdio};
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-        if Command::new("node").arg("--version").stdout(Stdio::null()).status().is_err() {
+        if Command::new("node")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .status()
+            .is_err()
+        {
             eprintln!("skipping: node not available");
             return;
         }
@@ -829,14 +1225,21 @@ mod tests {
 
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let server = manifest_dir.join("../luna_mock_server/server.mjs");
-        assert!(server.exists(), "vendored mock server missing at {server:?}");
+        assert!(
+            server.exists(),
+            "vendored mock server missing at {server:?}"
+        );
 
         let media_root = std::env::temp_dir().join(format!("luna-it-{}", std::process::id()));
         let camera_dir = media_root.join("Camera01");
         std::fs::create_dir_all(&camera_dir).unwrap();
         let target = "IMG_20260718_142012_00_002.jpg";
         std::fs::write(camera_dir.join(target), b"fakejpeg").unwrap();
-        std::fs::write(camera_dir.join("IMG_20260717_091205_00_003.jpg"), b"fakejpeg2").unwrap();
+        std::fs::write(
+            camera_dir.join("IMG_20260717_091205_00_003.jpg"),
+            b"fakejpeg2",
+        )
+        .unwrap();
 
         let http_port = 18142u16;
         let tcp_port = 16142u16;
@@ -866,7 +1269,12 @@ mod tests {
         // Stream hello authorizes HTTP; a FILE command must get a response
         control.write_all(&build_stream_hello(0x24)).await.unwrap();
         control
-            .write_all(&build_file_command(0x25, CODE_GET_OPTIONS, 1, &small_options_body()))
+            .write_all(&build_file_command(
+                0x25,
+                CODE_GET_OPTIONS,
+                1,
+                &small_options_body(),
+            ))
             .await
             .unwrap();
         let mut buffer = Vec::new();
@@ -889,10 +1297,12 @@ mod tests {
         // The HTTP auth gate opens ~3s after the handshake
         async fn http_get(port: u16, path: &str) -> String {
             let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let request = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+            let request =
+                format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
             stream.write_all(request.as_bytes()).await.unwrap();
             let mut out = Vec::new();
-            let _ = tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut out)).await;
+            let _ =
+                tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut out)).await;
             String::from_utf8_lossy(&out).to_string()
         }
 
@@ -904,7 +1314,10 @@ mod tests {
                 break;
             }
         }
-        assert!(index.starts_with("HTTP/1.1 200"), "index not authorized: {index}");
+        assert!(
+            index.starts_with("HTTP/1.1 200"),
+            "index not authorized: {index}"
+        );
         assert!(index.contains(target), "listing missing {target}: {index}");
 
         // Delete over TCP, then the file must vanish from the listing
@@ -933,9 +1346,15 @@ mod tests {
         assert_eq!(deleted.code, CODE_DELETE_FILES);
 
         let after = http_get(http_port, "/storage_internal/DCIM/Camera01/").await;
-        assert!(after.starts_with("HTTP/1.1 200"), "index lost after delete: {after}");
+        assert!(
+            after.starts_with("HTTP/1.1 200"),
+            "index lost after delete: {after}"
+        );
         assert!(!after.contains(target), "deleted file still listed");
-        assert!(after.contains("IMG_20260717_091205_00_003.jpg"), "unrelated file disappeared");
+        assert!(
+            after.contains("IMG_20260717_091205_00_003.jpg"),
+            "unrelated file disappeared"
+        );
 
         let _ = std::fs::remove_dir_all(&media_root);
     }

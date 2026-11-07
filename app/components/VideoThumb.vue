@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { withCameraSlot, CAMERA_PRIORITY, viewportPriority } from "~/utils/cameraQueue";
+import {
+  withCameraSlot,
+  CAMERA_PRIORITY,
+  isCameraQueueHeld,
+  viewportPriority,
+} from "~/utils/cameraQueue";
 
 /**
  * Video thumbnail: a real <video> element on the camera's HTTP URL, seeked to
@@ -32,6 +37,7 @@ const el = useTemplateRef("el");
 const video = useTemplateRef<HTMLVideoElement>("video");
 const activeSrc = ref<string | null>(null);
 const state = ref<"idle" | "loading" | "loaded" | "error">("idle");
+const held = computed(isCameraQueueHeld);
 
 let observer: IntersectionObserver | null = null;
 let stallTimer: ReturnType<typeof setTimeout> | null = null;
@@ -163,6 +169,8 @@ onBeforeUnmount(() => {
       class="absolute inset-0 flex items-center justify-center bg-elevated"
     >
       <UIcon v-if="state === 'error'" name="i-lucide-film" class="size-5 text-dimmed" />
+      <!-- A tile already fetching keeps its spinner; queued ones wait on the hold. -->
+      <CameraHeldPlaceholder v-else-if="held && !activeSrc" />
       <UIcon v-else name="i-lucide-loader-circle" class="size-5 animate-spin text-dimmed" />
     </div>
   </div>

@@ -20,6 +20,9 @@ let onDeadCallback: (() => void) | null = null;
 let probeCamera: (() => Promise<boolean>) | null = null;
 let probeInFlight = false;
 let transferDepth = 0;
+// Bumped on every arm and disarm, so a probe that was opened under an earlier
+// arming can tell its verdict is stale even if the callback is the same function.
+let revision = 0;
 
 export function beginHealthTransfer(): void {
   transferDepth += 1;
@@ -36,6 +39,7 @@ export function endHealthTransfer(): void {
  * @param probe Cheap liveness check; resolves true when the camera answered.
  */
 export function armCameraHealth(onDead: () => void, probe: () => Promise<boolean>): void {
+  revision += 1;
   consecutiveFailures = 0;
   probeInFlight = false;
   onDeadCallback = onDead;
@@ -44,6 +48,7 @@ export function armCameraHealth(onDead: () => void, probe: () => Promise<boolean
 
 /** Stop counting. Reports become no-ops until armed again. */
 export function disarmCameraHealth(): void {
+  revision += 1;
   consecutiveFailures = 0;
   probeInFlight = false;
   onDeadCallback = null;
@@ -69,6 +74,7 @@ async function runProbe(): Promise<void> {
   const callback = onDeadCallback;
   if (!probe || !callback) return;
 
+  const openedAt = revision;
   probeInFlight = true;
   let alive = false;
   try {
@@ -79,7 +85,7 @@ async function runProbe(): Promise<void> {
 
   // The session may have been torn down or re-armed while the probe was open;
   // in that case this verdict is stale and must not fire anything.
-  if (onDeadCallback !== callback) return;
+  if (revision !== openedAt) return;
   probeInFlight = false;
 
   if (alive) {

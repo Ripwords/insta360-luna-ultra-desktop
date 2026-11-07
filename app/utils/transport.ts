@@ -1,4 +1,4 @@
-import type { CameraInfo, LiveViewStats, MediaItem } from "~/types/media";
+import type { CameraInfo, LiveViewStats, MediaItem, WebcamStatus } from "~/types/media";
 import { lunaClient } from "~/utils/lunaClient";
 
 /**
@@ -17,6 +17,9 @@ export interface CameraTransport {
   liveViewStart(): Promise<{ url: string; port: number }>;
   liveViewStop(): Promise<void>;
   liveViewStats(): Promise<LiveViewStats>;
+  webcamStart(): Promise<WebcamStatus>;
+  webcamStop(): Promise<void>;
+  webcamStatus(): Promise<WebcamStatus>;
   probeOscPreview(host: string): Promise<string | null>;
   /**
    * Implementations own health reporting for their own transport: nothing

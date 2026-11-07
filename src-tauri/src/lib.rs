@@ -1,14 +1,18 @@
 mod liveview;
+mod local_http;
 mod luna;
+mod webcam;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  use tauri::Manager;
   tauri::Builder::default()
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_process::init())
     .manage(luna::LunaState::default())
     .manage(liveview::LiveViewState::default())
+    .manage(webcam::WebcamState::default())
     .invoke_handler(tauri::generate_handler![
       luna::luna_connect,
       luna::luna_disconnect,
@@ -19,6 +23,9 @@ pub fn run() {
       liveview::luna_liveview_start,
       liveview::luna_liveview_stop,
       liveview::luna_liveview_stats,
+      webcam::luna_webcam_start,
+      webcam::luna_webcam_stop,
+      webcam::luna_webcam_status,
     ])
     .setup(|app| {
       // Auto-updater (desktop only)
@@ -34,6 +41,14 @@ pub fn run() {
       }
       Ok(())
     })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app, event| {
+      if let tauri::RunEvent::Exit = event {
+        // Without this the camera keeps streaming after the app has gone.
+        let webcam = app.state::<webcam::WebcamState>();
+        let live = app.state::<liveview::LiveViewState>();
+        tauri::async_runtime::block_on(webcam::shutdown(&webcam, &live));
+      }
+    });
 }

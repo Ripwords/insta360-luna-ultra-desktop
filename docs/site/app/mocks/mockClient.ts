@@ -1,8 +1,18 @@
-import type { CameraInfo, LiveViewStats, MediaItem } from "#layer/types/media";
+import type { CameraInfo, LiveViewStats, MediaItem, WebcamStatus } from "#layer/types/media";
 import type { CameraTransport } from "#layer/utils/transport";
 import { buildMediaItems, entriesFromPaths } from "#layer/utils/lunaIndex";
 import { createCommandChannel } from "./mockCommands";
 import { FIXTURE_PATHS, FIXTURE_SIZES, fixtureUrl } from "./fixtures";
+
+const MOCK_WEBCAM: WebcamStatus = {
+  state: "streaming",
+  url: "http://127.0.0.1:49283/webcam.ts",
+  codec: "H.265",
+  width: 1280,
+  height: 720,
+  clients: 0,
+  secondsSinceFrame: 0.1,
+};
 
 export interface MockState {
   /** Camera paths still "on" the camera; delete removes from here. */
@@ -85,6 +95,16 @@ export function createMockTransport(seed: Partial<MockState> = {}): CameraTransp
 
     async liveViewStop(): Promise<void> {
       liveViewStartedAt = 0;
+    },
+
+    async webcamStart(): Promise<WebcamStatus> {
+      return MOCK_WEBCAM;
+    },
+
+    async webcamStop(): Promise<void> {},
+
+    async webcamStatus(): Promise<WebcamStatus> {
+      return MOCK_WEBCAM;
     },
 
     async liveViewStats(): Promise<LiveViewStats> {

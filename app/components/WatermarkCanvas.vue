@@ -2,6 +2,7 @@
 import { drawWatermark } from "~/utils/watermark";
 import { placeholderDataUrl } from "~/utils/placeholder";
 import { getCameraTransport } from "~/utils/transport";
+import { isCameraQueueHeld } from "~/utils/cameraQueue";
 
 /** A real camera photo URL to preview the watermark on. */
 const props = defineProps<{ src?: string }>();
@@ -9,6 +10,9 @@ const props = defineProps<{ src?: string }>();
 const { settings } = useWatermarkSettings();
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const loading = ref(true);
+/** The sample is fetched straight from the camera, so it waits out webcam mode. */
+const held = computed(() => !!props.src && isCameraQueueHeld());
+let requested = false;
 
 let image: HTMLImageElement | null = null;
 let objectUrl: string | null = null;
@@ -66,7 +70,14 @@ async function loadFromCamera() {
   }
 }
 
-onMounted(loadFromCamera);
+function loadWhenFree() {
+  if (requested || held.value) return;
+  requested = true;
+  void loadFromCamera();
+}
+
+onMounted(loadWhenFree);
+watch(held, loadWhenFree);
 
 watch(settings, () => void render(), { deep: true });
 
@@ -77,7 +88,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="relative overflow-hidden rounded-xl border border-default bg-muted">
-    <USkeleton v-if="loading" class="aspect-video w-full" />
+    <CameraHeldPlaceholder v-if="loading && held" detailed class="aspect-video" />
+    <USkeleton v-else-if="loading" class="aspect-video w-full" />
     <canvas v-show="!loading" ref="canvas" class="block w-full" aria-label="Watermark preview" />
   </div>
 </template>
