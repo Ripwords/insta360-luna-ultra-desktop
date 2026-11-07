@@ -14,8 +14,8 @@ const BROADCAST_CAPACITY: usize = 256;
 const MAX_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 pub struct Subscription {
-    /// The params, then the pictures since the last keyframe; empty if no
-    /// clean start point is cached.
+    /// The params, then the pictures since the last keyframe, stamped at the
+    /// live edge; empty if no clean start point is cached.
     pub bootstrap: Vec<Arc<AccessUnit>>,
     pub live: broadcast::Receiver<Arc<AccessUnit>>,
 }
@@ -134,16 +134,26 @@ impl Relay {
         let state = self.lock();
         let live = self.tx.subscribe();
         let mut bootstrap = Vec::new();
-        if let (true, Some(params), Some(first)) =
-            (state.cache_open, &state.params, state.cache.first())
+        if let (true, Some(params), Some(newest)) =
+            (state.cache_open, &state.params, state.cache.last())
         {
+            // Restamp the backlog into the ticks just before the newest
+            // picture: a player paces by timestamp, and arrival stamps would
+            // keep this client a whole GOP behind live. Cached stamps are
+            // strictly increasing, so this never goes below zero.
+            let first = newest.pts90k - (state.cache.len() as u64 - 1);
             bootstrap.push(Arc::new(AccessUnit {
                 data: params.annexb(),
                 keyframe: false,
                 params: Some(params.clone()),
-                pts90k: first.pts90k,
+                pts90k: first,
             }));
-            bootstrap.extend(state.cache.iter().cloned());
+            bootstrap.extend(state.cache.iter().enumerate().map(|(i, au)| {
+                Arc::new(AccessUnit {
+                    pts90k: first + i as u64,
+                    ..AccessUnit::clone(au)
+                })
+            }));
         }
         Subscription { bootstrap, live }
     }
@@ -269,15 +279,40 @@ mod tests {
         let mut sub = relay.subscribe();
         feed(&relay, start, &pics, 36, pics.len());
 
-        let all: Vec<u64> = drain(&mut everything).iter().map(|au| au.pts90k).collect();
+        let all = drain(&mut everything);
         assert_eq!(all.len(), pics.len() - HELD_BACK);
-        let first_cached = sub.bootstrap[1].pts90k;
-        let from = all.iter().position(|&pts| pts == first_cached).unwrap();
+        let from = all
+            .iter()
+            .position(|au| au.data == sub.bootstrap[1].data)
+            .unwrap();
 
-        let mut joined: Vec<u64> = sub.bootstrap[1..].iter().map(|au| au.pts90k).collect();
-        joined.extend(drain(&mut sub).iter().map(|au| au.pts90k));
-        assert!(joined.windows(2).all(|w| w[0] < w[1]), "{joined:?}");
-        assert_eq!(joined, all[from..]);
+        let mut joined: Vec<Arc<AccessUnit>> = sub.bootstrap[1..].to_vec();
+        joined.extend(drain(&mut sub));
+        let pts: Vec<u64> = joined.iter().map(|au| au.pts90k).collect();
+        assert!(pts.windows(2).all(|w| w[0] < w[1]), "{pts:?}");
+        let data: Vec<&Vec<u8>> = joined.iter().map(|au| &au.data).collect();
+        let expected: Vec<&Vec<u8>> = all[from..].iter().map(|au| &au.data).collect();
+        assert_eq!(data, expected);
+    }
+
+    /// A player paces by timestamp, so a backlog stamped at its arrival times
+    /// would keep a late joiner a whole GOP behind live for good. Packed into
+    /// the ticks just before the newest picture, it decodes in a burst.
+    #[test]
+    fn bootstrap_is_stamped_at_the_live_edge() {
+        let relay = Relay::new();
+        let start = Instant::now();
+        let pics = pictures(HEVC_IDR);
+        feed(&relay, start, &pics, 0, 36);
+        let newest = relay.lock().cache.last().unwrap().pts90k;
+
+        let sub = relay.subscribe();
+        let pictures = &sub.bootstrap[1..];
+        let pts: Vec<u64> = pictures.iter().map(|au| au.pts90k).collect();
+        assert_eq!(*pts.last().unwrap(), newest);
+        assert_eq!(pts[0], newest - (pts.len() as u64 - 1), "{pts:?}");
+        assert!(pts.windows(2).all(|w| w[1] == w[0] + 1), "{pts:?}");
+        assert_eq!(sub.bootstrap[0].pts90k, pts[0]);
     }
 
     fn with_params(mut au: AccessUnit, tag: u8) -> AccessUnit {

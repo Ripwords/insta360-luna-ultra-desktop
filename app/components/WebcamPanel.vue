@@ -108,9 +108,10 @@ const line = computed(() => {
               <span class="text-highlighted">Media Source</span>.
             </li>
             <li>Untick <span class="text-highlighted">Local File</span>.</li>
+            <li>Paste the address above into <span class="text-highlighted">Input</span>.</li>
             <li>
-              Paste the address above into <span class="text-highlighted">Input</span>, then select
-              OK.
+              Set <span class="text-highlighted">Network Buffering</span> to 0 MB, so the picture
+              isn't seconds behind. Then select OK.
             </li>
             <li>
               Select <span class="text-highlighted">Start Virtual Camera</span>, and pick
