@@ -1,5 +1,6 @@
-//! The webcam endpoint: the relay's pictures as MPEG-TS over plain HTTP on a
-//! fixed localhost port, for OBS's Media Source.
+//! The webcam endpoint, on a fixed localhost port: a page for OBS's Browser
+//! Source that decodes the relay's raw Annex B with WebCodecs, and the same
+//! pictures as MPEG-TS for players that want a plain video URL.
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -11,9 +12,9 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio::task::JoinSet;
 
 use super::nal::AccessUnit;
-use super::relay::Relay;
+use super::relay::{Relay, Subscription};
 use super::ts::TsMuxer;
-use crate::liveview::write_within;
+use crate::liveview::{stream_annexb, write_within};
 use crate::local_http::{
     read_request, status_response, Request, BAD_REQUEST, MISDIRECTED, REQUEST_TIMEOUT,
 };
@@ -21,6 +22,11 @@ use crate::local_http::{
 /// Fixed so the URL pasted into OBS keeps working between sessions.
 pub const WEBCAM_PORT: u16 = 49283;
 pub const WEBCAM_PATH: &str = "/webcam.ts";
+/// The page OBS's Browser Source loads. It reads `ANNEXB_PATH`.
+pub const OBS_PATH: &str = "/obs";
+pub const ANNEXB_PATH: &str = "/webcam.h265";
+/// Built from app/obs/player.ts by scripts/build-obs-player.mjs.
+const OBS_PAGE: &str = include_str!("obs.html");
 
 /// A client that accepts no bytes for this long is closed.
 const CLIENT_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -36,6 +42,13 @@ pub(crate) static FIXED_PORT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const
 const OK_HEAD: &[u8] = concat!(
     "HTTP/1.1 200 OK\r\n",
     "Content-Type: video/mp2t\r\n",
+    "Cache-Control: no-store\r\n",
+    "Connection: close\r\n\r\n"
+)
+.as_bytes();
+const ANNEXB_HEAD: &[u8] = concat!(
+    "HTTP/1.1 200 OK\r\n",
+    "Content-Type: application/octet-stream\r\n",
     "Cache-Control: no-store\r\n",
     "Connection: close\r\n\r\n"
 )
@@ -64,7 +77,21 @@ pub async fn bind_webcam() -> std::io::Result<TcpListener> {
     }
 }
 
-/// Serves `GET /webcam.ts` to every client that connects. `clients` counts
+fn page_response() -> Vec<u8> {
+    let head = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        OBS_PAGE.len()
+    );
+    [head.as_bytes(), OBS_PAGE.as_bytes()].concat()
+}
+
+/// The stream a client asked for.
+enum Stream {
+    Ts,
+    AnnexB,
+}
+
+/// Serves the OBS page and both streams to every client that connects. `clients` counts
 /// those currently streaming. Aborting this task closes every client socket.
 pub async fn serve_ts(listener: TcpListener, relay: Arc<Relay>, clients: Arc<AtomicU32>) {
     let mut tasks = JoinSet::new();
@@ -110,32 +137,50 @@ impl Drop for Counted {
     }
 }
 
-/// One client: the head, then MPEG-TS from a clean start (the cached GOP, or
-/// the next keyframe), then live pictures. A client that falls behind, or
-/// accepts nothing for `write_timeout`, is closed rather than continued
-/// mid-GOP; OBS reconnects and starts clean.
+/// One client: the OBS page, or a stream starting clean (the cached GOP, or
+/// the next keyframe). A streaming client that falls behind, or accepts
+/// nothing for `write_timeout`, is closed rather than continued mid-GOP; the
+/// page and OBS reconnect and start clean.
 async fn serve_client(
     mut socket: TcpStream,
     relay: Arc<Relay>,
     clients: Arc<AtomicU32>,
     write_timeout: Duration,
 ) {
-    let refusal = match read_request(&mut socket, REQUEST_TIMEOUT).await {
-        Request::Get(path, _) if path == WEBCAM_PATH => None,
-        Request::Get(..) => Some(NOT_FOUND.to_vec()),
-        Request::WrongHost => Some(status_response(MISDIRECTED)),
-        Request::Invalid => Some(status_response(BAD_REQUEST)),
+    let stream = match read_request(&mut socket, REQUEST_TIMEOUT).await {
+        Request::Get(path, _) if path == WEBCAM_PATH => Ok(Stream::Ts),
+        Request::Get(path, _) if path == ANNEXB_PATH => Ok(Stream::AnnexB),
+        Request::Get(path, _) if path == OBS_PATH => Err(page_response()),
+        Request::Get(..) => Err(NOT_FOUND.to_vec()),
+        Request::WrongHost => Err(status_response(MISDIRECTED)),
+        Request::Invalid => Err(status_response(BAD_REQUEST)),
     };
-    if let Some(response) = refusal {
-        let _ = write_within(&mut socket, &response, write_timeout).await;
-        return;
-    }
+    let stream = match stream {
+        Ok(stream) => stream,
+        Err(response) => {
+            let _ = write_within(&mut socket, &response, write_timeout).await;
+            return;
+        }
+    };
     let Some(_counted) = Counted::try_new(clients) else {
         let _ = write_within(&mut socket, &status_response(UNAVAILABLE), write_timeout).await;
         return;
     };
     let subscription = relay.subscribe();
-    if !write_within(&mut socket, OK_HEAD, write_timeout).await {
+    match stream {
+        Stream::AnnexB => {
+            if write_within(&mut socket, ANNEXB_HEAD, write_timeout).await {
+                stream_annexb(&mut socket, subscription, write_timeout).await;
+            }
+        }
+        Stream::Ts => stream_ts(&mut socket, subscription, write_timeout).await,
+    }
+}
+
+/// MPEG-TS from a clean start (the cached GOP, or the next keyframe), then
+/// live pictures.
+async fn stream_ts(socket: &mut TcpStream, subscription: Subscription, write_timeout: Duration) {
+    if !write_within(socket, OK_HEAD, write_timeout).await {
         return;
     }
     let mut muxer = subscription
@@ -145,7 +190,7 @@ async fn serve_client(
         .map(|params| TsMuxer::new(params.codec));
     if let Some(muxer) = muxer.as_mut() {
         for au in &subscription.bootstrap {
-            if !write_within(&mut socket, &muxer.mux(au), write_timeout).await {
+            if !write_within(socket, &muxer.mux(au), write_timeout).await {
                 return;
             }
         }
@@ -180,7 +225,7 @@ async fn serve_client(
         let Some(current) = muxer.as_mut() else {
             continue;
         };
-        if !write_within(&mut socket, &current.mux(&au), write_timeout).await {
+        if !write_within(socket, &current.mux(&au), write_timeout).await {
             return;
         }
     }
@@ -357,10 +402,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn serves_the_obs_page_without_counting_it() {
+        let relay = Relay::new();
+        let server = server(&relay).await;
+        let mut client = get(server.port, OBS_PATH).await;
+        let head = read_head(&mut client).await;
+        assert!(head.starts_with("HTTP/1.1 200 OK\r\n"), "{head}");
+        assert!(
+            head.contains("\r\nContent-Type: text/html; charset=utf-8\r\n"),
+            "{head}"
+        );
+        assert!(
+            head.contains(&format!("\r\nContent-Length: {}\r\n", OBS_PAGE.len())),
+            "{head}"
+        );
+        let mut body = String::new();
+        tokio::time::timeout(READ_LIMIT, client.read_to_string(&mut body))
+            .await
+            .expect("the page response must close")
+            .unwrap();
+        assert_eq!(body, OBS_PAGE);
+        assert!(
+            body.contains("/webcam.h265"),
+            "the page reads the raw stream"
+        );
+        assert_eq!(server.clients.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn serves_annexb_for_the_obs_page_from_its_params() {
+        let relay = Relay::new();
+        relay.push_chunk(HEVC_IDR, Instant::now());
+        let server = server(&relay).await;
+        let mut client = get(server.port, ANNEXB_PATH).await;
+        let head = read_head(&mut client).await;
+        assert!(head.starts_with("HTTP/1.1 200 OK\r\n"), "{head}");
+        assert!(
+            head.contains("\r\nContent-Type: application/octet-stream\r\n"),
+            "{head}"
+        );
+        assert!(head.contains("\r\nCache-Control: no-store\r\n"), "{head}");
+        let body = read_at_least(&mut client, 5).await;
+        assert_eq!(body[..4], [0, 0, 0, 1]);
+        assert_eq!(body[4] >> 1 & 0x3f, 32, "the stream opens with the VPS");
+        wait_for_clients(&server.clients, 1).await;
+    }
+
+    #[tokio::test]
     async fn other_paths_404() {
         let relay = Relay::new();
         let server = server(&relay).await;
-        for path in ["/", "/stream", "/webcam.ts.bak", "/favicon.ico"] {
+        for path in [
+            "/",
+            "/stream",
+            "/webcam.ts.bak",
+            "/obs.html",
+            "/favicon.ico",
+        ] {
             let mut client = get(server.port, path).await;
             let mut response = String::new();
             tokio::time::timeout(READ_LIMIT, client.read_to_string(&mut response))

@@ -140,7 +140,7 @@ fn status(health: &Health, relay: &Relay, clients: u32, now: Instant) -> WebcamS
     let size = params.as_ref().and_then(dimensions);
     WebcamStatus {
         state: phase(true, health.connected, last_video, health.stalled, now),
-        url: Some(format!("http://127.0.0.1:{port}{}", server::WEBCAM_PATH)),
+        url: Some(format!("http://127.0.0.1:{port}{}", server::OBS_PATH)),
         codec: params.as_ref().map(|p| codec_name(p.codec)),
         width: size.map(|(w, _)| w),
         height: size.map(|(_, h)| h),
@@ -514,7 +514,7 @@ mod tests {
     fn status_serialises_to_the_frontend_contract() {
         let status = WebcamStatus {
             state: WebcamPhase::Streaming,
-            url: Some("http://127.0.0.1:49283/webcam.ts".into()),
+            url: Some("http://127.0.0.1:49283/obs".into()),
             codec: Some("H.265"),
             width: Some(1280),
             height: Some(720),
@@ -525,7 +525,7 @@ mod tests {
             serde_json::to_value(&status).unwrap(),
             serde_json::json!({
                 "state": "streaming",
-                "url": "http://127.0.0.1:49283/webcam.ts",
+                "url": "http://127.0.0.1:49283/obs",
                 "codec": "H.265",
                 "width": 1280,
                 "height": 720,
@@ -570,7 +570,7 @@ mod tests {
             streaming,
             WebcamStatus {
                 state: WebcamPhase::Streaming,
-                url: Some("http://127.0.0.1:49283/webcam.ts".into()),
+                url: Some("http://127.0.0.1:49283/obs".into()),
                 codec: Some("H.265"),
                 width: Some(1280),
                 height: Some(720),
@@ -802,7 +802,7 @@ mod tests {
         let fixed = format!(
             "http://127.0.0.1:{}{}",
             server::WEBCAM_PORT,
-            server::WEBCAM_PATH
+            server::OBS_PATH
         );
         if first.url.as_deref() != Some(fixed.as_str()) {
             eprintln!("skipped: port {} is held elsewhere", server::WEBCAM_PORT);

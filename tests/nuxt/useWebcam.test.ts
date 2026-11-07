@@ -11,7 +11,7 @@ import { mountComposable } from "./harness";
 
 const STREAMING: WebcamStatus = {
   state: "streaming",
-  url: "http://127.0.0.1:49283/webcam.ts",
+  url: "http://127.0.0.1:49283/obs",
   codec: "H.265",
   width: 1280,
   height: 720,

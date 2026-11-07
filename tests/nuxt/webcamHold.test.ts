@@ -119,8 +119,9 @@ describe("WebcamPanel", () => {
     await vi.dynamicImportSettled();
 
     const text = panel.text();
-    expect(text).toContain("Media Source");
-    expect(text).toContain("Local File");
+    expect(text).toContain("choose Browser");
+    expect(text).toContain("into URL");
+    expect(text).not.toContain("Media Source");
     expect(text).toContain("Start Virtual Camera");
   });
 });

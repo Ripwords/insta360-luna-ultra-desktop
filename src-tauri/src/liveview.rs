@@ -30,7 +30,7 @@ use crate::luna::{
     wire_field_varint, LunaState, Session, CODE_SET_ACCESS_CAMERA_FILE_STATE,
     CODE_START_LIVE_STREAM, CODE_STOP_LIVE_STREAM,
 };
-use crate::webcam::relay::Relay;
+use crate::webcam::relay::{Relay, Subscription};
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
 /// A client that accepts no bytes for this long is closed.
@@ -461,9 +461,20 @@ async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>, write_timeout: D
     {
         return;
     }
+    stream_annexb(&mut socket, subscription, write_timeout).await;
+}
+
+/// Writes a subscription as Annex B: the bootstrap (params, then the pictures
+/// since the last keyframe), then live pictures. Returns once the client
+/// falls behind or accepts nothing for `write_timeout`.
+pub(crate) async fn stream_annexb(
+    socket: &mut TcpStream,
+    subscription: Subscription,
+    write_timeout: Duration,
+) {
     let mut started = !subscription.bootstrap.is_empty();
     for au in &subscription.bootstrap {
-        if !write_within(&mut socket, &au.data, write_timeout).await {
+        if !write_within(socket, &au.data, write_timeout).await {
             return;
         }
     }
@@ -479,12 +490,12 @@ async fn serve_client(mut socket: TcpStream, relay: Arc<Relay>, write_timeout: D
             let (true, Some(params)) = (au.keyframe, &au.params) else {
                 continue;
             };
-            if !write_within(&mut socket, &params.annexb(), write_timeout).await {
+            if !write_within(socket, &params.annexb(), write_timeout).await {
                 return;
             }
             started = true;
         }
-        if !write_within(&mut socket, &au.data, write_timeout).await {
+        if !write_within(socket, &au.data, write_timeout).await {
             return;
         }
     }

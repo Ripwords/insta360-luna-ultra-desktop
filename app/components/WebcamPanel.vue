@@ -105,13 +105,13 @@ const line = computed(() => {
           <ol class="list-decimal space-y-1 pl-5 text-sm text-muted">
             <li>
               In OBS, under <span class="text-highlighted">Sources</span>, select + and choose
-              <span class="text-highlighted">Media Source</span>.
+              <span class="text-highlighted">Browser</span>.
             </li>
-            <li>Untick <span class="text-highlighted">Local File</span>.</li>
-            <li>Paste the address above into <span class="text-highlighted">Input</span>.</li>
+            <li>Paste the address above into <span class="text-highlighted">URL</span>.</li>
             <li>
-              Set <span class="text-highlighted">Network Buffering</span> to 0 MB, so the picture
-              isn't seconds behind. Then select OK.
+              Set <span class="text-highlighted">Width</span> and
+              <span class="text-highlighted">Height</span> to your canvas size, such as 1920 and
+              1080. Then select OK.
             </li>
             <li>
               Select <span class="text-highlighted">Start Virtual Camera</span>, and pick
