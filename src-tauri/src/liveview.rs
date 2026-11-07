@@ -27,7 +27,8 @@ use crate::local_http::{
     read_request, status_response, Request, BAD_REQUEST, MISDIRECTED, REQUEST_TIMEOUT,
 };
 use crate::luna::{
-    wire_field_varint, LunaState, Session, CODE_START_LIVE_STREAM, CODE_STOP_LIVE_STREAM,
+    wire_field_varint, LunaState, Session, CODE_SET_ACCESS_CAMERA_FILE_STATE,
+    CODE_START_LIVE_STREAM, CODE_STOP_LIVE_STREAM,
 };
 use crate::webcam::relay::Relay;
 
@@ -197,7 +198,28 @@ impl Default for LiveViewState {
     }
 }
 
+/// `AccessState.LIVE_VIEW` in SetAccessCameraFileState.
+const ACCESS_STATE_LIVE_VIEW: u32 = 5;
+
+/// Tells the camera the app is showing its live view. Since a firmware update
+/// the camera folds away when an app connects and stays folded through START
+/// until it hears this, or until someone touches its screen.
+fn live_view_announcement() -> Vec<u8> {
+    wire_field_varint(1, ACCESS_STATE_LIVE_VIEW)
+}
+
 async fn send_start(session: &Session) -> Result<(), String> {
+    // Best effort: firmware that predates the command should still stream.
+    if let Err(error) = session
+        .send_command(
+            CODE_SET_ACCESS_CAMERA_FILE_STATE,
+            &live_view_announcement(),
+            BEST_EFFORT_TIMEOUT,
+        )
+        .await
+    {
+        log::warn!("camera did not take the live-view announcement: {error}");
+    }
     session
         .send_command(
             CODE_START_LIVE_STREAM,
@@ -930,6 +952,7 @@ mod tests {
 
     const START: u16 = CODE_START_LIVE_STREAM;
     const STOP: u16 = CODE_STOP_LIVE_STREAM;
+    const ACCESS: u16 = CODE_SET_ACCESS_CAMERA_FILE_STATE;
 
     async fn consumers(live: &LiveViewState) -> HashSet<Consumer> {
         live.inner.lock().await.consumers.clone()
@@ -1048,6 +1071,34 @@ mod tests {
         // So the release that follows still stops the camera.
         live.release(Consumer::Webcam).await;
         assert_eq!(camera.wait_for(2).await, [START, STOP]);
+    }
+
+    /// On firmware that folds the camera when an app connects, only this
+    /// announcement unfolds it, so it goes before every START.
+    #[test]
+    fn the_live_view_announcement_is_state_five() {
+        assert_eq!(live_view_announcement(), [0x08, 0x05]);
+    }
+
+    #[tokio::test]
+    async fn starting_announces_live_view_first() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Viewfinder, session).await.unwrap();
+        camera.wait_for(1).await;
+        assert_eq!(camera.all_codes(), [ACCESS, START]);
+    }
+
+    #[tokio::test]
+    async fn a_restart_announces_live_view_again() {
+        let live = LiveViewState::default();
+        let (session, camera) = fake::connect(OnStart::Answer).await;
+        live.acquire(Consumer::Webcam, Arc::clone(&session))
+            .await
+            .unwrap();
+        live.restart(session).await.unwrap();
+        camera.wait_for(3).await;
+        assert_eq!(camera.all_codes(), [ACCESS, START, STOP, ACCESS, START]);
     }
 
     #[tokio::test]

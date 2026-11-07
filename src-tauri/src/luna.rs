@@ -35,6 +35,9 @@ pub(crate) const MEDIA_VIDEO: u8 = 0x20;
 
 pub(crate) const CODE_START_LIVE_STREAM: u16 = 1;
 pub(crate) const CODE_STOP_LIVE_STREAM: u16 = 2;
+/// SetAccessCameraFileState { AccessState state = 1 }: tells the camera what
+/// the app is doing with it.
+pub(crate) const CODE_SET_ACCESS_CAMERA_FILE_STATE: u16 = 118;
 const CODE_TAKE_PICTURE: u16 = 3;
 const CODE_START_CAPTURE: u16 = 4;
 const CODE_STOP_CAPTURE: u16 = 5;
@@ -195,7 +198,10 @@ pub(crate) enum Frame {
     /// Keepalive echo. Carries no payload we use — the probe proved video
     /// rides MEDIA frames, never these.
     Stream,
-    Media { substream: u8, data: Vec<u8> },
+    Media {
+        substream: u8,
+        data: Vec<u8>,
+    },
 }
 
 /// Incremental UCD2 frame scanner over the receive buffer. Returns complete
@@ -314,14 +320,23 @@ fn parse_device_info(host: &str, bodies: &[Vec<u8>]) -> LunaDeviceInfo {
     let device_name = seen.iter().find(|text| contains_brand(text)).cloned();
     let serial = seen
         .iter()
-        .find(|text| text.len() >= 8 && text.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()))
+        .find(|text| {
+            text.len() >= 8
+                && text
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        })
         .cloned();
     let firmware = seen
         .iter()
         .find(|text| {
             let stripped = text.strip_prefix('v').unwrap_or(text);
             let parts: Vec<&str> = stripped.splitn(3, '.').collect();
-            parts.len() == 3 && parts.iter().take(2).all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+            parts.len() == 3
+                && parts
+                    .iter()
+                    .take(2)
+                    .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
         })
         .cloned();
     let ssid = seen
@@ -405,7 +420,12 @@ impl Session {
         }
     }
 
-    async fn send_packet(&self, packet: Vec<u8>, request_id: u16, timeout: Duration) -> Result<RawResponse, String> {
+    async fn send_packet(
+        &self,
+        packet: Vec<u8>,
+        request_id: u16,
+        timeout: Duration,
+    ) -> Result<RawResponse, String> {
         let (tx, rx) = oneshot::channel();
         self.pending.lock().unwrap().insert(request_id, tx);
         if let Err(error) = self.write(&packet).await {
@@ -428,7 +448,12 @@ impl Session {
         self.stream_tx.subscribe()
     }
 
-    pub(crate) async fn send_command(&self, code: u16, body: &[u8], timeout: Duration) -> Result<RawResponse, String> {
+    pub(crate) async fn send_command(
+        &self,
+        code: u16,
+        body: &[u8],
+        timeout: Duration,
+    ) -> Result<RawResponse, String> {
         let request_id = self.next_request_id();
         let packet = build_file_command(self.next_seq(), code, request_id, body);
         self.send_packet(packet, request_id, timeout).await
@@ -436,7 +461,14 @@ impl Session {
 
     /// Replays a captured command byte-for-byte (fixed seq and request id),
     /// as the original app does during the info handshake.
-    async fn send_exact(&self, seq: u8, code: u16, request_id: u16, body: &[u8], timeout: Duration) -> Result<RawResponse, String> {
+    async fn send_exact(
+        &self,
+        seq: u8,
+        code: u16,
+        request_id: u16,
+        body: &[u8],
+        timeout: Duration,
+    ) -> Result<RawResponse, String> {
         let packet = build_file_command(seq, code, request_id, body);
         self.send_packet(packet, request_id, timeout).await
     }
@@ -521,7 +553,9 @@ fn start_session(stream: TcpStream, first_seq: u8) -> Arc<Session> {
                     for frame in drain_frames(&mut buffer) {
                         match frame {
                             Frame::File(response) => {
-                                if let Some(tx) = reader_pending.lock().unwrap().remove(&response.request_id) {
+                                if let Some(tx) =
+                                    reader_pending.lock().unwrap().remove(&response.request_id)
+                                {
                                     let _ = tx.send(response);
                                 }
                             }
@@ -547,16 +581,25 @@ fn start_session(stream: TcpStream, first_seq: u8) -> Arc<Session> {
     session
 }
 
-async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, host: String) -> Result<LunaDeviceInfo, String> {
-    let stream = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect((host.as_str(), CONTROL_PORT)))
-        .await
-        .map_err(|_| format!("connecting to {host}:{CONTROL_PORT} timed out"))?
-        .map_err(|e| format!("cannot reach camera at {host}:{CONTROL_PORT}: {e}"))?;
+async fn open_session(
+    app: AppHandle,
+    state: Arc<Mutex<Option<Arc<Session>>>>,
+    host: String,
+) -> Result<LunaDeviceInfo, String> {
+    let stream = tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        TcpStream::connect((host.as_str(), CONTROL_PORT)),
+    )
+    .await
+    .map_err(|_| format!("connecting to {host}:{CONTROL_PORT} timed out"))?
+    .map_err(|e| format!("cannot reach camera at {host}:{CONTROL_PORT}: {e}"))?;
 
     let session = start_session(stream, 0x24);
 
     // STREAM hello authorizes the HTTP media index a moment later
-    session.write(&build_stream_hello(session.next_seq())).await?;
+    session
+        .write(&build_stream_hello(session.next_seq()))
+        .await?;
 
     // Device info probes; tolerate individual failures like the original app
     let info_timeout = Duration::from_secs(4);
@@ -568,7 +611,10 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
     ];
     for (code, request_id, body) in probes {
         let seq = session.next_seq();
-        if let Ok(response) = session.send_exact(seq, code, request_id, &body, info_timeout).await {
+        if let Ok(response) = session
+            .send_exact(seq, code, request_id, &body, info_timeout)
+            .await
+        {
             bodies.push(response.body);
         }
     }
@@ -590,7 +636,9 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
         ticker.tick().await;
         loop {
             ticker.tick().await;
-            let Some(session) = ka_session.upgrade() else { break };
+            let Some(session) = ka_session.upgrade() else {
+                break;
+            };
             let transfer_active = session.is_transfer_active();
             let hello = build_stream_hello(session.next_seq());
             let cmd_timeout = if transfer_active {
@@ -601,8 +649,12 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
             let tick = async {
                 session.write(&hello).await?;
                 if !video_recent(session.last_video(), Instant::now()) {
-                    session.send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout).await?;
-                    session.send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout).await?;
+                    session
+                        .send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout)
+                        .await?;
+                    session
+                        .send_command(CODE_GET_OPTIONS, &small_options_body(), cmd_timeout)
+                        .await?;
                 }
                 Ok::<(), String>(())
             };
@@ -613,7 +665,10 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
                     failures += 1;
                     if failures >= 2 || session.is_poisoned() {
                         let mut stored = ka_state.lock().await;
-                        if stored.as_ref().is_some_and(|current| same_session(current, &session)) {
+                        if stored
+                            .as_ref()
+                            .is_some_and(|current| same_session(current, &session))
+                        {
                             stored.take();
                             // Emitted under the lock so a reconnect cannot see a stale event
                             let _ = ka_app.emit("luna://disconnected", ());
@@ -633,7 +688,11 @@ async fn open_session(app: AppHandle, state: Arc<Mutex<Option<Arc<Session>>>>, h
 }
 
 #[tauri::command]
-pub async fn luna_connect(app: AppHandle, state: State<'_, LunaState>, host: String) -> Result<LunaDeviceInfo, String> {
+pub async fn luna_connect(
+    app: AppHandle,
+    state: State<'_, LunaState>,
+    host: String,
+) -> Result<LunaDeviceInfo, String> {
     let trimmed = host.trim();
     if trimmed.is_empty() {
         return Err("camera host is empty".into());
@@ -650,7 +709,12 @@ pub async fn luna_disconnect(state: State<'_, LunaState>) -> Result<(), String> 
 
 #[tauri::command]
 pub async fn luna_status(state: State<'_, LunaState>) -> Result<Option<LunaDeviceInfo>, String> {
-    Ok(state.session.lock().await.as_ref().map(|session| session.device_info()))
+    Ok(state
+        .session
+        .lock()
+        .await
+        .as_ref()
+        .map(|session| session.device_info()))
 }
 
 /// The frontend received download bytes from the camera. A no-op without a session.
@@ -663,10 +727,16 @@ pub async fn luna_transfer_activity(state: State<'_, LunaState>) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn luna_delete_files(state: State<'_, LunaState>, paths: Vec<String>) -> Result<(), String> {
+pub async fn luna_delete_files(
+    state: State<'_, LunaState>,
+    paths: Vec<String>,
+) -> Result<(), String> {
     let session = {
         let guard = state.session.lock().await;
-        guard.as_ref().cloned().ok_or_else(|| "camera is not connected".to_string())?
+        guard
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| "camera is not connected".to_string())?
     };
     let mut unique: Vec<String> = Vec::new();
     for path in paths {
@@ -679,7 +749,11 @@ pub async fn luna_delete_files(state: State<'_, LunaState>, paths: Vec<String>) 
     }
     for batch in unique.chunks(50) {
         session
-            .send_command(CODE_DELETE_FILES, &build_delete_files_body(batch), Duration::from_secs(20))
+            .send_command(
+                CODE_DELETE_FILES,
+                &build_delete_files_body(batch),
+                Duration::from_secs(20),
+            )
             .await?;
     }
     Ok(())
@@ -707,7 +781,11 @@ fn is_allowed_command(code: u16) -> bool {
 /// Send a protobuf body to the camera and return the raw response body.
 /// Encoding and decoding live in the frontend, which owns the schema.
 #[tauri::command]
-pub async fn luna_command(state: State<'_, LunaState>, code: u16, body: Vec<u8>) -> Result<Vec<u8>, String> {
+pub async fn luna_command(
+    state: State<'_, LunaState>,
+    code: u16,
+    body: Vec<u8>,
+) -> Result<Vec<u8>, String> {
     if !is_allowed_command(code) {
         return Err(format!("command {code} is not permitted"));
     }
@@ -715,7 +793,9 @@ pub async fn luna_command(state: State<'_, LunaState>, code: u16, body: Vec<u8>)
         .session()
         .await
         .ok_or_else(|| "camera is not connected".to_string())?;
-    let response = session.send_command(code, &body, Duration::from_secs(10)).await?;
+    let response = session
+        .send_command(code, &body, Duration::from_secs(10))
+        .await?;
     Ok(response.body)
 }
 
@@ -742,12 +822,20 @@ pub(crate) mod fake {
     }
 
     impl FakeCamera {
-        /// Command codes received, in order.
+        /// Command codes received, in order, without the live-view
+        /// announcement that precedes every START.
         pub(crate) fn codes(&self) -> Vec<u16> {
+            let mut codes = self.all_codes();
+            codes.retain(|code| *code != CODE_SET_ACCESS_CAMERA_FILE_STATE);
+            codes
+        }
+
+        /// Every command code received, in order.
+        pub(crate) fn all_codes(&self) -> Vec<u16> {
             self.codes.lock().unwrap().clone()
         }
 
-        /// Waits until `count` commands have arrived.
+        /// Waits until `count` commands other than the announcement have arrived.
         pub(crate) async fn wait_for(&self, count: usize) -> Vec<u16> {
             for _ in 0..500 {
                 let codes = self.codes();
@@ -804,10 +892,14 @@ pub(crate) mod fake {
                 }
                 buffer.extend_from_slice(&chunk[..n]);
                 for frame in drain_frames(&mut buffer) {
-                    let Frame::File(command) = frame else { continue };
+                    let Frame::File(command) = frame else {
+                        continue;
+                    };
                     recorded.lock().unwrap().push(command.code);
-                    let answer = command.code != CODE_START_LIVE_STREAM || on_start == OnStart::Answer;
-                    if command.code == CODE_START_LIVE_STREAM && on_start == OnStart::HangUp && open {
+                    let answer =
+                        command.code != CODE_START_LIVE_STREAM || on_start == OnStart::Answer;
+                    if command.code == CODE_START_LIVE_STREAM && on_start == OnStart::HangUp && open
+                    {
                         let _ = write.shutdown().await;
                         open = false;
                     }
@@ -834,7 +926,10 @@ mod tests {
     use super::*;
 
     fn hex(s: &str) -> Vec<u8> {
-        (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
     }
 
     #[test]
@@ -873,9 +968,12 @@ mod tests {
         let (_read_half, write_half) = stream.into_split();
         let session = test_session(write_half);
         let payload = vec![0u8; 64 * 1024 * 1024];
-        let result = tokio::time::timeout(WRITE_TIMEOUT + Duration::from_secs(1), session.write(&payload))
-            .await
-            .expect("write must return within the write timeout");
+        let result = tokio::time::timeout(
+            WRITE_TIMEOUT + Duration::from_secs(1),
+            session.write(&payload),
+        )
+        .await
+        .expect("write must return within the write timeout");
         assert!(result.unwrap_err().contains("timed out"));
 
         let started = Instant::now();
@@ -887,9 +985,15 @@ mod tests {
     #[test]
     fn transfer_window_requires_recent_activity() {
         let now = Instant::now();
-        assert!(!within_transfer_window(None, now), "no transfer has ever delivered bytes");
+        assert!(
+            !within_transfer_window(None, now),
+            "no transfer has ever delivered bytes"
+        );
         assert!(within_transfer_window(Some(now), now));
-        assert!(within_transfer_window(Some(now - TRANSFER_ACTIVITY_WINDOW / 2), now));
+        assert!(within_transfer_window(
+            Some(now - TRANSFER_ACTIVITY_WINDOW / 2),
+            now
+        ));
         assert!(
             !within_transfer_window(Some(now - TRANSFER_ACTIVITY_WINDOW), now),
             "a transfer that stopped delivering bytes must not suppress the keepalive forever"
@@ -908,7 +1012,10 @@ mod tests {
     #[test]
     fn checksum_matches_captured_trailer() {
         let frame = hex("55434432010c04100f0000000800020100008000000830080f080b");
-        assert_eq!(insta360_checksum(&frame), u32::from_le_bytes([0x7c, 0x00, 0x8e, 0x7c]));
+        assert_eq!(
+            insta360_checksum(&frame),
+            u32::from_le_bytes([0x7c, 0x00, 0x8e, 0x7c])
+        );
     }
 
     #[test]
@@ -962,7 +1069,10 @@ mod tests {
         ] {
             assert!(is_allowed_command(code), "code {code} should be allowed");
         }
-        assert!(!is_allowed_command(CODE_DELETE_FILES), "deletion has its own command");
+        assert!(
+            !is_allowed_command(CODE_DELETE_FILES),
+            "deletion has its own command"
+        );
         assert!(!is_allowed_command(9999), "unknown codes must be refused");
     }
 
@@ -1096,7 +1206,12 @@ mod tests {
         use std::process::{Child, Command, Stdio};
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-        if Command::new("node").arg("--version").stdout(Stdio::null()).status().is_err() {
+        if Command::new("node")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .status()
+            .is_err()
+        {
             eprintln!("skipping: node not available");
             return;
         }
@@ -1110,14 +1225,21 @@ mod tests {
 
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let server = manifest_dir.join("../luna_mock_server/server.mjs");
-        assert!(server.exists(), "vendored mock server missing at {server:?}");
+        assert!(
+            server.exists(),
+            "vendored mock server missing at {server:?}"
+        );
 
         let media_root = std::env::temp_dir().join(format!("luna-it-{}", std::process::id()));
         let camera_dir = media_root.join("Camera01");
         std::fs::create_dir_all(&camera_dir).unwrap();
         let target = "IMG_20260718_142012_00_002.jpg";
         std::fs::write(camera_dir.join(target), b"fakejpeg").unwrap();
-        std::fs::write(camera_dir.join("IMG_20260717_091205_00_003.jpg"), b"fakejpeg2").unwrap();
+        std::fs::write(
+            camera_dir.join("IMG_20260717_091205_00_003.jpg"),
+            b"fakejpeg2",
+        )
+        .unwrap();
 
         let http_port = 18142u16;
         let tcp_port = 16142u16;
@@ -1147,7 +1269,12 @@ mod tests {
         // Stream hello authorizes HTTP; a FILE command must get a response
         control.write_all(&build_stream_hello(0x24)).await.unwrap();
         control
-            .write_all(&build_file_command(0x25, CODE_GET_OPTIONS, 1, &small_options_body()))
+            .write_all(&build_file_command(
+                0x25,
+                CODE_GET_OPTIONS,
+                1,
+                &small_options_body(),
+            ))
             .await
             .unwrap();
         let mut buffer = Vec::new();
@@ -1170,10 +1297,12 @@ mod tests {
         // The HTTP auth gate opens ~3s after the handshake
         async fn http_get(port: u16, path: &str) -> String {
             let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let request = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+            let request =
+                format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
             stream.write_all(request.as_bytes()).await.unwrap();
             let mut out = Vec::new();
-            let _ = tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut out)).await;
+            let _ =
+                tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut out)).await;
             String::from_utf8_lossy(&out).to_string()
         }
 
@@ -1185,7 +1314,10 @@ mod tests {
                 break;
             }
         }
-        assert!(index.starts_with("HTTP/1.1 200"), "index not authorized: {index}");
+        assert!(
+            index.starts_with("HTTP/1.1 200"),
+            "index not authorized: {index}"
+        );
         assert!(index.contains(target), "listing missing {target}: {index}");
 
         // Delete over TCP, then the file must vanish from the listing
@@ -1214,9 +1346,15 @@ mod tests {
         assert_eq!(deleted.code, CODE_DELETE_FILES);
 
         let after = http_get(http_port, "/storage_internal/DCIM/Camera01/").await;
-        assert!(after.starts_with("HTTP/1.1 200"), "index lost after delete: {after}");
+        assert!(
+            after.starts_with("HTTP/1.1 200"),
+            "index lost after delete: {after}"
+        );
         assert!(!after.contains(target), "deleted file still listed");
-        assert!(after.contains("IMG_20260717_091205_00_003.jpg"), "unrelated file disappeared");
+        assert!(
+            after.contains("IMG_20260717_091205_00_003.jpg"),
+            "unrelated file disappeared"
+        );
 
         let _ = std::fs::remove_dir_all(&media_root);
     }
