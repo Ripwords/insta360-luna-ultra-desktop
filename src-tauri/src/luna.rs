@@ -48,6 +48,10 @@ const CODE_GET_PHOTOGRAPHY_OPTIONS: u16 = 10;
 const CODE_DELETE_FILES: u16 = 12;
 const CODE_GET_FILE_LIST: u16 = 13;
 const CODE_GET_CURRENT_CAPTURE_STATUS: u16 = 15;
+/// PHONE_COMMAND_GIMBAL_CONTROL. Not in the vendored schema, which has no
+/// gimbal at all; known from captures of the official app on a Luna Ultra.
+/// Moves, recenters or flips the gimbal; nothing destructive.
+const CODE_GIMBAL_CONTROL: u16 = 226;
 
 const CONTROL_PORT: u16 = 6666;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(1500);
@@ -775,6 +779,7 @@ fn is_allowed_command(code: u16) -> bool {
             | CODE_GET_PHOTOGRAPHY_OPTIONS
             | CODE_GET_CURRENT_CAPTURE_STATUS
             | CODE_GET_FILE_LIST
+            | CODE_GIMBAL_CONTROL
     )
 }
 
@@ -1066,6 +1071,7 @@ mod tests {
             CODE_SET_PHOTOGRAPHY_OPTIONS,
             CODE_GET_PHOTOGRAPHY_OPTIONS,
             CODE_GET_CURRENT_CAPTURE_STATUS,
+            CODE_GIMBAL_CONTROL,
         ] {
             assert!(is_allowed_command(code), "code {code} should be allowed");
         }

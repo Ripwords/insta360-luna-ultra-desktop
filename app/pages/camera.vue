@@ -241,6 +241,14 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             <CameraZoomDial />
           </div>
 
+          <!--
+            The gimbal pad mirrors the zoom dial on the left edge, above the
+            pro bar, so the two hands-on controls frame the picture.
+          -->
+          <div class="absolute bottom-20 left-3 z-20">
+            <CameraGimbalPad />
+          </div>
+
           <!-- Errors sit below the readout rail, so neither ever moves -->
           <div v-if="topError" class="absolute inset-x-0 top-14 z-20 flex justify-center px-4">
             <span
