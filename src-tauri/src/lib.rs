@@ -1,3 +1,4 @@
+mod headtrack;
 mod liveview;
 mod local_http;
 mod luna;
@@ -26,6 +27,9 @@ pub fn run() {
       webcam::luna_webcam_start,
       webcam::luna_webcam_stop,
       webcam::luna_webcam_status,
+      headtrack::luna_headtrack_start,
+      headtrack::luna_headtrack_stop,
+      headtrack::luna_headtrack_status,
     ])
     .setup(|app| {
       // Auto-updater (desktop only)
@@ -49,6 +53,7 @@ pub fn run() {
         let webcam = app.state::<webcam::WebcamState>();
         let live = app.state::<liveview::LiveViewState>();
         tauri::async_runtime::block_on(webcam::shutdown(&webcam, &live));
+        headtrack::shutdown();
       }
     });
 }

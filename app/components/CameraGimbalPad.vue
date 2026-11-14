@@ -12,8 +12,18 @@ import { GIMBAL_RANGE } from "~/utils/gimbal";
  *
  * The arrow keys drive the same vector (Shift for full speed), whenever focus
  * is not in a control that wants them for itself.
+ *
+ * The headphones button hands the gimbal to the AirPods. Taking hold of the
+ * pad or the arrow keys takes it back, so two inputs never fight.
  */
 const { vector, ready, error, steer, release, recenter, flip } = useGimbal();
+const head = useHeadTracking();
+onMounted(() => void head.refreshSupport());
+
+/** Manual input wins over the headphones. */
+function takeOver() {
+  if (head.on.value) void head.stop();
+}
 
 const pad = useTemplateRef("pad");
 const dragging = ref(false);
@@ -41,6 +51,7 @@ function aim(event: PointerEvent) {
 
 function onDown(event: PointerEvent) {
   if (!ready.value) return;
+  takeOver();
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   dragging.value = true;
   aim(event);
@@ -80,6 +91,7 @@ function ownsArrows(target: EventTarget | null): boolean {
 function onKeyDown(event: KeyboardEvent) {
   if (!event.key.startsWith("Arrow") || !ready.value || ownsArrows(event.target)) return;
   event.preventDefault();
+  takeOver();
   fast = event.shiftKey;
   if (held.has(event.key) && !event.repeat) return;
   held.add(event.key);
@@ -108,6 +120,26 @@ onBeforeUnmount(() => {
 });
 
 const moving = computed(() => vector.value.pan !== 0 || vector.value.tilt !== 0);
+
+/** While the headphones steer, the knob shows what they are asking for. */
+const shownKnob = computed(() =>
+  dragging.value || !head.on.value
+    ? knob.value
+    : { x: vector.value.pan / GIMBAL_RANGE, y: -vector.value.tilt / GIMBAL_RANGE },
+);
+
+function onRecenter() {
+  if (head.on.value) void head.recenter();
+  else void recenter();
+}
+
+const headNote = computed(() => {
+  if (head.error.value) return head.error.value;
+  if (head.state.value === "starting") return "Starting head tracking…";
+  if (head.state.value === "waiting")
+    return "Waiting for your AirPods. Wear both, and pick a microphone other than the AirPods.";
+  return null;
+});
 </script>
 
 <template>
@@ -132,7 +164,7 @@ const moving = computed(() => vector.value.pan !== 0 || vector.value.tilt !== 0)
         class="pointer-events-none absolute left-1/2 top-1/2 size-8 rounded-full border border-white/60 bg-white/15 shadow"
         :class="dragging ? '' : 'transition-transform duration-150'"
         :style="{
-          transform: `translate(calc(-50% + ${knob.x * 32}px), calc(-50% + ${knob.y * 32}px))`,
+          transform: `translate(calc(-50% + ${shownKnob.x * 32}px), calc(-50% + ${shownKnob.y * 32}px))`,
         }"
       />
     </div>
@@ -144,8 +176,10 @@ const moving = computed(() => vector.value.pan !== 0 || vector.value.tilt !== 0)
         color="neutral"
         variant="ghost"
         class="text-white/70 hover:text-white"
-        aria-label="Recenter the gimbal"
-        @click="recenter"
+        :aria-label="
+          head.on.value ? 'Recenter the gimbal on where you are looking' : 'Recenter the gimbal'
+        "
+        @click="onRecenter"
       />
       <UButton
         icon="i-lucide-switch-camera"
@@ -156,7 +190,27 @@ const moving = computed(() => vector.value.pan !== 0 || vector.value.tilt !== 0)
         aria-label="Flip between front and selfie"
         @click="flip"
       />
+      <UButton
+        v-if="head.supported.value"
+        icon="i-lucide-headphones"
+        size="xs"
+        color="neutral"
+        :variant="head.on.value ? 'solid' : 'ghost'"
+        :class="head.on.value ? '' : 'text-white/70 hover:text-white'"
+        :aria-label="
+          head.on.value ? 'Stop following your AirPods' : 'Follow your head with AirPods'
+        "
+        :aria-pressed="head.on.value"
+        @click="head.toggle"
+      />
     </div>
+
+    <span
+      v-if="headNote"
+      class="max-w-36 text-center font-mono text-[10px]"
+      :class="head.error.value ? 'text-warning' : 'text-white/70'"
+      >{{ headNote }}</span
+    >
 
     <span v-if="error" class="max-w-32 text-center font-mono text-[10px] text-warning">{{
       error

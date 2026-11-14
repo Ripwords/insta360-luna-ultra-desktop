@@ -38,3 +38,10 @@ tokio-util = "0.7"
 # The auto-updater is a desktop-only concern
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
+
+# AirPods head tracking reads CMHeadphoneMotionManager, which is macOS-only
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSOperation", "NSError"] }
+objc2-core-motion = { version = "0.3", default-features = false, features = ["std", "block2", "CMHeadphoneMotionManager", "CMDeviceMotion", "CMAttitude", "CMLogItem", "CMAuthorization"] }
