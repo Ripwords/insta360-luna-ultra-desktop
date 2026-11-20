@@ -31,6 +31,7 @@ Docs: https://ripwords.github.io/insta360-luna-ultra-desktop/
 
 - **Real camera connection** — pairs with the Luna Ultra over its own Wi-Fi network using the camera's TCP control protocol and HTTP media index. No mock data.
 - **Camera control** — live viewfinder with a HUD (recording time, storage, resolution, battery), 1×–15× zoom, six capture modes, and one-tap photo/video capture.
+- **Gimbal** — drag anywhere on the picture to pan and tilt (or use the arrow keys), recenter, and flip between front and selfie. On a Mac, AirPods head tracking can steer it (in testing).
 - **Webcam mode** — serves the live preview to OBS as a Browser source, for recording or OBS's Virtual Camera. Your computer is on the camera's Wi-Fi while it streams, so it has no internet unless it has a second connection (Ethernet, USB tethering or a second Wi-Fi adapter).
 - **Pro bar** — exposure (ISO, shutter, EV, WB), look (colour mode, Leica and cinematic filters, strength), and format (resolution, framerate, aspect).
 - **Gallery** — date-grouped grid with photo/video filtering, three thumbnail sizes, and a full-screen preview with metadata and keyboard navigation.
@@ -50,11 +51,11 @@ published API, and its failure mode is silent: it **accepts** a write,
 under the wrong name. Nothing errors. So a feature only ships here once it has
 been set from the app and confirmed on the camera's own screen.
 
-|                         |                                                                                                                                                                                                                                                                                              |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🧪 **Built, gated off** | The full settings panel — stabilisation, format, capture timers, metering, bitrate, RAW (~30 controls), plus live-view diagnostics. Written and rendering, waiting on on-device verification.                                                                                                |
-| ○ **Known gaps**        | UltraPhoto capture mode, video watermarking, white-balance read-back, macOS notarization / Windows signing.                                                                                                                                                                                  |
-| ⏸ **On hold**           | Gimbal pan/tilt, gimbal attitude/gyro, Deep Track, tap to focus — each has a **named command** in the two thirds of the protocol this project cannot yet name ([protocol gap](docs/PROTOCOL-GAP.md)); parked on getting the numbers, not on finding a lever. Colour Recovery, still nothing. |
+|                         |                                                                                                                                                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🧪 **Built, gated off** | The full settings panel — stabilisation, format, capture timers, metering, bitrate, RAW (~30 controls), plus live-view diagnostics. Written and rendering, waiting on on-device verification.                                                                               |
+| ○ **Known gaps**        | UltraPhoto capture mode, video watermarking, white-balance read-back, macOS notarization / Windows signing.                                                                                                                                                                 |
+| ⏸ **On hold**           | Gimbal attitude/gyro, Deep Track, tap to focus — each has a **named command** in the two thirds of the protocol this project cannot yet name ([protocol gap](docs/PROTOCOL-GAP.md)); parked on getting the numbers, not on finding a lever. Colour Recovery, still nothing. |
 
 **[→ Full feature map](docs/FEATURES.md)** — the same picture area by area, with
 the measured field numbers, the per-mode availability rules, what was already

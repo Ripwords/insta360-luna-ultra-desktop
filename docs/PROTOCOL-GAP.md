@@ -103,6 +103,21 @@ notifications/ptz_track_state.proto
 `PTZ_CTRL` answered empty as option type 87 because gimbal control was never an
 option. It is its own command, with its own message.
 
+**`GIMBAL_CONTROL` is numbered: 226** (`0x00E2`), from captures of the official
+app in Insta360Linker and apatassini/Insta360luna, and it ships (see
+[FEATURES.md](FEATURES.md)). The same captures add:
+
+- **Every move gets a reply**, status code 200 echoing the request id, in a
+  median 9 ms and at most 47 ms. The app sends the next move every 20–44 ms
+  without waiting for it.
+- **Gimbal speed is photography option 85** (`0x55`), set through the ordinary
+  options write; the camera confirms a change with notification 8298.
+- **Insta360luna reads 8302's field 2 as the pitch limit and field 3 as the
+  yaw limit**, which fits the two clusters measured here.
+- **Codes 172, 191, 198, 201 and 238** appear in the official app's traffic and
+  are not yet named. Subject tracking is the obvious candidate among them;
+  neither repo sends anything they name as tracking.
+
 ## Subject tracking — this is Deep Track
 
 ```
