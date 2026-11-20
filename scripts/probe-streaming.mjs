@@ -336,19 +336,33 @@ async function sweep(session, pan, tilt, ms) {
   );
 }
 
+/** Protobuf int32: a negative value is its 64-bit two's complement, ten bytes. */
+function int32Varint(value) {
+  if (value >= 0) return varint(value);
+  let rest = BigInt.asUintN(64, BigInt(value));
+  const out = [];
+  while (rest > 0x7fn) {
+    out.push(Number(rest & 0x7fn) | 0x80);
+    rest >>= 7n;
+  }
+  out.push(Number(rest));
+  return Buffer.from(out);
+}
+
 /** The official app's session setup, from Insta360Linker's PCAP (2026-07-28). */
 async function registerLikeOfficialApp(session) {
   const clientId = "ffffffff-6c75-6e61-ffff-ffff6465736b";
   const epoch = Math.floor(Date.now() / 1000);
-  const zone = "Europe/Istanbul";
+  // The system zone, so the probe never moves the camera's clock to someone else's
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
   const offset = -new Date().getTimezoneOffset() * 60;
   const values = Buffer.concat([
     Buffer.from([0x60]),
     varint(epoch),
     Buffer.from([0x68]),
-    varint(offset),
+    int32Varint(offset),
     Buffer.from([0xfa, 0x0a]),
-    varint(zone.length),
+    varint(Buffer.byteLength(zone)),
     Buffer.from(zone),
   ]);
   const timeBody = Buffer.concat([
