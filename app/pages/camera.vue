@@ -174,6 +174,9 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             />
           </div>
 
+          <!-- Drag anywhere on the picture to pan and tilt; controls above it win -->
+          <CameraGimbalStick />
+
           <!--
             Frame marks. A viewfinder shows you the bounds of what it is
             recording, and the brackets are how every camera says it. They also
@@ -245,11 +248,11 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
           </div>
 
           <!--
-            The gimbal pad mirrors the zoom dial on the left edge, above the
-            pro bar, so the two hands-on controls frame the picture.
+            The gimbal's buttons mirror the zoom dial down the left edge. Its
+            steering is a drag on the picture itself (CameraGimbalStick).
           -->
-          <div class="absolute bottom-20 left-3 z-20">
-            <CameraGimbalPad />
+          <div class="absolute inset-y-20 left-2 z-20 flex items-center">
+            <CameraGimbalRail />
           </div>
 
           <!-- Errors sit below the readout rail, so neither ever moves -->
@@ -262,9 +265,12 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             </span>
           </div>
 
-          <!-- Quick exposure bar + gear, along the bottom of the viewfinder -->
+          <!--
+            Quick exposure bar + gear, along the bottom of the viewfinder. Above
+            the side rails, so its pickers open over them rather than under.
+          -->
           <div
-            class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pr-12 pt-10"
+            class="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pr-12 pt-10"
           >
             <CameraProBar @open-settings="settingsOpen = true" />
           </div>
