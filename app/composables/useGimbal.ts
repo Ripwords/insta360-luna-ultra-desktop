@@ -13,12 +13,24 @@ export const GIMBAL_TICK_MS = 40;
 export const GIMBAL_STOP_FRAMES = 4;
 
 /**
- * The loop is one per app, not one per caller: the pad and the arrow keys
+ * Moves sent without a reply yet, before the loop waits for one. The official
+ * app does not wait at all, and the camera normally answers within 50 ms, so
+ * this only bites when replies go missing: a lost one must not freeze the
+ * loop, which would leave the gimbal turning at its last speed.
+ */
+export const GIMBAL_MAX_IN_FLIGHT = 3;
+
+/** One lost reply is noise; this long with no reply at all is a fault worth showing. */
+export const GIMBAL_FAIL_MS = 1000;
+
+/**
+ * The loop is one per app, not one per caller: the stick and the arrow keys
  * each call useGimbal(), and two loops would double the traffic.
  */
 let timer: ReturnType<typeof setInterval> | null = null;
-let inFlight = false;
+let inFlight = 0;
 let stopFrames = 0;
+let lastAnswer = 0;
 
 export interface GimbalVector {
   pan: number;
@@ -26,13 +38,13 @@ export interface GimbalVector {
 }
 
 /**
- * Gimbal control, shared by every input that drives it (the on-screen pad,
+ * Gimbal control, shared by every input that drives it (the drag on the picture,
  * the arrow keys, and anything that follows).
  *
  * Inputs only ever set the vector they want. A single loop owns the wire: it
- * sends the latest vector on each tick, never queues a stale one behind a slow
- * reply (one request in flight at a time), and finishes with a few zero
- * vectors once everyone has let go.
+ * sends the latest vector on each tick without waiting for the reply to the
+ * last one (up to GIMBAL_MAX_IN_FLIGHT unanswered), and finishes with a few
+ * zero vectors once everyone has let go.
  *
  * The camera only acts on these while it is streaming its preview, so
  * `ready` follows the viewfinder and webcam mode rather than the connection.
@@ -52,28 +64,34 @@ export function useGimbal() {
     if (!error.value) error.value = errorMessage(cause, "The gimbal did not respond");
   }
 
-  async function tick() {
-    if (inFlight) return;
+  function tick() {
     const { pan, tilt } = vector.value;
     const moving = pan !== 0 || tilt !== 0;
-    if (!moving) {
+    if (moving) {
+      // The stop below always goes out; only moves wait for room
+      if (inFlight >= GIMBAL_MAX_IN_FLIGHT) return;
+      stopFrames = GIMBAL_STOP_FRAMES;
+    } else {
       if (stopFrames <= 0) {
         if (timer) clearInterval(timer);
         timer = null;
         return;
       }
       stopFrames--;
-    } else {
-      stopFrames = GIMBAL_STOP_FRAMES;
     }
-    inFlight = true;
-    try {
-      await sendGimbalMove(pan, tilt);
-    } catch (cause) {
-      report(cause);
-    } finally {
-      inFlight = false;
-    }
+    inFlight++;
+    sendGimbalMove(pan, tilt)
+      .then(
+        () => {
+          lastAnswer = Date.now();
+        },
+        (cause: unknown) => {
+          if (Date.now() - lastAnswer >= GIMBAL_FAIL_MS) report(cause);
+        },
+      )
+      .finally(() => {
+        inFlight--;
+      });
   }
 
   /** Ask for a speed on each axis, -100..100. Zero on both lets go. */
@@ -83,8 +101,9 @@ export function useGimbal() {
     if (pan !== 0 || tilt !== 0) error.value = null;
     if (!timer) {
       stopFrames = GIMBAL_STOP_FRAMES;
-      void tick();
-      timer = setInterval(() => void tick(), GIMBAL_TICK_MS);
+      lastAnswer = Date.now();
+      tick();
+      timer = setInterval(tick, GIMBAL_TICK_MS);
     }
   }
 

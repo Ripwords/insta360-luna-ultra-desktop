@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { GIMBAL_STOP_FRAMES, GIMBAL_TICK_MS } from "~/composables/useGimbal";
+import {
+  GIMBAL_FAIL_MS,
+  GIMBAL_MAX_IN_FLIGHT,
+  GIMBAL_STOP_FRAMES,
+  GIMBAL_TICK_MS,
+} from "~/composables/useGimbal";
 import {
   CODE_GIMBAL_CONTROL,
   encodeGimbalAction,
@@ -81,13 +86,13 @@ describe("useGimbal", () => {
     expect(sent.filter((body) => body.join() === stop.join())).toHaveLength(GIMBAL_STOP_FRAMES);
   });
 
-  it("keeps one request in flight and skips ticks behind a slow reply", async () => {
-    let answer!: () => void;
+  it("keeps sending past a slow reply, up to a cap, and always sends the stop", async () => {
+    const replies: Array<() => void> = [];
     const command = setup(
       vi.fn<CameraTransport["command"]>(
         () =>
           new Promise<Uint8Array>((resolve) => {
-            answer = () => resolve(new Uint8Array(0));
+            replies.push(() => resolve(new Uint8Array(0)));
           }),
       ),
     );
@@ -95,17 +100,17 @@ describe("useGimbal", () => {
     const gimbal = await mountComposable(() => useGimbal());
 
     gimbal.steer(40, 0);
-    await vi.advanceTimersByTimeAsync(GIMBAL_TICK_MS * 5);
-    expect(bodies(command)).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(GIMBAL_TICK_MS * 6);
+    expect(bodies(command)).toHaveLength(GIMBAL_MAX_IN_FLIGHT);
 
-    answer();
-    await vi.advanceTimersByTimeAsync(GIMBAL_TICK_MS);
-    expect(bodies(command)).toHaveLength(2);
+    // No reply has come back, and letting go must still stop the gimbal
     gimbal.release();
-    for (let i = 0; i < GIMBAL_STOP_FRAMES + 2; i++) {
-      answer();
-      await vi.advanceTimersByTimeAsync(GIMBAL_TICK_MS);
-    }
+    await vi.advanceTimersByTimeAsync(GIMBAL_TICK_MS * (GIMBAL_STOP_FRAMES + 2));
+    const stop = Array.from(encodeGimbalMove(0, 0));
+    expect(bodies(command).slice(GIMBAL_MAX_IN_FLIGHT)).toEqual(
+      Array(GIMBAL_STOP_FRAMES).fill(stop),
+    );
+    for (const reply of replies) reply();
   });
 
   it("lets go when the preview stops mid-gesture", async () => {
@@ -136,14 +141,16 @@ describe("useGimbal", () => {
     expect(sent).toContainEqual(Array.from(encodeGimbalAction(GIMBAL_ACTION.FLIP)));
   });
 
-  it("reports a failure once per gesture", async () => {
+  it("shrugs off a lost reply, and reports a second without any", async () => {
     setup(vi.fn<CameraTransport["command"]>(async () => Promise.reject("camera is not connected")));
     streaming();
     const gimbal = await mountComposable(() => useGimbal());
 
     gimbal.steer(50, 0);
     await vi.advanceTimersByTimeAsync(GIMBAL_TICK_MS * 3);
+    expect(gimbal.error.value).toBeNull();
 
+    await vi.advanceTimersByTimeAsync(GIMBAL_FAIL_MS);
     expect(gimbal.error.value).toBe("camera is not connected");
   });
 });
