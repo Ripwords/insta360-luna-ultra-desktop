@@ -51,6 +51,8 @@ function aim(event: PointerEvent) {
 
 function onDown(event: PointerEvent) {
   if (!ready.value) return;
+  // Otherwise the drag starts a text selection across the viewfinder
+  event.preventDefault();
   takeOver();
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   dragging.value = true;

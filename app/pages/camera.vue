@@ -143,7 +143,10 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
 
       <div v-else class="flex min-h-0 flex-1 flex-col gap-3">
         <!-- Viewfinder: the hero. Everything else floats over it. -->
-        <div class="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black" @wheel="onWheel">
+        <div
+          class="relative min-h-0 flex-1 select-none overflow-hidden rounded-2xl bg-black"
+          @wheel="onWheel"
+        >
           <LiveView class="absolute inset-0" />
 
           <!-- Starting / stopped state, centred over the black stage -->
