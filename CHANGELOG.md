@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.4.0...master
+
+[compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.4.0...master)
+
+### 🚀 Enhancements
+
+- **camera:** Pan, tilt, recenter and flip the gimbal ([8d0babb](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/8d0babb))
+- **camera:** Steer the gimbal with AirPods head tracking ([a800263](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/a800263))
+- **camera:** Steer the gimbal by dragging anywhere on the picture ([390c99d](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/390c99d))
+- **camera:** Gimbal control and AirPods head tracking ([#15](https://github.com/Ripwords/insta360-luna-ultra-desktop/pull/15))
+
+### 🩹 Fixes
+
+- **probes:** Sync the camera to the system timezone, not a hardcoded one ([8fde870](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/8fde870))
+- **camera:** Stop the gimbal drag from selecting text in the viewfinder ([c02d56b](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/c02d56b))
+- **luna:** Keep gimbal commands from stalling on a lost or crossed reply ([a1b2805](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/a1b2805))
+- **camera:** Keep steering the gimbal past a slow reply ([b1c91a9](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/b1c91a9))
+- **camera:** Scroll an open picker's list instead of zooming ([9be190a](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/9be190a))
+
+### 📖 Documentation
+
+- Describe AirPods head tracking ([ad762b5](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/ad762b5))
+- List gimbal control as shipped and record what the captures show ([5a68fd0](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/5a68fd0))
+
+### 🏡 Chore
+
+- **probes:** Measure preview audio, preview resolution and the gimbal ([48ec95e](https://github.com/Ripwords/insta360-luna-ultra-desktop/commit/48ec95e))
+- Merge #14 (probe-streaming) by ibraschwan ([#14](https://github.com/Ripwords/insta360-luna-ultra-desktop/issues/14))
+
+### ❤️ Contributors
+
+- JJ Teoh <teohjjteoh@gmail.com>
+- JJ <teohjjteoh@gmail.com>
+- İbrahim Çoban <ibrahim@b92e.wls.metu.edu.tr>
+
 ## v0.3.4...master
 
 [compare changes](https://github.com/Ripwords/insta360-luna-ultra-desktop/compare/v0.3.4...master)
