@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { defineComponent, h } from "vue";
 import { mountSuspended } from "@nuxt/test-utils/runtime";
+import { UApp } from "#components";
 import CameraPage from "~/pages/camera.vue";
 import { resetCameraTransport, setCameraTransport } from "~/utils/transport";
 import { makeFakeTransport } from "../helpers/fakeTransport";
@@ -10,7 +12,10 @@ const PAUSED = "Webcam mode is on, so the preview is paused";
 const mounted: { unmount(): void }[] = [];
 
 async function mountPage() {
-  const page = await mountSuspended(CameraPage);
+  // UApp provides the tooltip context the gimbal buttons need
+  const page = await mountSuspended(
+    defineComponent({ render: () => h(UApp, () => h(CameraPage)) }),
+  );
   mounted.push(page);
   return page;
 }

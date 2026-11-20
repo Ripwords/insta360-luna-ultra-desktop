@@ -45,6 +45,7 @@ const onKey = (event: KeyboardEvent) => event.key === "Escape" && emit("dismiss"
   <div
     class="absolute bottom-full left-1/2 z-30 mb-2 w-max min-w-full -translate-x-1/2 overflow-hidden rounded-xl bg-black/85 shadow-xl ring-1 ring-white/10 backdrop-blur-md"
     :class="busy ? 'pointer-events-none opacity-60' : ''"
+    @wheel.stop
   >
     <div
       ref="list"

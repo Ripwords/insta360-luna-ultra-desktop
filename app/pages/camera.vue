@@ -143,7 +143,10 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
 
       <div v-else class="flex min-h-0 flex-1 flex-col gap-3">
         <!-- Viewfinder: the hero. Everything else floats over it. -->
-        <div class="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black" @wheel="onWheel">
+        <div
+          class="relative min-h-0 flex-1 select-none overflow-hidden rounded-2xl bg-black"
+          @wheel="onWheel"
+        >
           <LiveView class="absolute inset-0" />
 
           <!-- Starting / stopped state, centred over the black stage -->
@@ -170,6 +173,9 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
               @click="start"
             />
           </div>
+
+          <!-- Drag anywhere on the picture to pan and tilt; controls above it win -->
+          <CameraGimbalStick />
 
           <!--
             Frame marks. A viewfinder shows you the bounds of what it is
@@ -241,6 +247,14 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             <CameraZoomDial />
           </div>
 
+          <!--
+            The gimbal's buttons mirror the zoom dial down the left edge. Its
+            steering is a drag on the picture itself (CameraGimbalStick).
+          -->
+          <div class="absolute inset-y-20 left-2 z-20 flex items-center">
+            <CameraGimbalRail />
+          </div>
+
           <!-- Errors sit below the readout rail, so neither ever moves -->
           <div v-if="topError" class="absolute inset-x-0 top-14 z-20 flex justify-center px-4">
             <span
@@ -251,9 +265,12 @@ const topError = computed(() => liveError.value ?? error.value ?? null);
             </span>
           </div>
 
-          <!-- Quick exposure bar + gear, along the bottom of the viewfinder -->
+          <!--
+            Quick exposure bar + gear, along the bottom of the viewfinder. Above
+            the side rails, so its pickers open over them rather than under.
+          -->
           <div
-            class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pr-12 pt-10"
+            class="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pr-12 pt-10"
           >
             <CameraProBar @open-settings="settingsOpen = true" />
           </div>

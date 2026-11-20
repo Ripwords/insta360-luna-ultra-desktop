@@ -48,6 +48,10 @@ const CODE_GET_PHOTOGRAPHY_OPTIONS: u16 = 10;
 const CODE_DELETE_FILES: u16 = 12;
 const CODE_GET_FILE_LIST: u16 = 13;
 const CODE_GET_CURRENT_CAPTURE_STATUS: u16 = 15;
+/// PHONE_COMMAND_GIMBAL_CONTROL. Not in the vendored schema, which has no
+/// gimbal at all; known from captures of the official app on a Luna Ultra.
+/// Moves, recenters or flips the gimbal; nothing destructive.
+const CODE_GIMBAL_CONTROL: u16 = 226;
 
 const CONTROL_PORT: u16 = 6666;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(1500);
@@ -183,8 +187,8 @@ fn build_file_command(seq: u8, code: u16, request_id: u16, body: &[u8]) -> Vec<u
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RawResponse {
-    /// Echoed command code; asserted in tests, carried for future status checks.
-    #[allow(dead_code)]
+    /// A status for a reply (the camera answers 200), or the notification
+    /// code for a notification.
     code: u16,
     request_id: u16,
     body: Vec<u8>,
@@ -403,13 +407,17 @@ impl Session {
         within_transfer_window(*self.last_transfer_activity.lock().unwrap(), Instant::now())
     }
 
-    async fn write(&self, packet: &[u8]) -> Result<(), String> {
+    /// Writes one packet, numbered only once it holds the writer: `build`
+    /// gets the next sequence number. Taking the number any earlier lets two
+    /// commands racing for the socket reach the camera out of sequence order.
+    async fn write_numbered(&self, build: impl FnOnce(u8) -> Vec<u8>) -> Result<(), String> {
         if self.is_poisoned() {
             return Err("camera connection lost".into());
         }
         let write = async {
             let mut writer = self.writer.lock().await;
-            writer.write_all(packet).await
+            let packet = build(self.next_seq());
+            writer.write_all(&packet).await
         };
         match tokio::time::timeout(WRITE_TIMEOUT, write).await {
             Ok(result) => result.map_err(|e| format!("camera write failed: {e}")),
@@ -422,13 +430,13 @@ impl Session {
 
     async fn send_packet(
         &self,
-        packet: Vec<u8>,
+        build: impl FnOnce(u8) -> Vec<u8>,
         request_id: u16,
         timeout: Duration,
     ) -> Result<RawResponse, String> {
         let (tx, rx) = oneshot::channel();
         self.pending.lock().unwrap().insert(request_id, tx);
-        if let Err(error) = self.write(&packet).await {
+        if let Err(error) = self.write_numbered(build).await {
             self.pending.lock().unwrap().remove(&request_id);
             return Err(error);
         }
@@ -455,22 +463,29 @@ impl Session {
         timeout: Duration,
     ) -> Result<RawResponse, String> {
         let request_id = self.next_request_id();
-        let packet = build_file_command(self.next_seq(), code, request_id, body);
-        self.send_packet(packet, request_id, timeout).await
+        self.send_packet(
+            |seq| build_file_command(seq, code, request_id, body),
+            request_id,
+            timeout,
+        )
+        .await
     }
 
-    /// Replays a captured command byte-for-byte (fixed seq and request id),
-    /// as the original app does during the info handshake.
+    /// Replays a captured command with a fixed request id, as the original
+    /// app does during the info handshake.
     async fn send_exact(
         &self,
-        seq: u8,
         code: u16,
         request_id: u16,
         body: &[u8],
         timeout: Duration,
     ) -> Result<RawResponse, String> {
-        let packet = build_file_command(seq, code, request_id, body);
-        self.send_packet(packet, request_id, timeout).await
+        self.send_packet(
+            |seq| build_file_command(seq, code, request_id, body),
+            request_id,
+            timeout,
+        )
+        .await
     }
 }
 
@@ -552,11 +567,19 @@ fn start_session(stream: TcpStream, first_seq: u8) -> Arc<Session> {
                     buffer.extend_from_slice(&chunk[..n]);
                     for frame in drain_frames(&mut buffer) {
                         match frame {
-                            Frame::File(response) => {
-                                if let Some(tx) =
-                                    reader_pending.lock().unwrap().remove(&response.request_id)
-                                {
-                                    let _ = tx.send(response);
+                            Frame::File(response) if answers_command(&response) => {
+                                let waiting =
+                                    reader_pending.lock().unwrap().remove(&response.request_id);
+                                match waiting {
+                                    Some(tx) => {
+                                        let _ = tx.send(response);
+                                    }
+                                    // Its command already timed out: late, not lost
+                                    None => log::debug!(
+                                        "unclaimed reply {} to request {}",
+                                        response.code,
+                                        response.request_id
+                                    ),
                                 }
                             }
                             Frame::Media { substream, data }
@@ -565,6 +588,8 @@ fn start_session(stream: TcpStream, first_seq: u8) -> Arc<Session> {
                                 *last_video.lock().unwrap() = Some(Instant::now());
                                 let _ = stream_tx.send(data);
                             }
+                            // Notifications (PTZ_STATE and friends) have no listener yet
+                            Frame::File(_) => {}
                             // Secondary preview and gyro substreams are ignored
                             Frame::Media { .. } => {}
                             // STREAM frames are keepalive echoes, never video
@@ -597,9 +622,7 @@ async fn open_session(
     let session = start_session(stream, 0x24);
 
     // STREAM hello authorizes the HTTP media index a moment later
-    session
-        .write(&build_stream_hello(session.next_seq()))
-        .await?;
+    session.write_numbered(build_stream_hello).await?;
 
     // Device info probes; tolerate individual failures like the original app
     let info_timeout = Duration::from_secs(4);
@@ -610,9 +633,8 @@ async fn open_session(
         (CODE_GET_OPTIONS, 3, large_options_body()),
     ];
     for (code, request_id, body) in probes {
-        let seq = session.next_seq();
         if let Ok(response) = session
-            .send_exact(seq, code, request_id, &body, info_timeout)
+            .send_exact(code, request_id, &body, info_timeout)
             .await
         {
             bodies.push(response.body);
@@ -640,14 +662,13 @@ async fn open_session(
                 break;
             };
             let transfer_active = session.is_transfer_active();
-            let hello = build_stream_hello(session.next_seq());
             let cmd_timeout = if transfer_active {
                 KEEPALIVE_COMMAND_TIMEOUT_BUSY
             } else {
                 KEEPALIVE_COMMAND_TIMEOUT
             };
             let tick = async {
-                session.write(&hello).await?;
+                session.write_numbered(build_stream_hello).await?;
                 if !video_recent(session.last_video(), Instant::now()) {
                     session
                         .send_command(CODE_GET_CURRENT_CAPTURE_STATUS, &[], cmd_timeout)
@@ -759,6 +780,28 @@ pub async fn luna_delete_files(
     Ok(())
 }
 
+/// Camera notifications are numbered from 0x2000 (8202, 8302 PTZ_STATE, ...)
+/// and carry request-id bytes like a reply; one whose bytes happened to match a
+/// waiting command would answer it with the wrong body. Replies carry a status.
+const FIRST_NOTIFICATION_CODE: u16 = 0x2000;
+
+fn answers_command(response: &RawResponse) -> bool {
+    response.code < FIRST_NOTIFICATION_CODE
+}
+
+/// Gimbal moves are resent every 40 ms and the camera answers them within
+/// 50 ms; one that waits longer is better given up than allowed to hold the
+/// next move back.
+const GIMBAL_REPLY_TIMEOUT: Duration = Duration::from_secs(1);
+
+fn command_timeout(code: u16) -> Duration {
+    if code == CODE_GIMBAL_CONTROL {
+        GIMBAL_REPLY_TIMEOUT
+    } else {
+        Duration::from_secs(10)
+    }
+}
+
 /// Commands the UI may send as raw protobuf. Deliberately excludes
 /// DELETE_FILES, which keeps its own batching command, and anything not
 /// listed here — the webview should not be able to reach arbitrary firmware
@@ -775,6 +818,7 @@ fn is_allowed_command(code: u16) -> bool {
             | CODE_GET_PHOTOGRAPHY_OPTIONS
             | CODE_GET_CURRENT_CAPTURE_STATUS
             | CODE_GET_FILE_LIST
+            | CODE_GIMBAL_CONTROL
     )
 }
 
@@ -794,7 +838,7 @@ pub async fn luna_command(
         .await
         .ok_or_else(|| "camera is not connected".to_string())?;
     let response = session
-        .send_command(code, &body, Duration::from_secs(10))
+        .send_command(code, &body, command_timeout(code))
         .await?;
     Ok(response.body)
 }
@@ -956,6 +1000,75 @@ mod tests {
         }
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_writes_reach_the_wire_in_sequence_order() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut received = Vec::new();
+            socket.read_to_end(&mut received).await.unwrap();
+            received
+        });
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let (_read_half, write_half) = stream.into_split();
+        let session = Arc::new(test_session(write_half));
+
+        let writers: Vec<_> = (0..200u16)
+            .map(|request_id| {
+                let session = Arc::clone(&session);
+                tokio::spawn(async move {
+                    session
+                        .write_numbered(|seq| {
+                            build_file_command(seq, CODE_GIMBAL_CONTROL, request_id, &[0u8; 32])
+                        })
+                        .await
+                        .unwrap();
+                })
+            })
+            .collect();
+        for writer in writers {
+            writer.await.unwrap();
+        }
+        drop(session);
+
+        let received = server.await.unwrap();
+        let mut seqs = Vec::new();
+        let mut at = 0;
+        while at < received.len() {
+            seqs.push(received[at + 7]);
+            let declared =
+                u32::from_le_bytes(received[at + 8..at + 12].try_into().unwrap()) as usize;
+            at += 12 + declared + 4;
+        }
+        assert_eq!(seqs.len(), 200);
+        for pair in seqs.windows(2) {
+            assert_eq!(pair[1], pair[0].wrapping_add(1), "out of order: {seqs:?}");
+        }
+    }
+
+    #[test]
+    fn notifications_never_answer_a_command() {
+        let frame = |code| RawResponse {
+            code,
+            request_id: 7,
+            body: Vec::new(),
+        };
+        assert!(answers_command(&frame(200)), "the camera's OK status");
+        assert!(answers_command(&frame(CODE_GET_OPTIONS)));
+        assert!(
+            !answers_command(&frame(8302)),
+            "PTZ_STATE during a gimbal move"
+        );
+        assert!(!answers_command(&frame(0x2000)));
+    }
+
+    #[test]
+    fn gimbal_moves_do_not_wait_long_for_a_reply() {
+        assert!(command_timeout(CODE_GIMBAL_CONTROL) <= Duration::from_secs(1));
+        assert_eq!(command_timeout(CODE_GET_OPTIONS), Duration::from_secs(10));
+    }
+
     #[tokio::test]
     async fn write_times_out_on_a_wedged_socket() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -970,14 +1083,14 @@ mod tests {
         let payload = vec![0u8; 64 * 1024 * 1024];
         let result = tokio::time::timeout(
             WRITE_TIMEOUT + Duration::from_secs(1),
-            session.write(&payload),
+            session.write_numbered(|_| payload.clone()),
         )
         .await
         .expect("write must return within the write timeout");
         assert!(result.unwrap_err().contains("timed out"));
 
         let started = Instant::now();
-        let second = session.write(b"x").await;
+        let second = session.write_numbered(|_| b"x".to_vec()).await;
         assert!(second.is_err());
         assert!(started.elapsed() < Duration::from_millis(500));
     }
@@ -1066,6 +1179,7 @@ mod tests {
             CODE_SET_PHOTOGRAPHY_OPTIONS,
             CODE_GET_PHOTOGRAPHY_OPTIONS,
             CODE_GET_CURRENT_CAPTURE_STATUS,
+            CODE_GIMBAL_CONTROL,
         ] {
             assert!(is_allowed_command(code), "code {code} should be allowed");
         }

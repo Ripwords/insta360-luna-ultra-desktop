@@ -13,5 +13,9 @@
        gates behind a one-time Downloads-folder prompt. -->
   <key>NSDownloadsFolderUsageDescription</key>
   <string>Luna Ultra Desktop saves the photos and videos you download from your camera into your Downloads folder.</string>
+  <!-- Head tracking reads AirPods motion through CMHeadphoneMotionManager,
+       which macOS gates behind the Motion & Fitness prompt. -->
+  <key>NSMotionUsageDescription</key>
+  <string>Luna Ultra Desktop reads your AirPods' head movement to steer the camera's gimbal when you turn on head tracking.</string>
 </dict>
 </plist>
